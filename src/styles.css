@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Instrument+Sans:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --surface: #fffaf4;
+  --surface-strong: #fffdf8;
+  --ink: #1f2a21;
+  --muted: #5f6f61;
+  --line: #d9c6af;
+  --brand: #1f7a52;
+  --brand-soft: #dff1e7;
+  --accent: #d96c3b;
+  --accent-soft: #ffe5d8;
+  --shadow: 0 24px 60px rgba(74, 53, 36, 0.12);
+  font-family: 'Instrument Sans', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(217, 108, 59, 0.16), transparent 30%),
+    radial-gradient(circle at top right, rgba(31, 122, 82, 0.16), transparent 26%),
+    linear-gradient(180deg, #f8f1e7 0%, #f4ecdf 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@theme {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Instrument Sans", sans-serif;
+}

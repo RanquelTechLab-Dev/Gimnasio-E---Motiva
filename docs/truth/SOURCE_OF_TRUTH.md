@@ -58,4 +58,8 @@ Regla: todo schema nace desde `supabase/migrations`. Ninguna tabla se crea manua
 
 ## Estado actual
 
-RAN-17 esta en ejecucion. Este bloque solo crea base documental y elimina el archivo accidental `1`.
+RAN-18 esta en ejecucion.
+
+- Frontend base creado con React, Vite, TypeScript y Tailwind.
+- Router base y layouts iniciales creados.
+- Supabase sigue pendiente.

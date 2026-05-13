@@ -8,3 +8,13 @@
 - Supabase nuevo queda pendiente.
 - Se crea base documental inicial.
 - Se elimina el archivo accidental `1` si corresponde.
+
+## 2026-05-13 - RANV2-02 iniciado
+
+- Se inicializa frontend base con React, Vite y TypeScript.
+- Se agrega Tailwind con plugin de Vite.
+- Se agrega router base.
+- Se crean layouts admin/alumno/publico.
+- Se crean pantallas placeholder.
+- Se agrega boton flotante WhatsApp.
+- Se agrega CI frontend para build y lint.

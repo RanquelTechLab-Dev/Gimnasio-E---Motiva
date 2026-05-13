@@ -2,13 +2,9 @@
 
 ## Actual
 
-Terminar RAN-17 / RANV2-01 con PR de base documental.
+Cerrar RAN-18 / RANV2-02 con PR de setup frontend.
 
 ## Siguiente
-
-RAN-18 / RANV2-02: setup React/Vite/TypeScript/Tailwind.
-
-## Luego
 
 RAN-19 / RANV2-03: Supabase schema inicial + RLS versionado.
 

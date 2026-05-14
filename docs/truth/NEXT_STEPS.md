@@ -2,14 +2,18 @@
 
 ## Actual
 
-Revisar PR de RAN-20 / RANV2-04 con fix de login UX/env.
+Revisar PR de RAN-21 / RANV2-05 con panel admin operativo.
 
 ## Siguiente
 
-RAN-20 / RANV2-04: mergear el fix de UX/env si la prueba local pasa, validar login/admin/student/logout y cerrar Linear.
+RAN-21 / RANV2-05: mergear PR, ejecutar `db push --dry-run` nuevamente, aplicar `db push` real solo si coincide, desplegar Edge Function `create-student` y probar operaciones reales.
 
 ## Pendiente
 
-- Validar login real con el admin creado por Walter.
 - No guardar secrets en el repo.
-- RANV2-05 queda para panel admin: alumnos, planes y pagos manuales.
+- Deploy de Edge Function `create-student`.
+- Crear alumno real desde admin.
+- Asignar membresia real.
+- Registrar, aprobar y rechazar pago manual real.
+- Cerrar RAN-21 despues de validar remoto y operaciones.
+- RANV2-06 queda pendiente para el siguiente issue aprobado por Linear.

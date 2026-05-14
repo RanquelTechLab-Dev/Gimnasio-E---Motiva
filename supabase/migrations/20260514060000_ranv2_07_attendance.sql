@@ -12,6 +12,41 @@ create index if not exists attendance_recorded_at_idx on public.attendance (reco
 create index if not exists attendance_status_idx on public.attendance (status);
 create index if not exists attendance_booking_status_idx on public.attendance (booking_id, status);
 
+create or replace function private.refresh_profile_attendance_markers(p_student_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, private
+as $$
+declare
+  v_last_attendance_at timestamptz;
+  v_last_payment_at timestamptz;
+  v_last_real_activity_at timestamptz;
+begin
+  select max(att.recorded_at) into v_last_attendance_at
+  from public.attendance att
+  where att.student_id = p_student_id
+    and att.status = 'present'::public.attendance_status;
+
+  select greatest(
+    max(pay.approved_at),
+    (select p.last_payment_at from public.profiles p where p.id = p_student_id)
+  ) into v_last_payment_at
+  from public.payments pay
+  where pay.student_id = p_student_id
+    and pay.status = 'approved'::public.payment_status;
+
+  v_last_real_activity_at := greatest(v_last_attendance_at, v_last_payment_at);
+
+  update public.profiles
+  set
+    last_attendance_at = v_last_attendance_at,
+    last_real_activity_at = v_last_real_activity_at,
+    updated_at = now()
+  where id = p_student_id;
+end;
+$$;
+
 create or replace function public.list_attendance_sessions(
   from_date date,
   to_date date
@@ -114,6 +149,7 @@ declare
   v_attendance public.attendance%rowtype;
   v_previous public.attendance%rowtype;
   v_action text;
+  v_previous_booking_status public.booking_status;
   v_charged_as_attended boolean := false;
 begin
   if v_actor is null or not private.is_admin() then
@@ -152,6 +188,8 @@ begin
   if v_booking.status = 'cancelled' and status <> 'justified' then
     raise exception 'Una reserva cancelada solo puede registrarse como justificada.';
   end if;
+
+  v_previous_booking_status := v_booking.status;
 
   select * into v_previous
   from public.attendance att
@@ -222,10 +260,21 @@ begin
   else
     -- Justified is an administrative attendance note only. Cancellation and
     -- credit return stay exclusively in RANV2-06 cancel_booking.
-    select * into v_booking
-    from public.bookings b
-    where b.id = mark_attendance.booking_id;
+    if v_booking.status in ('attended'::public.booking_status, 'no_show'::public.booking_status) then
+      update public.bookings
+      set
+        status = 'booked',
+        updated_at = now()
+      where id = v_booking.id
+      returning * into v_booking;
+    else
+      select * into v_booking
+      from public.bookings b
+      where b.id = mark_attendance.booking_id;
+    end if;
   end if;
+
+  perform private.refresh_profile_attendance_markers(v_booking.student_id);
 
   insert into public.audit_logs (actor_id, entity_type, entity_id, action, metadata)
   values (
@@ -239,6 +288,7 @@ begin
       'session_id', v_booking.session_id,
       'status', v_attendance.status,
       'previous_status', v_previous.status,
+      'previous_booking_status', v_previous_booking_status,
       'booking_status', v_booking.status,
       'charged_as_attended', v_attendance.charged_as_attended,
       'notes', nullif(btrim(coalesce(notes, '')), '')
@@ -258,6 +308,7 @@ $$;
 
 revoke all on function public.list_attendance_sessions(date, date) from public, anon;
 revoke all on function public.mark_attendance(uuid, public.attendance_status, text) from public, anon;
+revoke all on function private.refresh_profile_attendance_markers(uuid) from public, anon;
 
 grant execute on function public.list_attendance_sessions(date, date) to authenticated;
 grant execute on function public.mark_attendance(uuid, public.attendance_status, text) to authenticated;

@@ -55,3 +55,12 @@
 - `/` redirige segun sesion y rol.
 - Se eliminan accesos publicos a panel alumno/admin.
 - Se remueven textos tecnicos visibles de RAN/placeholder en la app.
+
+## 2026-05-14 - RANV2-05 panel admin operativo
+
+- Se agrega panel admin operativo para alumnos, planes, membresias y pagos manuales.
+- Se crean RPCs transaccionales y auditadas para asignar membresias, registrar pagos, aprobar pagos y rechazar pagos.
+- Se versiona Edge Function local `create-student` para alta segura de alumnos con Auth.
+- Se documenta que la migracion RANV2-05 queda pendiente de `db push` real.
+- Se documenta que la Edge Function queda pendiente de deploy.
+- No se agregan pagos online, reservas reales, Mailjet, Google Drive, Cloudflare ni secrets.

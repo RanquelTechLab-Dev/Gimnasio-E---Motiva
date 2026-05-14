@@ -16,7 +16,7 @@ export function AdminLayout() {
   return (
     <LayoutShell
       navItems={navItems}
-      pendingLabel="Acceso admin protegido. La gestion operativa se incorpora en los proximos bloques."
+      pendingLabel="Acceso admin protegido. Alumnos, planes y pagos manuales operan desde este panel."
       section="Panel administracion"
       subtitle="Area reservada para perfiles con rol admin activo en Supabase."
       title="Panel administracion"

@@ -92,6 +92,16 @@ export function StudentFilesPage() {
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     {file.mime_type ?? 'Sin tipo'} · {formatSize(file.size_bytes)}
                   </p>
+                  {file.description ? (
+                    <p className="mt-2 text-sm text-[var(--muted)]">
+                      {file.description}
+                    </p>
+                  ) : null}
+                  {!file.drive_url ? (
+                    <p className="mt-2 text-xs font-semibold text-[var(--brand)]">
+                      Documento registrado por administracion
+                    </p>
+                  ) : null}
                 </div>
                 {file.drive_url ? (
                   <a

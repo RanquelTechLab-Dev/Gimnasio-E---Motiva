@@ -129,8 +129,10 @@ export type StudentFile = {
   file_id: string
   kind: 'training_plan' | 'observation' | 'attachment'
   title: string
+  description: string | null
   drive_url: string | null
   mime_type: string | null
   size_bytes: number | null
+  visible_to_student: boolean
   created_at: string
 }

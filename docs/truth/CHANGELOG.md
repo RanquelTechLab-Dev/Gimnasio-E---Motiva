@@ -119,3 +119,13 @@
 - `/app/bookings`, `/app/payments`, `/app/attendance` y `/app/files` muestran datos propios del alumno.
 - Archivos/Google Drive real quedan fuera de RANV2-08.
 - No se ejecuta `db push` real en este bloque.
+
+## 2026-05-14 - RANV2-09 plan, observaciones y archivos
+
+- Se agrega migracion local para extender `training_notes` y `files`.
+- Admin puede crear/editar/archivar plan de entrenamiento, observaciones y seguimiento operativo.
+- Admin puede registrar metadata de documentos sin subir archivo real.
+- Se agrega visibilidad controlada para alumno en notas y archivos.
+- `/app/files` muestra documentos propios visibles y planes de entrenamiento visibles.
+- Google Drive real, subida binaria, pagos online, Mailjet, Cloudflare y RANV2-10 quedan fuera.
+- No se ejecuta `db push` real en este bloque.

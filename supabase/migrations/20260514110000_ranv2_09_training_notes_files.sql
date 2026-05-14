@@ -100,7 +100,7 @@ $$;
 revoke all on function private.ensure_student_exists(uuid) from public, anon;
 grant execute on function private.ensure_student_exists(uuid) to authenticated;
 
-create or replace function public.admin_list_student_training_notes(student_id uuid)
+create or replace function public.admin_list_student_training_notes(p_student_id uuid)
 returns table (
   note_id uuid,
   student_id uuid,
@@ -124,7 +124,7 @@ declare
   v_actor uuid;
 begin
   v_actor := private.ensure_admin();
-  perform private.ensure_student_exists(admin_list_student_training_notes.student_id);
+  perform private.ensure_student_exists(p_student_id);
 
   return query
   select
@@ -144,7 +144,7 @@ begin
   from public.training_notes tn
   left join public.profiles cb on cb.id = tn.created_by
   left join public.profiles ub on ub.id = tn.updated_by
-  where tn.student_id = admin_list_student_training_notes.student_id
+  where tn.student_id = p_student_id
   order by
     case when tn.archived_at is null then 0 else 1 end,
     tn.updated_at desc,
@@ -302,7 +302,7 @@ begin
 end;
 $$;
 
-create or replace function public.admin_list_student_files(student_id uuid)
+create or replace function public.admin_list_student_files(p_student_id uuid)
 returns table (
   file_id uuid,
   student_id uuid,
@@ -329,7 +329,7 @@ declare
   v_actor uuid;
 begin
   v_actor := private.ensure_admin();
-  perform private.ensure_student_exists(admin_list_student_files.student_id);
+  perform private.ensure_student_exists(p_student_id);
 
   return query
   select
@@ -352,7 +352,7 @@ begin
   from public.files f
   left join public.profiles cb on cb.id = f.uploaded_by
   left join public.profiles ub on ub.id = f.updated_by
-  where f.student_id = admin_list_student_files.student_id
+  where f.student_id = p_student_id
   order by
     case when f.archived_at is null then 0 else 1 end,
     f.updated_at desc,

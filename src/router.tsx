@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router'
 import { PublicLayout } from './layouts/PublicLayout'
 import { StudentLayout } from './layouts/StudentLayout'
 import { AdminLayout } from './layouts/AdminLayout'
+import { ProtectedRoute } from './auth/ProtectedRoute'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage'
@@ -29,28 +30,38 @@ export const router = createBrowserRouter([
   },
   {
     path: '/app',
-    element: <StudentLayout />,
+    element: <ProtectedRoute />,
     children: [
-      { index: true, element: <StudentDashboardPage /> },
-      { path: 'calendar', element: <StudentCalendarPage /> },
-      { path: 'my-bookings', element: <StudentBookingsPage /> },
-      { path: 'my-plan', element: <StudentPlanPage /> },
-      { path: 'profile', element: <StudentProfilePage /> },
+      {
+        element: <StudentLayout />,
+        children: [
+          { index: true, element: <StudentDashboardPage /> },
+          { path: 'calendar', element: <StudentCalendarPage /> },
+          { path: 'my-bookings', element: <StudentBookingsPage /> },
+          { path: 'my-plan', element: <StudentPlanPage /> },
+          { path: 'profile', element: <StudentProfilePage /> },
+        ],
+      },
     ],
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: <ProtectedRoute requireAdmin />,
     children: [
-      { index: true, element: <AdminDashboardPage /> },
-      { path: 'students', element: <AdminStudentsPage /> },
-      { path: 'payments', element: <AdminPaymentsPage /> },
-      { path: 'calendar', element: <AdminCalendarPage /> },
-      { path: 'attendance', element: <AdminAttendancePage /> },
-      { path: 'plans', element: <AdminPlansPage /> },
-      { path: 'emails', element: <AdminEmailsPage /> },
-      { path: 'storage', element: <AdminStoragePage /> },
-      { path: 'settings', element: <AdminSettingsPage /> },
+      {
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: 'students', element: <AdminStudentsPage /> },
+          { path: 'payments', element: <AdminPaymentsPage /> },
+          { path: 'calendar', element: <AdminCalendarPage /> },
+          { path: 'attendance', element: <AdminAttendancePage /> },
+          { path: 'plans', element: <AdminPlansPage /> },
+          { path: 'emails', element: <AdminEmailsPage /> },
+          { path: 'storage', element: <AdminStoragePage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+        ],
+      },
     ],
   },
 ])

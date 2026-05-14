@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router'
+import { SessionBadge } from './SessionBadge'
 import { WhatsAppFloatingButton } from './WhatsAppFloatingButton'
 
 type NavItem = {
@@ -74,7 +75,10 @@ export function LayoutShell({
                 {title}
               </h2>
             </div>
-            <p className="max-w-xl text-sm text-[var(--muted)]">{subtitle}</p>
+            <div className="flex w-full max-w-xl flex-col gap-3">
+              <p className="text-sm text-[var(--muted)]">{subtitle}</p>
+              <SessionBadge />
+            </div>
           </header>
 
           <Outlet />

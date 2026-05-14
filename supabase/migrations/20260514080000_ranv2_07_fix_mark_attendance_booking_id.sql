@@ -1,9 +1,9 @@
 -- RANV2-07: fix ambiguous booking_id references in mark_attendance.
 
 create or replace function public.mark_attendance(
-  p_booking_id uuid,
-  p_status public.attendance_status,
-  p_notes text default null
+  booking_id uuid,
+  status public.attendance_status,
+  notes text default null
 )
 returns jsonb
 language plpgsql
@@ -11,6 +11,9 @@ security definer
 set search_path = public, private
 as $$
 declare
+  v_input_booking_id uuid := $1;
+  v_input_status public.attendance_status := $2;
+  v_input_notes text := $3;
   v_actor uuid := auth.uid();
   v_booking public.bookings%rowtype;
   v_session public.class_sessions%rowtype;
@@ -25,13 +28,13 @@ begin
     raise exception 'Solo un admin activo puede marcar asistencia.';
   end if;
 
-  if p_status is null then
+  if v_input_status is null then
     raise exception 'El estado de asistencia es obligatorio.';
   end if;
 
   select b.* into v_booking
   from public.bookings b
-  where b.id = p_booking_id
+  where b.id = v_input_booking_id
   for update;
 
   if not found then
@@ -55,7 +58,7 @@ begin
   end if;
 
   if v_booking.status = 'cancelled'::public.booking_status
-    and p_status <> 'justified'::public.attendance_status then
+    and v_input_status <> 'justified'::public.attendance_status then
     raise exception 'Una reserva cancelada solo puede registrarse como justificada.';
   end if;
 
@@ -68,7 +71,7 @@ begin
 
   v_action := case when found then 'attendance.updated' else 'attendance.marked' end;
   v_charged_as_attended := coalesce(v_booking.charged_as_attended, false)
-    or (p_status = 'absent'::public.attendance_status and v_activity.requires_24h_cancel);
+    or (v_input_status = 'absent'::public.attendance_status and v_activity.requires_24h_cancel);
 
   insert into public.attendance (
     booking_id,
@@ -86,10 +89,10 @@ begin
     v_booking.id,
     v_booking.student_id,
     v_booking.session_id,
-    p_status,
+    v_input_status,
     v_actor,
     v_session.ends_at,
-    nullif(btrim(coalesce(p_notes, '')), ''),
+    nullif(btrim(coalesce(v_input_notes, '')), ''),
     v_charged_as_attended,
     'admin',
     now()
@@ -105,14 +108,14 @@ begin
     updated_at = now()
   returning * into v_attendance;
 
-  if p_status = 'present'::public.attendance_status then
+  if v_input_status = 'present'::public.attendance_status then
     update public.bookings b
     set
       status = 'attended'::public.booking_status,
       updated_at = now()
     where b.id = v_booking.id
     returning b.* into v_booking;
-  elsif p_status = 'absent'::public.attendance_status then
+  elsif v_input_status = 'absent'::public.attendance_status then
     update public.bookings b
     set
       status = 'no_show'::public.booking_status,
@@ -133,7 +136,7 @@ begin
     else
       select b.* into v_booking
       from public.bookings b
-      where b.id = p_booking_id;
+      where b.id = v_input_booking_id;
     end if;
   end if;
 
@@ -159,7 +162,7 @@ begin
       'processed_at', now(),
       'recorded_at', v_session.ends_at,
       'source', 'admin',
-      'notes', nullif(btrim(coalesce(p_notes, '')), '')
+      'notes', nullif(btrim(coalesce(v_input_notes, '')), '')
     )
   );
 

@@ -155,11 +155,11 @@ export function AppCalendarPage() {
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                  {session.requires_24h_cancel ? (
-                    <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[var(--accent)]">
-                      Cancelacion 24h
-                    </span>
-                  ) : null}
+                  <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[var(--accent)]">
+                    {session.requires_24h_cancel
+                      ? 'Cancelacion 24h'
+                      : 'Cancelacion 12h'}
+                  </span>
                   {session.own_booking_id ? (
                     <span className="rounded-full bg-[var(--brand-soft)] px-3 py-1 text-[var(--brand)]">
                       Ya reservada

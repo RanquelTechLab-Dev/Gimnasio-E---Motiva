@@ -100,3 +100,13 @@
 - La asistencia automatica usa `class_sessions.ends_at` como fecha real de asistencia; el procesamiento posterior queda en metadata de auditoria.
 - La automatizacion no toca creditos, pagos, Mailjet, Drive, Cloudflare ni RAN-24.
 - No se ejecuta `db push` real en este bloque.
+
+## 2026-05-14 - RANV2-06B ventanas de cancelacion
+
+- Se agrega migracion local para ajustar `cancel_booking`.
+- Clases comunes: cancelacion permitida hasta 12 horas antes del inicio.
+- Personalizado 1:1: cancelacion permitida hasta 24 horas antes del inicio.
+- Cancelar a tiempo devuelve credito una sola vez.
+- Si el alumno intenta cancelar fuera de ventana, la reserva queda activa y no se devuelve credito.
+- Se actualiza `list_my_bookings` para mostrar bloqueo 12h/24h.
+- No se ejecuta `db push` real en este bloque.

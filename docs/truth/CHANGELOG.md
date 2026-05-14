@@ -73,3 +73,12 @@
 - Se versiona migracion para persistir la fecha elegida en `payments.paid_at`.
 - Google Drive real queda fuera de RANV2-05 y pendiente para RANV2-09/RANV2-11.
 - Se corrige la seleccion de alumno para que la ficha y formularios no queden activos sobre un alumno oculto por el buscador.
+
+## 2026-05-14 - RANV2-06 calendario, clases y reservas
+
+- Se agrega migracion local para calendario, clases y reservas.
+- Se agregan RPCs transaccionales para crear, editar y cancelar clases.
+- Se agregan RPCs para reservar y cancelar reservas con reglas por plan, membresia, cupo y creditos.
+- Se implementa regla 24h para actividades personalizadas con `requires_24h_cancel`.
+- Se reemplazan placeholders de `/admin/calendar`, `/app/calendar` y `/app/my-bookings` por UI operativa.
+- No se ejecuta `db push` real en este bloque.

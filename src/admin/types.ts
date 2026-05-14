@@ -108,3 +108,40 @@ export type UpdatePlanInput = {
   price: number
   active: boolean
 }
+
+export type CalendarSession = {
+  session_id: string
+  activity_id: string
+  activity_name: string
+  activity_slug: string
+  requires_24h_cancel: boolean
+  title: string
+  starts_at: string
+  ends_at: string
+  capacity: number
+  trainer_name: string | null
+  notes: string | null
+  active: boolean
+  cancelled_at: string | null
+  reserved_count: number
+  spots_left: number
+  own_booking_id: string | null
+  own_booking_status: 'booked' | 'cancelled' | 'attended' | 'no_show' | null
+  can_book: boolean
+  block_reason: string | null
+}
+
+export type ClassSessionInput = {
+  activity_id: string
+  title: string
+  starts_at: string
+  ends_at: string
+  capacity: number
+  coach_name: string
+  notes: string
+}
+
+export type UpdateClassSessionInput = ClassSessionInput & {
+  session_id: string
+  active: boolean
+}

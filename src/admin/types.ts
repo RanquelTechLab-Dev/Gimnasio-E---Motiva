@@ -53,6 +53,7 @@ export type Membership = {
 
 export type PaymentMethod = 'cash' | 'transfer'
 export type PaymentStatus = 'pending' | 'approved' | 'rejected'
+export type AttendanceStatus = 'present' | 'absent' | 'justified'
 
 export type Payment = {
   id: string
@@ -144,4 +145,32 @@ export type ClassSessionInput = {
 export type UpdateClassSessionInput = ClassSessionInput & {
   session_id: string
   active: boolean
+}
+
+export type AttendanceSessionRow = {
+  session_id: string
+  activity_id: string
+  activity_name: string
+  requires_24h_cancel: boolean
+  title: string
+  starts_at: string
+  ends_at: string
+  capacity: number
+  session_active: boolean
+  session_cancelled_at: string | null
+  booking_id: string
+  student_id: string
+  student_first_name: string
+  student_last_name: string
+  student_email: string
+  student_phone: string | null
+  booking_status: 'booked' | 'cancelled' | 'attended' | 'no_show'
+  booked_at: string
+  booking_charged_as_attended: boolean
+  attendance_id: string | null
+  attendance_status: AttendanceStatus | null
+  attendance_recorded_at: string | null
+  attendance_recorded_by: string | null
+  attendance_notes: string | null
+  attendance_charged_as_attended: boolean | null
 }

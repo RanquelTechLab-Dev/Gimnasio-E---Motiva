@@ -30,7 +30,7 @@ No es fuente activa. No se copian migraciones, ramas ni codigo viejo sin auditor
 
 Proyecto: E-Motiva App Gimnasio v2
 
-Issue actual: RAN-22 - RANV2-06 - Calendario, clases y reservas.
+Issue actual: RAN-23 - RANV2-07 - Asistencia y control de cupos.
 
 ## Supabase
 
@@ -50,7 +50,8 @@ Estado actual:
 - Seeds base de actividades y planes aplicados.
 - Auth frontend real validado.
 - Panel admin operativo para alumnos, planes, membresias y pagos manuales cerrado en RANV2-05.
-- Calendario, clases y reservas en ejecucion para RANV2-06.
+- Calendario, clases y reservas cerrado en RANV2-06.
+- Asistencia y control de cupos en ejecucion para RANV2-07.
 
 ## Stack previsto
 
@@ -72,7 +73,7 @@ Estado actual:
 
 ## Estado actual
 
-RAN-22 esta en ejecucion.
+RAN-23 esta en ejecucion.
 
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
@@ -85,4 +86,5 @@ RAN-22 esta en ejecucion.
 - Login admin, `/admin`, `/app`, logout y guards sin sesion validados.
 - RANV2-05 agrego panel operativo para alumnos, planes, membresias y pagos manuales.
 - Edge Function `create-student` fue desplegada.
-- RANV2-06 agrega calendario, clases y reservas con cupos, reglas por plan/membresia/creditos y cancelacion 24h para personalizado 1:1.
+- RANV2-06 agrego calendario, clases y reservas con cupos, reglas por plan/membresia/creditos y cancelacion 24h para personalizado 1:1.
+- RANV2-07 agrega panel admin de asistencia sobre reservas existentes, con auditoria y actualizacion de actividad real solo para asistencia `present`.

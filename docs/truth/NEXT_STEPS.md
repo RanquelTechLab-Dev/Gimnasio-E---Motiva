@@ -2,21 +2,17 @@
 
 ## Actual
 
-RAN-25 / RANV2-09: plan de entrenamiento, observaciones y archivos.
+RAN-30 / RANV2-14: Cloudflare deploy preview para demo.
 
 ## Siguiente
 
-RAN-25 / RANV2-09: revisar PR, aplicar migracion con `db push` real en bloque posterior y probar admin/alumno reales.
+Crear proyecto Cloudflare Pages conectado al repo, cargar variables publicas y validar URL de demo.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Revisar PR RANV2-09.
-- Ejecutar `db push --dry-run` y luego `db push` real solo en bloque posterior aprobado.
-- Probar admin `/admin/students` con ficha de alumno.
-- Crear/editar plan de entrenamiento y observaciones.
-- Crear/editar metadata de documento.
-- Probar `/app/files` con alumno real y visibilidad propia.
-- Verificar audit logs `training_note.*` y `file_metadata.*`.
-- Google Drive real y subida binaria quedan fuera.
-- Pagos online, Mailjet, Cloudflare y deploy quedan fuera de RANV2-09.
+- Configurar Cloudflare Pages con build `npm run build` y output `dist`.
+- Cargar `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_WHATSAPP_NUMBER`.
+- Validar URL base, `/login`, `/admin` y `/app`.
+- No cargar `service_role`, DB password, Supabase JWT secret ni secrets de integraciones.
+- Google Drive real, pagos online, Mailjet y WhatsApp API quedan fuera de RANV2-14.

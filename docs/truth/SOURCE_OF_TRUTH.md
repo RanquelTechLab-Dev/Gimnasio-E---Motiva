@@ -30,7 +30,7 @@ No es fuente activa. No se copian migraciones, ramas ni codigo viejo sin auditor
 
 Proyecto: E-Motiva App Gimnasio v2
 
-Issue actual: RAN-25 - RANV2-09 - Plan de entrenamiento, observaciones y archivos.
+Issue actual: RAN-30 - RANV2-14 - Cloudflare deploy.
 
 ## Supabase
 
@@ -54,7 +54,8 @@ Estado actual:
 - Asistencia y control de cupos cerrado funcionalmente en RANV2-07.
 - Ventanas de cancelacion 12h/24h cerrado en RANV2-06B.
 - Perfil alumno y autogestion cerrado en RANV2-08.
-- Plan de entrenamiento, observaciones y metadata de archivos en ejecucion para RANV2-09.
+- Plan de entrenamiento, observaciones y metadata de archivos cerrado funcionalmente en RANV2-09.
+- Cloudflare Pages deploy preview en preparacion para RANV2-14.
 
 ## Stack previsto
 
@@ -76,7 +77,7 @@ Estado actual:
 
 ## Estado actual
 
-RAN-25 esta en ejecucion.
+RAN-30 esta en ejecucion.
 
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
@@ -94,3 +95,4 @@ RAN-25 esta en ejecucion.
 - RANV2-06B ajusta cancelaciones: clases comunes hasta 12 horas antes y personalizado 1:1 hasta 24 horas antes.
 - RANV2-08 habilita dashboard y autogestion basica para alumno sin acceso admin.
 - RANV2-09 agrega gestion admin de plan de entrenamiento, observaciones y metadata de archivos, con lectura segura para alumno.
+- RANV2-14 prepara deploy Cloudflare Pages con fallback SPA para rutas directas.

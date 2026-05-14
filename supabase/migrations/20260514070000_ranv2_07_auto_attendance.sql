@@ -108,7 +108,7 @@ begin
       v_row.session_id,
       'present'::public.attendance_status,
       v_actor,
-      now(),
+      v_row.ends_at,
       'Asistencia automatica por reserva no cancelada.',
       coalesce(v_row.charged_as_attended, false),
       'auto',
@@ -139,6 +139,10 @@ begin
         'previous_booking_status', v_row.booking_status,
         'booking_status', 'attended',
         'charged_as_attended', v_attendance.charged_as_attended,
+        'class_started_at', v_row.starts_at,
+        'class_ended_at', v_row.ends_at,
+        'processed_at', now(),
+        'recorded_at', v_row.ends_at,
         'source', 'auto'
       )
     );

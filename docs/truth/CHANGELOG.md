@@ -97,5 +97,6 @@
 - Se ajusta el criterio funcional: Carolina no toma asistencia manual.
 - Se agrega migracion local para finalizar automaticamente reservas `booked` de clases ya terminadas y no canceladas como `present`.
 - `/admin/attendance` pasa a revisar asistencia automatica y corregir casos puntuales.
+- La asistencia automatica usa `class_sessions.ends_at` como fecha real de asistencia; el procesamiento posterior queda en metadata de auditoria.
 - La automatizacion no toca creditos, pagos, Mailjet, Drive, Cloudflare ni RAN-24.
 - No se ejecuta `db push` real en este bloque.

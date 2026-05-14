@@ -63,6 +63,12 @@ La cancelacion real de reservas pertenece a RANV2-06 mediante `cancel_booking`.
 - Solo finaliza reservas `booked` de clases ya terminadas y no canceladas.
 - No crea asistencia para reservas canceladas.
 - No toca creditos ni `memberships.remaining_credits`.
+- Guarda `attendance.recorded_at` con la hora real de finalizacion de la clase
+  (`class_sessions.ends_at`), no con la hora de procesamiento.
+- `attendance.updated_at` y `audit_logs.metadata.processed_at` reflejan cuando se
+  proceso la automatizacion.
+- `profiles.last_attendance_at` y `profiles.last_real_activity_at` quedan basados
+  en la hora real de asistencia, incluso si una clase historica se procesa despues.
 - Inserta auditoria `attendance.auto_marked`.
 
 ## RPCs

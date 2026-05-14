@@ -27,3 +27,4 @@
 - Se inicializa estructura local de Supabase sin schema ni migraciones.
 - No se ejecuta `db push`.
 - No se crean tablas ni policies todavia.
+- Se alinea Supabase Auth local redirect con Vite dev server en puerto 5173.

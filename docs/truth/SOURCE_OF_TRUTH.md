@@ -30,13 +30,24 @@ No es fuente activa. No se copian migraciones, ramas ni codigo viejo sin auditor
 
 Proyecto: E-Motiva App Gimnasio v2
 
-Issue actual: RAN-17 - RANV2-01 - Base documental y alcance funcional.
+Issue actual: RAN-19 - RANV2-03 - Supabase schema inicial + RLS versionado.
 
 ## Supabase
 
-Supabase nuevo pendiente de creacion.
+Proyecto activo: `emotiva-gym-app-v2`
+
+- Project ref: `kmfxgeqxulwaauracyzs`
+- Organizacion: `RanquelTechLab-Dev's Org`
+- Region: `sa-east-1` (South America / Sao Paulo)
 
 Regla: todo schema nace desde `supabase/migrations`. Ninguna tabla se crea manualmente en Dashboard. Ningun `db push` se ejecuta sin `db push --dry-run` previo.
+
+Estado actual del preflight:
+
+- Proyecto Supabase nuevo creado y linkeado localmente.
+- No hay schema creado todavia.
+- No se ejecuto `db push`.
+- No se crearon tablas manualmente.
 
 ## Stack previsto
 
@@ -58,8 +69,9 @@ Regla: todo schema nace desde `supabase/migrations`. Ninguna tabla se crea manua
 
 ## Estado actual
 
-RAN-18 esta en ejecucion.
+RAN-19 esta en ejecucion.
 
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
-- Supabase sigue pendiente.
+- Supabase nuevo limpio creado y linkeado.
+- Proximo subbloque: migracion local inicial + RLS versionado.

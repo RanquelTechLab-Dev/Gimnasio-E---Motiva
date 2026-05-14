@@ -18,3 +18,13 @@
 - Se crean pantallas placeholder.
 - Se agrega boton flotante WhatsApp.
 - Se agrega CI frontend para build y lint.
+
+## 2026-05-13 - RANV2-03 preflight Supabase
+
+- Se verifica y linkea el proyecto `emotiva-gym-app-v2`.
+- Se registra el project ref `kmfxgeqxulwaauracyzs`.
+- Se confirma region `sa-east-1`.
+- Se inicializa estructura local de Supabase sin schema ni migraciones.
+- No se ejecuta `db push`.
+- No se crean tablas ni policies todavia.
+- Se alinea Supabase Auth local redirect con Vite dev server en puerto 5173.

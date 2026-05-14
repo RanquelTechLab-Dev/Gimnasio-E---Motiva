@@ -2,12 +2,12 @@
 
 ## Actual
 
-Cerrar RAN-18 / RANV2-02 con PR de setup frontend.
+Preparar RAN-19 / RANV2-03 con migracion local inicial + RLS versionado.
 
 ## Siguiente
 
-RAN-19 / RANV2-03: Supabase schema inicial + RLS versionado.
+RAN-19 / RANV2-03: crear migracion local inicial, revisar SQL y recien despues validar `db push --dry-run`.
 
 ## Pendiente antes de RAN-19
 
-Crear Supabase nuevo para E-Motiva v2 y confirmar datos del proyecto. No crear schema manualmente.
+Supabase nuevo ya fue creado y linkeado. Falta crear el schema inicial exclusivamente desde `supabase/migrations`, sin tablas manuales y sin `db push` hasta validar el dry-run.

@@ -1,6 +1,9 @@
 import { supabase, supabaseConfigError } from '../lib/supabase'
 import type {
   AssignMembershipInput,
+  Activity,
+  CalendarSession,
+  ClassSessionInput,
   CreateStudentInput,
   Membership,
   Payment,
@@ -8,6 +11,7 @@ import type {
   Plan,
   RegisterPaymentInput,
   StudentProfile,
+  UpdateClassSessionInput,
   UpdatePlanInput,
   UpdateStudentInput,
 } from './types'
@@ -100,6 +104,21 @@ export async function listPlans() {
   }
 
   return (data ?? []) as unknown as Plan[]
+}
+
+export async function listActivities() {
+  const client = getClient()
+  const { data, error } = await client
+    .from('activities')
+    .select('id, name, slug, active')
+    .eq('active', true)
+    .order('name', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as Activity[]
 }
 
 export async function updatePlan(planId: string, input: UpdatePlanInput) {
@@ -214,6 +233,74 @@ export async function rejectManualPayment(paymentId: string, reason: string) {
   const client = getClient()
   const { data, error } = await client.rpc('reject_manual_payment', {
     payment_id: paymentId,
+    reason: reason.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function listCalendarSessions(fromDate: string, toDate: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('list_calendar_sessions', {
+    from_date: fromDate,
+    to_date: toDate,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as CalendarSession[]
+}
+
+export async function createClassSession(input: ClassSessionInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('create_class_session', {
+    activity_id: input.activity_id,
+    title: input.title,
+    starts_at: input.starts_at,
+    ends_at: input.ends_at,
+    capacity: input.capacity,
+    coach_name: input.coach_name.trim() || null,
+    notes: input.notes.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function updateClassSession(input: UpdateClassSessionInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('update_class_session', {
+    session_id: input.session_id,
+    activity_id: input.activity_id,
+    title: input.title,
+    starts_at: input.starts_at,
+    ends_at: input.ends_at,
+    capacity: input.capacity,
+    coach_name: input.coach_name.trim() || null,
+    notes: input.notes.trim() || null,
+    active: input.active,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function cancelClassSession(sessionId: string, reason: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('cancel_class_session', {
+    session_id: sessionId,
     reason: reason.trim() || null,
   })
 

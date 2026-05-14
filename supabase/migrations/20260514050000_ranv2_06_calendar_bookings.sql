@@ -174,6 +174,14 @@ begin
     raise exception 'El cupo no puede ser menor a las reservas activas (%).', v_active_bookings;
   end if;
 
+  if v_active_bookings > 0 and (
+    update_class_session.activity_id is distinct from v_session.activity_id or
+    update_class_session.starts_at is distinct from v_session.starts_at or
+    update_class_session.ends_at is distinct from v_session.ends_at
+  ) then
+    raise exception 'No se puede cambiar actividad ni horario de una clase con reservas activas. Cancela la clase o crea una nueva.';
+  end if;
+
   select * into v_activity
   from public.activities a
   where a.id = update_class_session.activity_id

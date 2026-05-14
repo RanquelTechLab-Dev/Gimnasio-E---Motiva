@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  autoFinalizeAttendance,
   formatAdminError,
   listAttendanceSessions,
   markAttendance,
@@ -22,6 +23,12 @@ const bookingLabels: Record<AttendanceSessionRow['booking_status'], string> = {
   cancelled: 'Cancelada',
   attended: 'Asistida',
   no_show: 'Ausente',
+}
+
+const correctionLabels: Record<AttendanceStatus, string> = {
+  present: 'Corregir a asistio',
+  absent: 'Corregir a ausente',
+  justified: 'Corregir a justificado',
 }
 
 function formatLocalDate(date: Date) {
@@ -73,7 +80,9 @@ export function AdminAttendancePage() {
   async function loadData() {
     setLoading(true)
     setError(null)
+    setSuccess(null)
     try {
+      const finalizeResult = await autoFinalizeAttendance(fromDate, toDate)
       const nextRows = await listAttendanceSessions(fromDate, toDate)
       setRows(nextRows)
       setNotes((current) => {
@@ -85,6 +94,11 @@ export function AdminAttendancePage() {
         }
         return nextNotes
       })
+      if (finalizeResult.finalized_count > 0) {
+        setSuccess(
+          `Asistencias automaticas generadas: ${finalizeResult.finalized_count}.`,
+        )
+      }
     } catch (loadError) {
       setError(formatAdminError(loadError))
     } finally {
@@ -127,8 +141,9 @@ export function AdminAttendancePage() {
               Clases y alumnos reservados
             </h3>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              La asistencia requiere reserva. Los creditos no se ajustan desde
-              este panel.
+              La asistencia se genera automaticamente para reservas no
+              canceladas cuando la clase finaliza. Este panel solo revisa y
+              corrige casos puntuales; los creditos no se ajustan desde aca.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
@@ -199,7 +214,7 @@ export function AdminAttendancePage() {
                         <th className="px-3 py-2">Reserva</th>
                         <th className="px-3 py-2">Asistencia</th>
                         <th className="px-3 py-2">Notas</th>
-                        <th className="px-3 py-2">Acciones</th>
+                        <th className="px-3 py-2">Correccion</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -255,21 +270,27 @@ export function AdminAttendancePage() {
                             />
                           </td>
                           <td className="rounded-r-2xl px-3 py-3">
-                            <div className="flex flex-wrap gap-2">
-                              {(['present', 'absent', 'justified'] as const).map(
-                                (status) => (
-                                  <button
-                                    className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"
-                                    disabled={savingBookingId === row.booking_id}
-                                    key={status}
-                                    onClick={() => void handleMark(row, status)}
-                                    type="button"
-                                  >
-                                    {attendanceLabels[status]}
-                                  </button>
-                                ),
-                              )}
-                            </div>
+                            {row.attendance_status ? (
+                              <div className="flex flex-wrap gap-2">
+                                {(['present', 'absent', 'justified'] as const).map(
+                                  (status) => (
+                                    <button
+                                      className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"
+                                      disabled={savingBookingId === row.booking_id}
+                                      key={status}
+                                      onClick={() => void handleMark(row, status)}
+                                      type="button"
+                                    >
+                                      {correctionLabels[status]}
+                                    </button>
+                                  ),
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-[var(--muted)]">
+                                Se autogenera al finalizar la clase si no cancela.
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}

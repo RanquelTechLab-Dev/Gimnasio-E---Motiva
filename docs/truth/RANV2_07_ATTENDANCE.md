@@ -1,16 +1,24 @@
 # RANV2-07 - Attendance tracking
 
 RANV2-07 agrega el panel operativo de asistencia sobre reservas existentes.
+La asistencia no la toma Carolina manualmente: se genera automaticamente para
+reservas no canceladas cuando la clase ya finalizo.
 
 ## Alcance
 
 - Panel admin `/admin/attendance`.
 - Listado de clases por fecha con alumnos reservados.
-- Marcado y correccion de asistencia:
+- Finalizacion automatica de asistencia:
+  - reserva `booked`
+  - clase finalizada
+  - clase no cancelada
+  - sin asistencia previa
+- Correccion administrativa de asistencia:
   - `present`
   - `absent`
   - `justified`
-- Auditoria con `attendance.marked` y `attendance.updated`.
+- Auditoria con `attendance.auto_marked`, `attendance.marked` y
+  `attendance.updated`.
 - Actualizacion de actividad real solo para asistencia efectiva.
 
 ## Reglas
@@ -22,6 +30,8 @@ RANV2-07 agrega el panel operativo de asistencia sobre reservas existentes.
 - Actualiza `profiles.last_attendance_at`.
 - Actualiza `profiles.last_real_activity_at`.
 - No descuenta creditos.
+- En el flujo normal se crea automaticamente al finalizar la clase si la
+  reserva no fue cancelada.
 
 ### Absent
 
@@ -46,12 +56,28 @@ RANV2-07 agrega el panel operativo de asistencia sobre reservas existentes.
 
 La cancelacion real de reservas pertenece a RANV2-06 mediante `cancel_booking`.
 
+## Automatizacion
+
+- `public.auto_finalize_attendance(from_date date, to_date date)` es admin-only.
+- Se ejecuta desde `/admin/attendance` antes de listar el rango.
+- Solo finaliza reservas `booked` de clases ya terminadas y no canceladas.
+- No crea asistencia para reservas canceladas.
+- No toca creditos ni `memberships.remaining_credits`.
+- Guarda `attendance.recorded_at` con la hora real de finalizacion de la clase
+  (`class_sessions.ends_at`), no con la hora de procesamiento.
+- `attendance.updated_at` y `audit_logs.metadata.processed_at` reflejan cuando se
+  proceso la automatizacion.
+- `profiles.last_attendance_at` y `profiles.last_real_activity_at` quedan basados
+  en la hora real de asistencia, incluso si una clase historica se procesa despues.
+- Inserta auditoria `attendance.auto_marked`.
+
 ## RPCs
 
+- `public.auto_finalize_attendance(from_date date, to_date date)`
 - `public.list_attendance_sessions(from_date date, to_date date)`
 - `public.mark_attendance(booking_id uuid, status public.attendance_status, notes text default null)`
 
-Ambas son admin-only, `security definer`, con `search_path = public, private`, sin permisos para `anon/public` y con `execute` para `authenticated`.
+Son admin-only, `security definer`, con `search_path = public, private`, sin permisos para `anon/public` y con `execute` para `authenticated`.
 
 ## Fuera de alcance
 
@@ -68,10 +94,9 @@ Ambas son admin-only, `security definer`, con `search_path = public, private`, s
 
 ## Pendiente post-merge
 
-- `db push` real.
-- Probar `present` real.
-- Probar `absent` real.
-- Probar `justified` real.
+- `db push` real de la migracion de asistencia automatica.
+- Probar finalizacion automatica real.
+- Probar correcciones `present`, `absent` y `justified`.
 - Verificar `last_attendance_at`.
 - Verificar `last_real_activity_at`.
 - Verificar `audit_logs`.

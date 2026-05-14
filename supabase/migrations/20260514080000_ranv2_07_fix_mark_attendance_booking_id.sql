@@ -88,7 +88,7 @@ begin
     v_booking.session_id,
     p_status,
     v_actor,
-    now(),
+    v_session.ends_at,
     nullif(btrim(coalesce(p_notes, '')), ''),
     v_charged_as_attended,
     'admin',
@@ -154,6 +154,11 @@ begin
       'previous_booking_status', v_previous_booking_status,
       'booking_status', v_booking.status,
       'charged_as_attended', v_attendance.charged_as_attended,
+      'class_started_at', v_session.starts_at,
+      'class_ended_at', v_session.ends_at,
+      'processed_at', now(),
+      'recorded_at', v_session.ends_at,
+      'source', 'admin',
       'notes', nullif(btrim(coalesce(p_notes, '')), '')
     )
   );

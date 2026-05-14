@@ -38,6 +38,7 @@ type PaymentFormState = {
   membership_id: string
   amount: string
   method: PaymentMethod
+  payment_date: string
   notes: string
 }
 
@@ -60,6 +61,7 @@ export function AdminPaymentsPage() {
     membership_id: '',
     amount: '',
     method: 'cash',
+    payment_date: todayDate(),
     notes: '',
   })
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({})
@@ -162,10 +164,11 @@ export function AdminPaymentsPage() {
         membership_id: form.membership_id,
         amount,
         method: form.method,
+        payment_date: form.payment_date,
         notes: form.notes,
       })
       setSuccess('Pago manual registrado como pendiente.')
-      setForm({ ...form, amount: '', notes: '' })
+      setForm({ ...form, amount: '', payment_date: todayDate(), notes: '' })
       await loadData(filter)
     } catch (saveError) {
       setError(formatAdminError(saveError))
@@ -394,6 +397,20 @@ export function AdminPaymentsPage() {
                 step="0.01"
                 type="number"
                 value={form.amount}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold" htmlFor="payment-date">
+                Fecha
+              </label>
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                id="payment-date"
+                onChange={(event) =>
+                  setForm({ ...form, payment_date: event.target.value })
+                }
+                type="date"
+                value={form.payment_date}
               />
             </div>
             <div>

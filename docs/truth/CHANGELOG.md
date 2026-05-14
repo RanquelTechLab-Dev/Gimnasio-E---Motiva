@@ -64,3 +64,11 @@
 - Se documenta que la migracion RANV2-05 queda pendiente de `db push` real.
 - Se documenta que la Edge Function queda pendiente de deploy.
 - No se agregan pagos online, reservas reales, Mailjet, Google Drive, Cloudflare ni secrets.
+
+## 2026-05-14 - RANV2-05 UX alumnos y fecha de pago
+
+- Se mejora el panel de alumnos con buscador por nombre, apellido, email y telefono.
+- Se refuerza la tabla de alumnos y la ficha personal con datos, membresias, pagos y acciones.
+- Se agrega fecha/calendario al registro de pago manual.
+- Se versiona migracion para persistir la fecha elegida en `payments.paid_at`.
+- Google Drive real queda fuera de RANV2-05 y pendiente para RANV2-09/RANV2-11.

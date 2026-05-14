@@ -100,6 +100,7 @@ export type RegisterPaymentInput = {
   amount: number
   method: PaymentMethod
   notes: string
+  payment_date: string
 }
 
 export type UpdatePlanInput = {

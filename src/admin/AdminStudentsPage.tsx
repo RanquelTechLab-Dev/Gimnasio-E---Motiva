@@ -47,6 +47,7 @@ type PaymentFormState = {
   membership_id: string
   amount: string
   method: PaymentMethod
+  payment_date: string
   notes: string
 }
 
@@ -77,6 +78,24 @@ function studentDisplayName(student: StudentProfile) {
   return `${student.first_name} ${student.last_name}`.trim()
 }
 
+function matchesStudentSearch(student: StudentProfile, searchValue: string) {
+  const normalized = searchValue.trim().toLowerCase()
+
+  if (!normalized) {
+    return true
+  }
+
+  return [
+    student.first_name,
+    student.last_name,
+    student.email,
+    student.phone ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(normalized)
+}
+
 function studentToEditForm(student: StudentProfile): EditStudentState {
   return {
     first_name: student.first_name,
@@ -104,6 +123,7 @@ export function AdminStudentsPage() {
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
+  const [studentSearch, setStudentSearch] = useState('')
   const [studentForm, setStudentForm] = useState<StudentFormState>({
     first_name: '',
     last_name: '',
@@ -120,6 +140,7 @@ export function AdminStudentsPage() {
     membership_id: '',
     amount: '',
     method: 'cash',
+    payment_date: todayDate(),
     notes: '',
   })
   const [loading, setLoading] = useState(true)
@@ -140,6 +161,9 @@ export function AdminStudentsPage() {
   )
   const selectedPayments = payments.filter(
     (payment) => payment.student_id === selectedStudent?.id,
+  )
+  const filteredStudents = students.filter((student) =>
+    matchesStudentSearch(student, studentSearch),
   )
   const plansById = useMemo(
     () => new Map(plans.map((plan) => [plan.id, plan])),
@@ -174,6 +198,7 @@ export function AdminStudentsPage() {
       setPaymentForm((current) => ({
         ...current,
         membership_id: firstMembership?.id ?? '',
+        payment_date: current.payment_date || todayDate(),
       }))
     } catch (loadError) {
       setError(formatAdminError(loadError))
@@ -308,10 +333,16 @@ export function AdminStudentsPage() {
         membership_id: paymentForm.membership_id,
         amount,
         method: paymentForm.method,
+        payment_date: paymentForm.payment_date,
         notes: paymentForm.notes,
       })
       setSuccess('Pago manual registrado como pendiente.')
-      setPaymentForm({ ...paymentForm, amount: '', notes: '' })
+      setPaymentForm({
+        ...paymentForm,
+        amount: '',
+        payment_date: todayDate(),
+        notes: '',
+      })
       await loadData()
     } catch (paymentError) {
       setError(formatAdminError(paymentError))
@@ -349,7 +380,29 @@ export function AdminStudentsPage() {
             Edge Function `create-student` en el bloque posterior.
           </div>
         ) : (
-          <div className="mt-5 overflow-hidden rounded-[20px] border border-[var(--line)]">
+          <div className="mt-5 grid gap-4">
+            <div>
+              <label
+                className="text-sm font-semibold"
+                htmlFor="student-search"
+              >
+                Buscar alumno
+              </label>
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                id="student-search"
+                onChange={(event) => setStudentSearch(event.target.value)}
+                placeholder="Nombre, apellido, email o telefono"
+                value={studentSearch}
+              />
+            </div>
+
+            {filteredStudents.length === 0 ? (
+              <div className="rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
+                No hay alumnos que coincidan con la busqueda.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-[20px] border border-[var(--line)]">
             <div className="grid min-w-[780px] grid-cols-[1.4fr_1.4fr_0.8fr_0.8fr_0.9fr] bg-[var(--surface-strong)] px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
               <span>Nombre</span>
               <span>Email</span>
@@ -358,7 +411,7 @@ export function AdminStudentsPage() {
               <span>Ultimo pago</span>
             </div>
             <div className="grid max-h-[520px] overflow-auto">
-              {students.map((student) => (
+              {filteredStudents.map((student) => (
                 <button
                   className={`grid min-w-[780px] grid-cols-[1.4fr_1.4fr_0.8fr_0.8fr_0.9fr] px-4 py-3 text-left text-sm transition ${
                     selectedStudent?.id === student.id
@@ -369,7 +422,7 @@ export function AdminStudentsPage() {
                   onClick={() => selectStudent(student)}
                   type="button"
                 >
-                  <span className="font-semibold">
+                  <span className="font-semibold text-[var(--brand)] underline-offset-4 hover:underline">
                     {studentDisplayName(student)}
                   </span>
                   <span>{student.email}</span>
@@ -385,6 +438,8 @@ export function AdminStudentsPage() {
                 </button>
               ))}
             </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -449,6 +504,19 @@ export function AdminStudentsPage() {
                   })
                 )}
               </div>
+            </article>
+
+            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
+                Archivos
+              </p>
+              <h4 className="mt-2 font-display text-xl font-bold">
+                Pendiente
+              </h4>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                La carga de archivos y Google Drive real quedan fuera de
+                RANV2-05 y se retoman en RANV2-09/RANV2-11.
+              </p>
             </article>
 
             <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 lg:col-span-2">
@@ -755,6 +823,18 @@ export function AdminStudentsPage() {
                 step="0.01"
                 type="number"
                 value={paymentForm.amount}
+              />
+              <input
+                aria-label="Fecha del pago manual"
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setPaymentForm({
+                    ...paymentForm,
+                    payment_date: event.target.value,
+                  })
+                }
+                type="date"
+                value={paymentForm.payment_date}
               />
               <select
                 aria-label="Metodo del pago manual"

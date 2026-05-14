@@ -14,7 +14,7 @@ export function StudentLayout() {
   return (
     <LayoutShell
       navItems={navItems}
-      pendingLabel="Datos propios conectados a Supabase. Pagos online, Drive real y archivos avanzados quedan fuera de este bloque."
+      pendingLabel="Tus datos se actualizan desde administración. Si algo no coincide, contactanos para revisarlo."
       section="Panel alumno"
       subtitle="Autogestion basica para perfil, reservas, pagos y asistencia."
       title="Espacio del alumno"

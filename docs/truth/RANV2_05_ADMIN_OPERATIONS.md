@@ -35,10 +35,13 @@ Pendiente: deploy de la Edge Function en bloque posterior.
 Rutas operativas:
 
 - `/admin/students`: listado de alumnos, ficha, edicion basica, alta por Edge Function, asignacion de membresia y registro de pago manual.
+- El listado de alumnos incluye busqueda por nombre, apellido, email y telefono.
 - `/admin/plans`: listado de planes, actividades vinculadas de solo lectura y edicion de precio, descripcion y estado.
 - `/admin/payments`: listado de pagos con filtros, registro manual, aprobacion y rechazo.
 
 Los precios reales se editan desde el panel. Si un precio sigue en `0`, la UI muestra `Pendiente de definir precio real`.
+
+El registro de pago manual permite elegir fecha con calendario. Esa fecha se persiste en `payments.paid_at` desde la RPC `register_manual_payment`.
 
 ## Limites
 
@@ -48,3 +51,4 @@ Los precios reales se editan desde el panel. Si un precio sigue en `0`, la UI mu
 - No hay reservas reales en este bloque.
 - No hay Mailjet, Google Drive, Cloudflare ni Edge Functions desplegadas.
 - No hay `db push` real en este bloque.
+- La carga de archivos y Google Drive real quedan pendientes para RANV2-09/RANV2-11.

@@ -187,6 +187,7 @@ export async function registerManualPayment(input: RegisterPaymentInput) {
     amount: input.amount,
     method: input.method,
     notes: input.notes.trim() || null,
+    payment_date: input.payment_date,
   })
 
   if (error) {

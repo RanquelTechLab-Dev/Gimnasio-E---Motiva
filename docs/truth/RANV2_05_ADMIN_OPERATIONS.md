@@ -36,6 +36,7 @@ Rutas operativas:
 
 - `/admin/students`: listado de alumnos, ficha, edicion basica, alta por Edge Function, asignacion de membresia y registro de pago manual.
 - El listado de alumnos incluye busqueda por nombre, apellido, email y telefono.
+- La ficha y los formularios del alumno se limpian si el buscador oculta al alumno seleccionado, evitando operar sobre un alumno que ya no esta visible.
 - `/admin/plans`: listado de planes, actividades vinculadas de solo lectura y edicion de precio, descripcion y estado.
 - `/admin/payments`: listado de pagos con filtros, registro manual, aprobacion y rechazo.
 

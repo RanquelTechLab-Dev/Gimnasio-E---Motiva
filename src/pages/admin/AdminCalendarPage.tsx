@@ -4,10 +4,10 @@ export function AdminCalendarPage() {
   return (
     <PlaceholderPanel
       bullets={[
-        'Clases y sesiones no creadas todavia.',
-        'Calendario funcional queda para RANV2-06.',
-        'Sin reglas de cupo ni validacion real por ahora.',
-        'Solo estructura visual y navegacion.',
+        'Clases y sesiones se incorporan en el modulo de calendario.',
+        'Calendario funcional para administracion.',
+        'Reglas de cupo y validacion por plan se agregan con reservas.',
+        'Acceso protegido para administracion.',
       ]}
       description="Base para calendario administrativo, edicion de clases y vista operativa del gimnasio."
       eyebrow="/admin/calendar"

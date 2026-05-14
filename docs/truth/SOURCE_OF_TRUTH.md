@@ -76,7 +76,8 @@ RAN-20 esta en ejecucion.
 - Router base y layouts iniciales creados.
 - Supabase nuevo limpio creado y linkeado.
 - Migracion inicial + RLS aplicada en Supabase remoto.
-- Migracion RANV2-04 de hardening de policies creada localmente.
+- Migracion RANV2-04 de hardening de policies aplicada en Supabase remoto.
 - Login email/password y guards admin/alumno agregados.
-- Admin real pendiente de creacion manual/post-merge.
-- No se ejecuto `db push` real para RANV2-04 todavia.
+- UX publica simplificada: sin accesos publicos a paneles internos.
+- Usuario Auth admin y profile admin creados/verificados.
+- Prueba final de login queda pendiente de validacion manual con contrasena provisoria.

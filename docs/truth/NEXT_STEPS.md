@@ -2,14 +2,14 @@
 
 ## Actual
 
-Revisar PR de RAN-20 / RANV2-04 con Auth + roles admin/alumno y hardening minimo de advisors.
+Revisar PR de RAN-20 / RANV2-04 con fix de login UX/env.
 
 ## Siguiente
 
-RAN-20 / RANV2-04: mergear PR, aplicar `db push` real de la migracion RANV2-04 en bloque posterior autorizado, crear admin Auth real y validar login/admin/student/logout.
+RAN-20 / RANV2-04: mergear el fix de UX/env si la prueba local pasa, validar login/admin/student/logout y cerrar Linear.
 
 ## Pendiente
 
-- No crear usuarios ni profiles reales hasta el bloque remoto/manual posterior.
+- Validar login real con el admin creado por Walter.
 - No guardar secrets en el repo.
 - RANV2-05 queda para panel admin: alumnos, planes y pagos manuales.

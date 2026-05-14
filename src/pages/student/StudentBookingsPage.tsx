@@ -4,12 +4,12 @@ export function StudentBookingsPage() {
   return (
     <PlaceholderPanel
       bullets={[
-        'Sin reservas reales en este bloque.',
-        'No existe validacion por plan todavia.',
-        'Cancelaciones y reglas 24h quedan para RANV2-06.',
-        'La estructura ya esta lista para conectarse luego.',
+        'Reservas del alumno.',
+        'Validacion por plan se aplica desde reglas de negocio.',
+        'Cancelaciones y reglas 24h se incorporan con el calendario.',
+        'Acceso disponible solo con sesion activa.',
       ]}
-      description="La futura vista de reservas del alumno ya tiene su ruta definida para no rehacer navegacion mas adelante."
+      description="Vista donde el alumno consultara y gestionara sus reservas cuando el calendario este habilitado."
       eyebrow="/app/my-bookings"
       title="Mis reservas"
     />

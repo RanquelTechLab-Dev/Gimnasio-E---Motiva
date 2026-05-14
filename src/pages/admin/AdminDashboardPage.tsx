@@ -4,12 +4,12 @@ export function AdminDashboardPage() {
   return (
     <PlaceholderPanel
       bullets={[
-        'Panel admin sin backend conectado.',
-        'Alumnos, pagos y membresias reales quedan para RANV2-05.',
-        'Auth real queda para RANV2-04.',
-        'Supabase nuevo sigue pendiente.',
+        'Acceso protegido para administracion.',
+        'Alumnos, pagos y membresias se incorporan en el panel operativo.',
+        'Sesion activa validada con Supabase Auth.',
+        'Perfil admin cargado desde Supabase.',
       ]}
-      description="Base de administracion para que el proximo bloque agregue operaciones reales sin rehacer layout ni rutas."
+      description="Panel inicial de administracion para gestionar E-Motiva a medida que se incorporan las operaciones del gimnasio."
       eyebrow="/admin"
       title="Dashboard administracion"
     />

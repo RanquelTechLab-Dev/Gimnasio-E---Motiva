@@ -368,7 +368,7 @@ export async function markAttendance(
 export async function listStudentTrainingNotes(studentId: string) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_list_student_training_notes', {
-    student_id: studentId,
+    p_student_id: studentId,
   })
 
   if (error) {
@@ -412,7 +412,7 @@ export async function archiveTrainingNote(noteId: string) {
 export async function listStudentFiles(studentId: string) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_list_student_files', {
-    student_id: studentId,
+    p_student_id: studentId,
   })
 
   if (error) {

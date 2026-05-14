@@ -346,8 +346,16 @@ alter table public.email_logs enable row level security;
 alter table public.drive_status enable row level security;
 alter table public.audit_logs enable row level security;
 
+revoke all on all tables in schema public from public;
+revoke all on all tables in schema public from anon;
+
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
+
+revoke all on function public.current_profile_role() from public, anon;
+revoke all on function public.is_admin() from public, anon;
+revoke all on function public.set_updated_at() from public, anon;
+
 grant execute on function public.current_profile_role() to authenticated;
 grant execute on function public.is_admin() to authenticated;
 

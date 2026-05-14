@@ -10,6 +10,9 @@ import { StudentCalendarPage } from './pages/student/StudentCalendarPage'
 import { StudentBookingsPage } from './pages/student/StudentBookingsPage'
 import { StudentPlanPage } from './pages/student/StudentPlanPage'
 import { StudentProfilePage } from './pages/student/StudentProfilePage'
+import { StudentPaymentsPage } from './pages/student/StudentPaymentsPage'
+import { StudentAttendancePage } from './pages/student/StudentAttendancePage'
+import { StudentFilesPage } from './pages/student/StudentFilesPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { AdminStudentsPage } from './pages/admin/AdminStudentsPage'
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage'
@@ -37,8 +40,12 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <StudentDashboardPage /> },
           { path: 'calendar', element: <StudentCalendarPage /> },
+          { path: 'bookings', element: <StudentBookingsPage /> },
           { path: 'my-bookings', element: <StudentBookingsPage /> },
           { path: 'my-plan', element: <StudentPlanPage /> },
+          { path: 'payments', element: <StudentPaymentsPage /> },
+          { path: 'attendance', element: <StudentAttendancePage /> },
+          { path: 'files', element: <StudentFilesPage /> },
           { path: 'profile', element: <StudentProfilePage /> },
         ],
       },

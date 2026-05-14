@@ -110,3 +110,12 @@
 - Si el alumno intenta cancelar fuera de ventana, la reserva queda activa y no se devuelve credito.
 - Se actualiza `list_my_bookings` para mostrar bloqueo 12h/24h.
 - No se ejecuta `db push` real en este bloque.
+
+## 2026-05-14 - RANV2-08 perfil alumno
+
+- Se agrega migracion local con RPCs de autogestion de alumno.
+- `/app` muestra dashboard real con perfil, membresia, creditos, proxima reserva, ultimo pago y ultima asistencia.
+- `/app/profile` permite editar solo telefono y preferencia de emails.
+- `/app/bookings`, `/app/payments`, `/app/attendance` y `/app/files` muestran datos propios del alumno.
+- Archivos/Google Drive real quedan fuera de RANV2-08.
+- No se ejecuta `db push` real en este bloque.

@@ -2,19 +2,18 @@
 
 ## Actual
 
-RAN-32 / RANV2-06B: ventanas de cancelacion 12h/24h.
+RAN-24 / RANV2-08: perfil alumno y autogestion.
 
 ## Siguiente
 
-RAN-32 / RANV2-06B: revisar PR, aplicar migracion con `db push` real en bloque posterior y probar cancelaciones comun/personalizado dentro y fuera de ventana.
+RAN-24 / RANV2-08: revisar PR, aplicar migracion con `db push` real en bloque posterior y probar alumno real.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Probar cancelacion comun con mas de 12 horas.
-- Probar cancelacion comun con menos de 12 horas.
-- Probar personalizado 1:1 con mas de 24 horas.
-- Probar personalizado 1:1 con menos de 24 horas.
-- Verificar creditos y audit logs de cancelacion.
+- Probar `/app` con alumno real.
+- Probar `/app/profile` y actualizacion segura de telefono/emails.
+- Probar `/app/bookings`, `/app/payments`, `/app/attendance` y `/app/files`.
+- Verificar audit log `profile.updated_by_student`.
 - Google Drive/archivos reales quedan para RANV2-09/RANV2-11.
-- RAN-24 perfil alumno queda fuera de RANV2-06B.
+- Pagos online, Mailjet, Cloudflare y deploy quedan fuera de RANV2-08.

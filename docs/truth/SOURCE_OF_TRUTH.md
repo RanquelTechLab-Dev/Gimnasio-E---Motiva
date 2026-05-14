@@ -30,7 +30,7 @@ No es fuente activa. No se copian migraciones, ramas ni codigo viejo sin auditor
 
 Proyecto: E-Motiva App Gimnasio v2
 
-Issue actual: RAN-32 - RANV2-06B - Ventanas de cancelacion 12h/24h.
+Issue actual: RAN-24 - RANV2-08 - Perfil alumno y autogestion.
 
 ## Supabase
 
@@ -52,7 +52,8 @@ Estado actual:
 - Panel admin operativo para alumnos, planes, membresias y pagos manuales cerrado en RANV2-05.
 - Calendario, clases y reservas cerrado en RANV2-06.
 - Asistencia y control de cupos cerrado funcionalmente en RANV2-07.
-- Ventanas de cancelacion 12h/24h en ejecucion para RANV2-06B.
+- Ventanas de cancelacion 12h/24h cerrado en RANV2-06B.
+- Perfil alumno y autogestion en ejecucion para RANV2-08.
 
 ## Stack previsto
 
@@ -74,7 +75,7 @@ Estado actual:
 
 ## Estado actual
 
-RAN-32 esta en ejecucion.
+RAN-24 esta en ejecucion.
 
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
@@ -90,3 +91,4 @@ RAN-32 esta en ejecucion.
 - RANV2-06 agrego calendario, clases y reservas con cupos, reglas por plan/membresia/creditos y cancelacion 24h para personalizado 1:1.
 - RANV2-07 agrega panel admin de asistencia sobre reservas existentes. La asistencia normal se genera automaticamente para reservas no canceladas de clases finalizadas; el panel queda para revisar y corregir casos puntuales.
 - RANV2-06B ajusta cancelaciones: clases comunes hasta 12 horas antes y personalizado 1:1 hasta 24 horas antes.
+- RANV2-08 habilita dashboard y autogestion basica para alumno sin acceso admin.

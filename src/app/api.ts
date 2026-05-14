@@ -1,5 +1,13 @@
 import { supabase, supabaseConfigError } from '../lib/supabase'
-import type { CalendarSession, MyBooking } from './types'
+import type {
+  CalendarSession,
+  MyBooking,
+  StudentAttendance,
+  StudentFile,
+  StudentPayment,
+  StudentProfileDetails,
+  StudentProfileSummary,
+} from './types'
 
 function getClient() {
   if (!supabase) {
@@ -67,4 +75,65 @@ export async function listMyBookings() {
   }
 
   return (data ?? []) as MyBooking[]
+}
+
+export async function getMyProfileSummary() {
+  const client = getClient()
+  const { data, error } = await client.rpc('get_my_profile_summary')
+
+  if (error) {
+    throw error
+  }
+
+  return data as StudentProfileSummary
+}
+
+export async function updateMyProfilePreferences(input: {
+  phone: string
+  receives_emails: boolean
+}) {
+  const client = getClient()
+  const { data, error } = await client.rpc('update_my_profile_preferences', {
+    p_phone: input.phone,
+    p_receives_emails: input.receives_emails,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as StudentProfileDetails
+}
+
+export async function listMyPayments() {
+  const client = getClient()
+  const { data, error } = await client.rpc('list_my_payments')
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as StudentPayment[]
+}
+
+export async function listMyAttendance() {
+  const client = getClient()
+  const { data, error } = await client.rpc('list_my_attendance')
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as StudentAttendance[]
+}
+
+export async function listMyFiles() {
+  const client = getClient()
+  const { data, error } = await client.rpc('list_my_files')
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as StudentFile[]
 }

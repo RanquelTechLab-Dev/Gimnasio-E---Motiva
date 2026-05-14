@@ -119,7 +119,7 @@ $$;
 
 create or replace function public.update_my_profile_preferences(
   p_phone text default null,
-  p_receives_emails boolean default true
+  p_receives_emails boolean default null
 )
 returns jsonb
 language plpgsql
@@ -153,7 +153,7 @@ begin
   update public.profiles
   set
     phone = nullif(btrim(coalesce(p_phone, '')), ''),
-    receives_emails = coalesce(p_receives_emails, true),
+    receives_emails = coalesce(p_receives_emails, v_profile.receives_emails),
     updated_at = now()
   where id = v_actor
   returning * into v_profile;

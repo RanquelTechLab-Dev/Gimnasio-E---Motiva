@@ -64,7 +64,7 @@ export function StudentFilesPage() {
         Mis documentos
       </h3>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        Los archivos reales con Google Drive quedan para un bloque posterior.
+        Cuando el equipo suba documentos para vos, los vas a ver aca.
       </p>
       {loading ? (
         <p className="mt-5 text-sm text-[var(--muted)]">Cargando archivos...</p>

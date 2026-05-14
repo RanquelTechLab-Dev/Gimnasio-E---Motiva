@@ -129,3 +129,10 @@
 - `/app/files` muestra documentos propios visibles y planes de entrenamiento visibles.
 - Google Drive real, subida binaria, pagos online, Mailjet, Cloudflare y RANV2-10 quedan fuera.
 - No se ejecuta `db push` real en este bloque.
+
+## 2026-05-14 - RANV2-14 preparacion Cloudflare Pages
+
+- Se agrega fallback SPA para Cloudflare Pages mediante `public/_redirects`.
+- Se documenta configuracion de deploy Vite: `npm run build` y salida `dist`.
+- Se documentan variables publicas necesarias para el frontend.
+- No se agregan secrets, migraciones ni cambios funcionales.

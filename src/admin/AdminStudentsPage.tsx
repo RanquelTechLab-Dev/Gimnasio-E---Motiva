@@ -1,22 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  archiveStudentFileMetadata,
+  archiveTrainingNote,
   assignMembership,
+  createStudentFileMetadata,
   createStudent,
   formatAdminError,
+  listStudentFiles,
+  listStudentTrainingNotes,
   listMemberships,
   listPayments,
   listPlans,
   listStudents,
   registerManualPayment,
+  updateStudentFileMetadata,
   updateStudent,
+  upsertTrainingNote,
 } from './api'
 import type {
+  AdminStudentFile,
+  AdminTrainingNote,
+  FileKind,
   Membership,
   PaymentMethod,
   Payment,
   Plan,
   StudentProfile,
+  StudentFileMetadataInput,
+  TrainingNoteType,
 } from './types'
 
 type StudentFormState = {
@@ -51,11 +63,43 @@ type PaymentFormState = {
   notes: string
 }
 
+type TrainingNoteFormState = {
+  note_id: string | null
+  note_type: TrainingNoteType
+  title: string
+  body: string
+  visible_to_student: boolean
+}
+
+type FileMetadataFormState = {
+  file_id: string | null
+  kind: FileKind
+  title: string
+  description: string
+  drive_url: string
+  mime_type: string
+  size_bytes: string
+  visible_to_student: boolean
+}
+
 const moneyFormatter = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
   maximumFractionDigits: 0,
 })
+
+const noteTypeLabels: Record<TrainingNoteType, string> = {
+  admin_note: 'Nota administrativa',
+  follow_up: 'Seguimiento',
+  observation: 'Observacion',
+  training_plan: 'Plan de entrenamiento',
+}
+
+const fileKindLabels: Record<FileKind, string> = {
+  attachment: 'Adjunto',
+  observation: 'Observacion',
+  training_plan: 'Plan de entrenamiento',
+}
 
 function todayDate() {
   return formatLocalDate(new Date())
@@ -117,11 +161,48 @@ function buildMembershipForm(plans: Plan[]): MembershipFormState {
   }
 }
 
+function buildTrainingNoteForm(): TrainingNoteFormState {
+  return {
+    note_id: null,
+    note_type: 'training_plan',
+    title: '',
+    body: '',
+    visible_to_student: false,
+  }
+}
+
+function buildFileMetadataForm(): FileMetadataFormState {
+  return {
+    file_id: null,
+    kind: 'attachment',
+    title: '',
+    description: '',
+    drive_url: '',
+    mime_type: '',
+    size_bytes: '',
+    visible_to_student: false,
+  }
+}
+
+function formatSize(value: number | null) {
+  if (value === null) {
+    return 'Sin tamano'
+  }
+
+  if (value < 1024) {
+    return `${value} B`
+  }
+
+  return `${(value / 1024).toFixed(1)} KB`
+}
+
 export function AdminStudentsPage() {
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [trainingNotes, setTrainingNotes] = useState<AdminTrainingNote[]>([])
+  const [studentFiles, setStudentFiles] = useState<AdminStudentFile[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [studentSearch, setStudentSearch] = useState('')
   const [studentForm, setStudentForm] = useState<StudentFormState>({
@@ -143,6 +224,10 @@ export function AdminStudentsPage() {
     payment_date: todayDate(),
     notes: '',
   })
+  const [trainingNoteForm, setTrainingNoteForm] =
+    useState<TrainingNoteFormState>(buildTrainingNoteForm())
+  const [fileMetadataForm, setFileMetadataForm] =
+    useState<FileMetadataFormState>(buildFileMetadataForm())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -170,6 +255,19 @@ export function AdminStudentsPage() {
   )
   const selectedPayments = payments.filter(
     (payment) => payment.student_id === selectedStudent?.id,
+  )
+  const activeTrainingPlan =
+    trainingNotes.find(
+      (note) =>
+        note.student_id === selectedStudent?.id &&
+        note.note_type === 'training_plan' &&
+        note.archived_at === null,
+    ) ?? null
+  const selectedTrainingNotes = trainingNotes.filter(
+    (note) => note.student_id === selectedStudent?.id,
+  )
+  const selectedStudentFiles = studentFiles.filter(
+    (file) => file.student_id === selectedStudent?.id,
   )
 
   async function loadData() {
@@ -202,11 +300,31 @@ export function AdminStudentsPage() {
         membership_id: firstMembership?.id ?? '',
         payment_date: current.payment_date || todayDate(),
       }))
+      if (nextSelected) {
+        const [nextNotes, nextFiles] = await Promise.all([
+          listStudentTrainingNotes(nextSelected.id),
+          listStudentFiles(nextSelected.id),
+        ])
+        setTrainingNotes(nextNotes)
+        setStudentFiles(nextFiles)
+      } else {
+        setTrainingNotes([])
+        setStudentFiles([])
+      }
     } catch (loadError) {
       setError(formatAdminError(loadError))
     } finally {
       setLoading(false)
     }
+  }
+
+  async function loadSelectedStudentOperations(studentId: string) {
+    const [nextNotes, nextFiles] = await Promise.all([
+      listStudentTrainingNotes(studentId),
+      listStudentFiles(studentId),
+    ])
+    setTrainingNotes(nextNotes)
+    setStudentFiles(nextFiles)
   }
 
   useEffect(() => {
@@ -220,6 +338,10 @@ export function AdminStudentsPage() {
   function clearSelectedStudentForms() {
     setSelectedStudentId(null)
     setEditForm(null)
+    setTrainingNotes([])
+    setStudentFiles([])
+    setTrainingNoteForm(buildTrainingNoteForm())
+    setFileMetadataForm(buildFileMetadataForm())
     setMembershipForm(buildMembershipForm(plans))
     setPaymentForm((current) => ({
       ...current,
@@ -258,6 +380,9 @@ export function AdminStudentsPage() {
     }))
     setError(null)
     setSuccess(null)
+    setTrainingNoteForm(buildTrainingNoteForm())
+    setFileMetadataForm(buildFileMetadataForm())
+    void loadSelectedStudentOperations(student.id)
   }
 
   async function handleCreateStudent(event: FormEvent<HTMLFormElement>) {
@@ -380,6 +505,138 @@ export function AdminStudentsPage() {
       await loadData()
     } catch (paymentError) {
       setError(formatAdminError(paymentError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSaveTrainingNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedStudent) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await upsertTrainingNote({
+        note_id: trainingNoteForm.note_id,
+        student_id: selectedStudent.id,
+        note_type: trainingNoteForm.note_type,
+        title: trainingNoteForm.title,
+        body: trainingNoteForm.body,
+        visible_to_student: trainingNoteForm.visible_to_student,
+      })
+      setSuccess(
+        trainingNoteForm.note_id
+          ? 'Nota actualizada.'
+          : 'Nota creada para el alumno.',
+      )
+      setTrainingNoteForm(buildTrainingNoteForm())
+      await loadSelectedStudentOperations(selectedStudent.id)
+    } catch (noteError) {
+      setError(formatAdminError(noteError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function editTrainingNote(note: AdminTrainingNote) {
+    setTrainingNoteForm({
+      note_id: note.note_id,
+      note_type: note.note_type,
+      title: note.title,
+      body: note.body ?? '',
+      visible_to_student: note.visible_to_student,
+    })
+    setError(null)
+    setSuccess(null)
+  }
+
+  async function handleArchiveTrainingNote(noteId: string) {
+    if (!selectedStudent) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await archiveTrainingNote(noteId)
+      setSuccess('Nota archivada.')
+      setTrainingNoteForm(buildTrainingNoteForm())
+      await loadSelectedStudentOperations(selectedStudent.id)
+    } catch (archiveError) {
+      setError(formatAdminError(archiveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSaveFileMetadata(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedStudent) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const input: StudentFileMetadataInput = {
+        ...fileMetadataForm,
+        student_id: selectedStudent.id,
+      }
+      if (fileMetadataForm.file_id) {
+        await updateStudentFileMetadata({
+          ...input,
+          file_id: fileMetadataForm.file_id,
+        })
+        setSuccess('Documento actualizado.')
+      } else {
+        await createStudentFileMetadata(input)
+        setSuccess('Documento registrado.')
+      }
+      setFileMetadataForm(buildFileMetadataForm())
+      await loadSelectedStudentOperations(selectedStudent.id)
+    } catch (fileError) {
+      setError(formatAdminError(fileError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function editFileMetadata(file: AdminStudentFile) {
+    setFileMetadataForm({
+      file_id: file.file_id,
+      kind: file.kind,
+      title: file.title,
+      description: file.description ?? '',
+      drive_url: file.drive_url ?? '',
+      mime_type: file.mime_type ?? '',
+      size_bytes: file.size_bytes === null ? '' : String(file.size_bytes),
+      visible_to_student: file.visible_to_student,
+    })
+    setError(null)
+    setSuccess(null)
+  }
+
+  async function handleArchiveFileMetadata(fileId: string) {
+    if (!selectedStudent) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await archiveStudentFileMetadata(fileId)
+      setSuccess('Documento archivado.')
+      setFileMetadataForm(buildFileMetadataForm())
+      await loadSelectedStudentOperations(selectedStudent.id)
+    } catch (archiveError) {
+      setError(formatAdminError(archiveError))
     } finally {
       setSaving(false)
     }
@@ -544,15 +801,371 @@ export function AdminStudentsPage() {
 
             <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
-                Archivos
+                Plan de entrenamiento
               </p>
-              <h4 className="mt-2 font-display text-xl font-bold">
-                Pendiente
-              </h4>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                La carga de archivos y Google Drive real quedan fuera de
-                RANV2-05 y se retoman en RANV2-09/RANV2-11.
-              </p>
+              {activeTrainingPlan ? (
+                <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white p-3 text-sm">
+                  <p className="font-semibold">{activeTrainingPlan.title}</p>
+                  {activeTrainingPlan.body ? (
+                    <p className="mt-2 whitespace-pre-wrap text-[var(--muted)]">
+                      {activeTrainingPlan.body}
+                    </p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-[var(--muted)]">
+                    {activeTrainingPlan.visible_to_student
+                      ? 'Visible para el alumno'
+                      : 'Solo administracion'}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--muted)]">
+                  Todavia no hay plan de entrenamiento registrado.
+                </p>
+              )}
+            </article>
+
+            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 lg:col-span-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
+                    Plan y observaciones
+                  </p>
+                  <h4 className="mt-2 font-display text-xl font-bold">
+                    Seguimiento operativo
+                  </h4>
+                </div>
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-white"
+                  onClick={() => setTrainingNoteForm(buildTrainingNoteForm())}
+                  type="button"
+                >
+                  Nueva nota
+                </button>
+              </div>
+
+              <form
+                className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4"
+                onSubmit={handleSaveTrainingNote}
+              >
+                <div className="grid gap-3 md:grid-cols-[0.8fr_1.2fr]">
+                  <select
+                    aria-label="Tipo de nota"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setTrainingNoteForm({
+                        ...trainingNoteForm,
+                        note_type: event.target.value as TrainingNoteType,
+                      })
+                    }
+                    value={trainingNoteForm.note_type}
+                  >
+                    {Object.entries(noteTypeLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    aria-label="Titulo de nota"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setTrainingNoteForm({
+                        ...trainingNoteForm,
+                        title: event.target.value,
+                      })
+                    }
+                    placeholder="Titulo"
+                    value={trainingNoteForm.title}
+                  />
+                </div>
+                <textarea
+                  aria-label="Contenido de nota"
+                  className="min-h-28 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setTrainingNoteForm({
+                      ...trainingNoteForm,
+                      body: event.target.value,
+                    })
+                  }
+                  placeholder="Detalle operativo, plan o seguimiento"
+                  value={trainingNoteForm.body}
+                />
+                <label className="flex items-center gap-3 text-sm font-semibold">
+                  <input
+                    checked={trainingNoteForm.visible_to_student}
+                    onChange={(event) =>
+                      setTrainingNoteForm({
+                        ...trainingNoteForm,
+                        visible_to_student: event.target.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                  Visible para alumno
+                </label>
+                <button
+                  className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                  disabled={saving}
+                  type="submit"
+                >
+                  {trainingNoteForm.note_id ? 'Actualizar nota' : 'Guardar nota'}
+                </button>
+              </form>
+
+              <div className="mt-4 grid gap-2 text-sm">
+                {selectedTrainingNotes.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-[var(--muted)]">
+                    Sin plan ni observaciones registradas.
+                  </p>
+                ) : (
+                  selectedTrainingNotes.map((note) => (
+                    <div
+                      className={`rounded-2xl border border-[var(--line)] bg-white p-3 ${
+                        note.archived_at ? 'opacity-60' : ''
+                      }`}
+                      key={note.note_id}
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold">{note.title}</p>
+                          <p className="text-xs text-[var(--muted)]">
+                            {noteTypeLabels[note.note_type]} ·{' '}
+                            {note.visible_to_student
+                              ? 'Visible para alumno'
+                              : 'Solo administracion'}
+                            {note.archived_at ? ' · Archivada' : ''}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            className="rounded-xl border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                            onClick={() => editTrainingNote(note)}
+                            type="button"
+                          >
+                            Editar
+                          </button>
+                          {!note.archived_at ? (
+                            <button
+                              className="rounded-xl border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                              onClick={() =>
+                                void handleArchiveTrainingNote(note.note_id)
+                              }
+                              type="button"
+                            >
+                              Archivar
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      {note.body ? (
+                        <p className="mt-2 whitespace-pre-wrap text-[var(--muted)]">
+                          {note.body}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+            </article>
+
+            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 lg:col-span-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
+                    Archivos
+                  </p>
+                  <h4 className="mt-2 font-display text-xl font-bold">
+                    Documentos y metadata
+                  </h4>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Registra documentos y enlaces. La subida de archivo real se
+                    gestiona fuera de este formulario.
+                  </p>
+                </div>
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-white"
+                  onClick={() => setFileMetadataForm(buildFileMetadataForm())}
+                  type="button"
+                >
+                  Nuevo documento
+                </button>
+              </div>
+
+              <form
+                className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4"
+                onSubmit={handleSaveFileMetadata}
+              >
+                <div className="grid gap-3 md:grid-cols-[0.8fr_1.2fr]">
+                  <select
+                    aria-label="Tipo de documento"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setFileMetadataForm({
+                        ...fileMetadataForm,
+                        kind: event.target.value as FileKind,
+                      })
+                    }
+                    value={fileMetadataForm.kind}
+                  >
+                    {Object.entries(fileKindLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    aria-label="Titulo del documento"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setFileMetadataForm({
+                        ...fileMetadataForm,
+                        title: event.target.value,
+                      })
+                    }
+                    placeholder="Titulo"
+                    value={fileMetadataForm.title}
+                  />
+                </div>
+                <textarea
+                  aria-label="Descripcion del documento"
+                  className="min-h-20 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setFileMetadataForm({
+                      ...fileMetadataForm,
+                      description: event.target.value,
+                    })
+                  }
+                  placeholder="Descripcion o nota interna"
+                  value={fileMetadataForm.description}
+                />
+                <div className="grid gap-3 md:grid-cols-3">
+                  <input
+                    aria-label="URL opcional del documento"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setFileMetadataForm({
+                        ...fileMetadataForm,
+                        drive_url: event.target.value,
+                      })
+                    }
+                    placeholder="URL opcional"
+                    value={fileMetadataForm.drive_url}
+                  />
+                  <input
+                    aria-label="Tipo MIME del documento"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setFileMetadataForm({
+                        ...fileMetadataForm,
+                        mime_type: event.target.value,
+                      })
+                    }
+                    placeholder="Tipo MIME opcional"
+                    value={fileMetadataForm.mime_type}
+                  />
+                  <input
+                    aria-label="Tamano del documento"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    min="0"
+                    onChange={(event) =>
+                      setFileMetadataForm({
+                        ...fileMetadataForm,
+                        size_bytes: event.target.value,
+                      })
+                    }
+                    placeholder="Bytes opcional"
+                    type="number"
+                    value={fileMetadataForm.size_bytes}
+                  />
+                </div>
+                <label className="flex items-center gap-3 text-sm font-semibold">
+                  <input
+                    checked={fileMetadataForm.visible_to_student}
+                    onChange={(event) =>
+                      setFileMetadataForm({
+                        ...fileMetadataForm,
+                        visible_to_student: event.target.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                  Visible para alumno
+                </label>
+                <button
+                  className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                  disabled={saving}
+                  type="submit"
+                >
+                  {fileMetadataForm.file_id
+                    ? 'Actualizar documento'
+                    : 'Registrar documento'}
+                </button>
+              </form>
+
+              <div className="mt-4 grid gap-2 text-sm">
+                {selectedStudentFiles.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-[var(--muted)]">
+                    Sin documentos registrados.
+                  </p>
+                ) : (
+                  selectedStudentFiles.map((file) => (
+                    <div
+                      className={`rounded-2xl border border-[var(--line)] bg-white p-3 ${
+                        file.archived_at ? 'opacity-60' : ''
+                      }`}
+                      key={file.file_id}
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold">{file.title}</p>
+                          <p className="text-xs text-[var(--muted)]">
+                            {fileKindLabels[file.kind]} · {formatSize(file.size_bytes)} ·{' '}
+                            {file.visible_to_student
+                              ? 'Visible para alumno'
+                              : 'Solo administracion'}
+                            {file.archived_at ? ' · Archivado' : ''}
+                          </p>
+                          {file.description ? (
+                            <p className="mt-2 text-[var(--muted)]">
+                              {file.description}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex gap-2">
+                          {file.drive_url ? (
+                            <a
+                              className="rounded-xl border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                              href={file.drive_url}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              Abrir
+                            </a>
+                          ) : null}
+                          <button
+                            className="rounded-xl border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                            onClick={() => editFileMetadata(file)}
+                            type="button"
+                          >
+                            Editar
+                          </button>
+                          {!file.archived_at ? (
+                            <button
+                              className="rounded-xl border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                              onClick={() =>
+                                void handleArchiveFileMetadata(file.file_id)
+                              }
+                              type="button"
+                            >
+                              Archivar
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </article>
 
             <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 lg:col-span-2">

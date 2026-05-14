@@ -2,18 +2,21 @@
 
 ## Actual
 
-RAN-24 / RANV2-08: perfil alumno y autogestion.
+RAN-25 / RANV2-09: plan de entrenamiento, observaciones y archivos.
 
 ## Siguiente
 
-RAN-24 / RANV2-08: revisar PR, aplicar migracion con `db push` real en bloque posterior y probar alumno real.
+RAN-25 / RANV2-09: revisar PR, aplicar migracion con `db push` real en bloque posterior y probar admin/alumno reales.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Probar `/app` con alumno real.
-- Probar `/app/profile` y actualizacion segura de telefono/emails.
-- Probar `/app/bookings`, `/app/payments`, `/app/attendance` y `/app/files`.
-- Verificar audit log `profile.updated_by_student`.
-- Google Drive/archivos reales quedan para RANV2-09/RANV2-11.
-- Pagos online, Mailjet, Cloudflare y deploy quedan fuera de RANV2-08.
+- Revisar PR RANV2-09.
+- Ejecutar `db push --dry-run` y luego `db push` real solo en bloque posterior aprobado.
+- Probar admin `/admin/students` con ficha de alumno.
+- Crear/editar plan de entrenamiento y observaciones.
+- Crear/editar metadata de documento.
+- Probar `/app/files` con alumno real y visibilidad propia.
+- Verificar audit logs `training_note.*` y `file_metadata.*`.
+- Google Drive real y subida binaria quedan fuera.
+- Pagos online, Mailjet, Cloudflare y deploy quedan fuera de RANV2-09.

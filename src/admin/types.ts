@@ -54,6 +54,12 @@ export type Membership = {
 export type PaymentMethod = 'cash' | 'transfer'
 export type PaymentStatus = 'pending' | 'approved' | 'rejected'
 export type AttendanceStatus = 'present' | 'absent' | 'justified'
+export type FileKind = 'training_plan' | 'observation' | 'attachment'
+export type TrainingNoteType =
+  | 'training_plan'
+  | 'observation'
+  | 'follow_up'
+  | 'admin_note'
 
 export type Payment = {
   id: string
@@ -108,6 +114,62 @@ export type UpdatePlanInput = {
   description: string
   price: number
   active: boolean
+}
+
+export type AdminTrainingNote = {
+  note_id: string
+  student_id: string
+  note_type: TrainingNoteType
+  title: string
+  body: string | null
+  visible_to_student: boolean
+  created_by: string | null
+  created_by_name: string | null
+  updated_by: string | null
+  updated_by_name: string | null
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
+export type UpsertTrainingNoteInput = {
+  note_id?: string | null
+  student_id: string
+  note_type: TrainingNoteType
+  title: string
+  body: string
+  visible_to_student: boolean
+}
+
+export type AdminStudentFile = {
+  file_id: string
+  student_id: string
+  kind: FileKind
+  title: string
+  description: string | null
+  drive_url: string | null
+  mime_type: string | null
+  size_bytes: number | null
+  visible_to_student: boolean
+  uploaded_by: string | null
+  uploaded_by_name: string | null
+  updated_by: string | null
+  updated_by_name: string | null
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
+export type StudentFileMetadataInput = {
+  file_id?: string | null
+  student_id: string
+  kind: FileKind
+  title: string
+  description: string
+  drive_url: string
+  mime_type: string
+  size_bytes: string
+  visible_to_student: boolean
 }
 
 export type CalendarSession = {

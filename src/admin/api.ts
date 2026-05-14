@@ -2,6 +2,8 @@ import { supabase, supabaseConfigError } from '../lib/supabase'
 import type {
   AssignMembershipInput,
   Activity,
+  AdminStudentFile,
+  AdminTrainingNote,
   AttendanceSessionRow,
   AttendanceStatus,
   AutoFinalizeAttendanceResult,
@@ -13,10 +15,12 @@ import type {
   PaymentStatus,
   Plan,
   RegisterPaymentInput,
+  StudentFileMetadataInput,
   StudentProfile,
   UpdateClassSessionInput,
   UpdatePlanInput,
   UpdateStudentInput,
+  UpsertTrainingNoteInput,
 } from './types'
 
 function getClient() {
@@ -352,6 +356,133 @@ export async function markAttendance(
     booking_id: bookingId,
     status,
     notes: notes.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function listStudentTrainingNotes(studentId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_list_student_training_notes', {
+    student_id: studentId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as AdminTrainingNote[]
+}
+
+export async function upsertTrainingNote(input: UpsertTrainingNoteInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_upsert_training_note', {
+    note_id: input.note_id ?? null,
+    student_id: input.student_id,
+    note_type: input.note_type,
+    title: input.title,
+    body: input.body,
+    visible_to_student: input.visible_to_student,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function archiveTrainingNote(noteId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_archive_training_note', {
+    note_id: noteId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function listStudentFiles(studentId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_list_student_files', {
+    student_id: studentId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as AdminStudentFile[]
+}
+
+function parseOptionalSize(value: string) {
+  if (!value.trim()) {
+    return null
+  }
+
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error('El tamano debe ser un numero mayor o igual a cero.')
+  }
+
+  return Math.trunc(parsed)
+}
+
+export async function createStudentFileMetadata(
+  input: StudentFileMetadataInput,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_create_student_file_metadata', {
+    student_id: input.student_id,
+    kind: input.kind,
+    title: input.title,
+    drive_url: input.drive_url.trim() || null,
+    description: input.description.trim() || null,
+    mime_type: input.mime_type.trim() || null,
+    size_bytes: parseOptionalSize(input.size_bytes),
+    visible_to_student: input.visible_to_student,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function updateStudentFileMetadata(
+  input: StudentFileMetadataInput & { file_id: string },
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_update_student_file_metadata', {
+    file_id: input.file_id,
+    kind: input.kind,
+    title: input.title,
+    drive_url: input.drive_url.trim() || null,
+    description: input.description.trim() || null,
+    mime_type: input.mime_type.trim() || null,
+    size_bytes: parseOptionalSize(input.size_bytes),
+    visible_to_student: input.visible_to_student,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function archiveStudentFileMetadata(fileId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_archive_student_file_metadata', {
+    file_id: fileId,
   })
 
   if (error) {

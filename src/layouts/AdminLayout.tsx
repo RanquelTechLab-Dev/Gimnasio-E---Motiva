@@ -16,9 +16,9 @@ export function AdminLayout() {
   return (
     <LayoutShell
       navItems={navItems}
-      pendingLabel="Auth real, Supabase y operaciones administrables quedan pendientes para RANV2-03, RANV2-04 y RANV2-05."
+      pendingLabel="Acceso admin protegido. Operaciones administrables reales quedan pendientes para RANV2-05."
       section="Panel administracion"
-      subtitle="Base visual y de navegacion para que el siguiente bloque conecte negocio real sin rehacer estructura."
+      subtitle="Area reservada para perfiles con rol admin activo en Supabase."
       title="Panel administracion"
     />
   )

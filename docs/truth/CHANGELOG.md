@@ -37,3 +37,13 @@
 - Se agregan policies minimas para admin/alumno.
 - Se agregan seeds base de actividades y planes con precios pendientes.
 - No se ejecuta `db push` real.
+
+## 2026-05-14 - RANV2-04 auth + roles
+
+- Se agrega cliente Supabase Auth en frontend sin secrets.
+- Se agrega flujo de sesion, login email/password y logout.
+- Se agregan guards para alumno/admin.
+- Se carga profile desde `public.profiles`.
+- Se crea migracion RANV2-04 para hardening minimo de advisors.
+- Se documenta bootstrap manual del admin inicial.
+- No se ejecuta `db push` real en este bloque.

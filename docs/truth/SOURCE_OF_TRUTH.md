@@ -30,7 +30,7 @@ No es fuente activa. No se copian migraciones, ramas ni codigo viejo sin auditor
 
 Proyecto: E-Motiva App Gimnasio v2
 
-Issue actual: RAN-19 - RANV2-03 - Supabase schema inicial + RLS versionado.
+Issue actual: RAN-20 - RANV2-04 - Auth + roles admin/alumno.
 
 ## Supabase
 
@@ -42,12 +42,13 @@ Proyecto activo: `emotiva-gym-app-v2`
 
 Regla: todo schema nace desde `supabase/migrations`. Ninguna tabla se crea manualmente en Dashboard. Ningun `db push` se ejecuta sin `db push --dry-run` previo.
 
-Estado actual del preflight:
+Estado actual:
 
 - Proyecto Supabase nuevo creado y linkeado localmente.
-- No hay schema creado todavia.
-- No se ejecuto `db push`.
-- No se crearon tablas manualmente.
+- Schema inicial aplicado desde migracion versionada.
+- RLS activo sobre tablas publicas.
+- Seeds base de actividades y planes aplicados.
+- Auth frontend real en ejecucion para RANV2-04.
 
 ## Stack previsto
 
@@ -69,12 +70,13 @@ Estado actual del preflight:
 
 ## Estado actual
 
-RAN-19 esta en ejecucion.
+RAN-20 esta en ejecucion.
 
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
 - Supabase nuevo limpio creado y linkeado.
-- Migracion local inicial + RLS creada en `supabase/migrations`.
-- Tablas base, policies minimas y seeds base documentados.
-- No se ejecuto `db push` real todavia.
-- Proximo paso: revisar PR y autorizar aplicacion remota en bloque posterior.
+- Migracion inicial + RLS aplicada en Supabase remoto.
+- Migracion RANV2-04 de hardening de policies creada localmente.
+- Login email/password y guards admin/alumno agregados.
+- Admin real pendiente de creacion manual/post-merge.
+- No se ejecuto `db push` real para RANV2-04 todavia.

@@ -2,12 +2,14 @@
 
 ## Actual
 
-Revisar PR de RAN-19 / RANV2-03 con migracion local inicial + RLS versionado.
+Revisar PR de RAN-20 / RANV2-04 con Auth + roles admin/alumno y hardening minimo de advisors.
 
 ## Siguiente
 
-RAN-19 / RANV2-03: validar `db push --dry-run`, revisar PR y luego aplicar `db push` real en bloque posterior autorizado.
+RAN-20 / RANV2-04: mergear PR, aplicar `db push` real de la migracion RANV2-04 en bloque posterior autorizado, crear admin Auth real y validar login/admin/student/logout.
 
-## Pendiente antes de RAN-19
+## Pendiente
 
-Supabase nuevo ya fue creado y linkeado. El schema inicial debe aplicarse exclusivamente desde `supabase/migrations`, sin tablas manuales y sin `db push` real hasta validar el dry-run y aprobar el bloque remoto.
+- No crear usuarios ni profiles reales hasta el bloque remoto/manual posterior.
+- No guardar secrets en el repo.
+- RANV2-05 queda para panel admin: alumnos, planes y pagos manuales.

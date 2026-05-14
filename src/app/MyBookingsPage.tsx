@@ -69,6 +69,10 @@ export function MyBookingsPage() {
           <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
             Mis reservas
           </h3>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Las clases comunes cancelan hasta 12h antes. Personalizado 1:1
+            cancela hasta 24h antes.
+          </p>
         </div>
         <button
           className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"

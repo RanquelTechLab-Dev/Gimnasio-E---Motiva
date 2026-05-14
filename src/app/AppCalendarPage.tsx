@@ -94,8 +94,8 @@ export function AppCalendarPage() {
             Clases disponibles
           </h3>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            La reserva final la valida Supabase por plan, membresia, cupo y
-            creditos.
+            Las reservas se confirman segun tu plan, membresia, cupo disponible
+            y creditos.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">

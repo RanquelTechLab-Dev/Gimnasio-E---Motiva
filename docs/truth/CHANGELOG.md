@@ -47,3 +47,11 @@
 - Se crea migracion RANV2-04 para hardening minimo de advisors.
 - Se documenta bootstrap manual del admin inicial.
 - No se ejecuta `db push` real en este bloque.
+
+## 2026-05-14 - RANV2-04 login UX/env fix
+
+- Se valida `.env.local` local con URL, publishable key y WhatsApp sin commitear secrets.
+- Se simplifica la UX publica para mostrar solo el acceso E-Motiva.
+- `/` redirige segun sesion y rol.
+- Se eliminan accesos publicos a panel alumno/admin.
+- Se remueven textos tecnicos visibles de RAN/placeholder en la app.

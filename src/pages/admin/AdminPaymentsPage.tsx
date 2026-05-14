@@ -6,10 +6,10 @@ export function AdminPaymentsPage() {
       bullets={[
         'Sin pagos online.',
         'No Mercado Pago ni Stripe.',
-        'Pagos manuales quedan para RANV2-05.',
-        'Comprobante por WhatsApp o en persona en bloques futuros.',
+        'Pagos manuales se incorporan en el panel operativo.',
+        'Comprobante por WhatsApp o en persona.',
       ]}
-      description="Vista base para registrar y aprobar pagos manuales cuando exista backend real."
+      description="Vista para registrar y aprobar pagos manuales cuando se habilite la gestion operativa."
       eyebrow="/admin/payments"
       title="Pagos manuales"
     />

@@ -12,7 +12,7 @@ export function StudentLayout() {
   return (
     <LayoutShell
       navItems={navItems}
-      pendingLabel="Sesion real conectada. Reglas de plan, cupos y datos operativos quedan para RANV2-05 y RANV2-06."
+      pendingLabel="Sesion real conectada. Las reglas de plan, cupos y datos operativos se incorporan en los proximos bloques."
       section="Panel alumno"
       subtitle="Acceso protegido para alumnos con sesion activa y perfil cargado desde Supabase."
       title="Espacio del alumno"

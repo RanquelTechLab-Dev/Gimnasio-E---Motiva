@@ -4,12 +4,12 @@ export function StudentCalendarPage() {
   return (
     <PlaceholderPanel
       bullets={[
-        'Calendario placeholder.',
-        'Sin clases reales ni cupos por ahora.',
-        'La logica de reservas queda para RANV2-06.',
-        'No hay backend conectado.',
+        'Calendario del alumno.',
+        'Clases y cupos se incorporan en el modulo de reservas.',
+        'La logica de reservas queda protegida por reglas de negocio.',
+        'Acceso disponible solo con sesion activa.',
       ]}
-      description="Este espacio va a mostrar las clases disponibles segun plan y cupo, pero hoy queda como base visual."
+      description="Este espacio muestra el lugar donde el alumno consultara clases disponibles segun plan y cupo."
       eyebrow="/app/calendar"
       title="Calendario del alumno"
     />

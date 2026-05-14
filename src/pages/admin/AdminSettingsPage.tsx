@@ -6,10 +6,10 @@ export function AdminSettingsPage() {
       bullets={[
         'Sin configuraciones persistidas.',
         'No hay secrets ni integraciones.',
-        'Sirve como placeholder del panel admin.',
+        'Espacio reservado para configuracion del panel admin.',
         'La configuracion real se incorpora por bloque.',
       ]}
-      description="Espacio reservado para configuraciones futuras sin mezclar este bloque de setup con backend o integraciones."
+      description="Espacio reservado para configuraciones futuras sin mezclar este bloque con integraciones externas."
       eyebrow="/admin/settings"
       title="Configuracion"
     />

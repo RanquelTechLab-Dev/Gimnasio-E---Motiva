@@ -72,3 +72,4 @@
 - Se agrega fecha/calendario al registro de pago manual.
 - Se versiona migracion para persistir la fecha elegida en `payments.paid_at`.
 - Google Drive real queda fuera de RANV2-05 y pendiente para RANV2-09/RANV2-11.
+- Se corrige la seleccion de alumno para que la ficha y formularios no queden activos sobre un alumno oculto por el buscador.

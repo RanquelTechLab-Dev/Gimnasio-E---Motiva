@@ -148,26 +148,28 @@ export function AdminStudentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  const filteredStudents = useMemo(
+    () =>
+      students.filter((student) => matchesStudentSearch(student, studentSearch)),
+    [students, studentSearch],
+  )
   const selectedStudent = useMemo(
     () =>
-      students.find((student) => student.id === selectedStudentId) ??
-      students[0] ??
-      null,
-    [selectedStudentId, students],
+      selectedStudentId
+        ? filteredStudents.find((student) => student.id === selectedStudentId) ??
+          null
+        : null,
+    [filteredStudents, selectedStudentId],
   )
-
+  const plansById = useMemo(
+    () => new Map(plans.map((plan) => [plan.id, plan])),
+    [plans],
+  )
   const selectedMemberships = memberships.filter(
     (membership) => membership.student_id === selectedStudent?.id,
   )
   const selectedPayments = payments.filter(
     (payment) => payment.student_id === selectedStudent?.id,
-  )
-  const filteredStudents = students.filter((student) =>
-    matchesStudentSearch(student, studentSearch),
-  )
-  const plansById = useMemo(
-    () => new Map(plans.map((plan) => [plan.id, plan])),
-    [plans],
   )
 
   async function loadData() {
@@ -215,13 +217,45 @@ export function AdminStudentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function clearSelectedStudentForms() {
+    setSelectedStudentId(null)
+    setEditForm(null)
+    setMembershipForm(buildMembershipForm(plans))
+    setPaymentForm((current) => ({
+      ...current,
+      membership_id: '',
+      amount: '',
+      payment_date: current.payment_date || todayDate(),
+      notes: '',
+    }))
+  }
+
+  function handleStudentSearchChange(searchValue: string) {
+    setStudentSearch(searchValue)
+
+    if (!selectedStudentId) {
+      return
+    }
+
+    const selectedStillVisible = students
+      .filter((student) => matchesStudentSearch(student, searchValue))
+      .some((student) => student.id === selectedStudentId)
+
+    if (!selectedStillVisible) {
+      clearSelectedStudentForms()
+    }
+  }
+
   function selectStudent(student: StudentProfile) {
     const firstMembership = memberships.find(
       (membership) => membership.student_id === student.id,
     )
     setSelectedStudentId(student.id)
     setEditForm(studentToEditForm(student))
-    setPaymentForm({ ...paymentForm, membership_id: firstMembership?.id ?? '' })
+    setPaymentForm((current) => ({
+      ...current,
+      membership_id: firstMembership?.id ?? '',
+    }))
     setError(null)
     setSuccess(null)
   }
@@ -391,7 +425,9 @@ export function AdminStudentsPage() {
               <input
                 className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 id="student-search"
-                onChange={(event) => setStudentSearch(event.target.value)}
+                onChange={(event) =>
+                  handleStudentSearchChange(event.target.value)
+                }
                 placeholder="Nombre, apellido, email o telefono"
                 value={studentSearch}
               />
@@ -545,7 +581,12 @@ export function AdminStudentsPage() {
               </div>
             </article>
           </div>
-        ) : null}
+        ) : (
+          <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
+            Selecciona un alumno de la tabla para ver la ficha, editar datos,
+            asignar membresias o registrar pagos.
+          </div>
+        )}
       </div>
 
       <aside className="grid gap-5">

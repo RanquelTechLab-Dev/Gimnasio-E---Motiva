@@ -28,3 +28,12 @@
 - No se ejecuta `db push`.
 - No se crean tablas ni policies todavia.
 - Se alinea Supabase Auth local redirect con Vite dev server en puerto 5173.
+
+## 2026-05-14 - RANV2-03 schema inicial + RLS
+
+- Se crea migracion inicial versionada de Supabase.
+- Se agregan tablas base para perfiles, actividades, planes, membresias, pagos, clases, reservas, asistencia, notas, archivos, emails, Drive y auditoria.
+- Se habilita RLS en tablas publicas.
+- Se agregan policies minimas para admin/alumno.
+- Se agregan seeds base de actividades y planes con precios pendientes.
+- No se ejecuta `db push` real.

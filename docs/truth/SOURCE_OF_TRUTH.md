@@ -74,4 +74,7 @@ RAN-19 esta en ejecucion.
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
 - Supabase nuevo limpio creado y linkeado.
-- Proximo subbloque: migracion local inicial + RLS versionado.
+- Migracion local inicial + RLS creada en `supabase/migrations`.
+- Tablas base, policies minimas y seeds base documentados.
+- No se ejecuto `db push` real todavia.
+- Proximo paso: revisar PR y autorizar aplicacion remota en bloque posterior.

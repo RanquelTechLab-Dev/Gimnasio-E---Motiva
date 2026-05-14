@@ -174,3 +174,9 @@ export type AttendanceSessionRow = {
   attendance_notes: string | null
   attendance_charged_as_attended: boolean | null
 }
+
+export type AutoFinalizeAttendanceResult = {
+  finalized_count: number
+  from_date: string
+  to_date: string
+}

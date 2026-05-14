@@ -87,4 +87,4 @@ RAN-23 esta en ejecucion.
 - RANV2-05 agrego panel operativo para alumnos, planes, membresias y pagos manuales.
 - Edge Function `create-student` fue desplegada.
 - RANV2-06 agrego calendario, clases y reservas con cupos, reglas por plan/membresia/creditos y cancelacion 24h para personalizado 1:1.
-- RANV2-07 agrega panel admin de asistencia sobre reservas existentes, con auditoria y actualizacion de actividad real solo para asistencia `present`.
+- RANV2-07 agrega panel admin de asistencia sobre reservas existentes. La asistencia normal se genera automaticamente para reservas no canceladas de clases finalizadas; el panel queda para revisar y corregir casos puntuales.

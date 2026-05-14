@@ -2,16 +2,17 @@
 
 ## Actual
 
-RAN-23 / RANV2-07: revisar PR de asistencia y control de cupos.
+RAN-23 / RANV2-07: revisar fix de asistencia automatica.
 
 ## Siguiente
 
-RAN-23 / RANV2-07: mergear PR, aplicar migracion con `db push` real en bloque posterior y probar marcado de asistencia real.
+RAN-23 / RANV2-07: mergear PR fix, aplicar migracion con `db push` real en bloque posterior y probar finalizacion automatica de asistencia.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Validar `present`, `absent` y `justified`.
+- Validar asistencia automatica para reservas no canceladas de clases finalizadas.
+- Validar correcciones `present`, `absent` y `justified`.
 - Validar `profiles.last_attendance_at`.
 - Validar `profiles.last_real_activity_at`.
 - Verificar audit logs de asistencia.

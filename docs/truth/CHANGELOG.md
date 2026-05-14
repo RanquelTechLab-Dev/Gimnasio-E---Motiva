@@ -91,3 +91,11 @@
 - Se reemplaza el placeholder `/admin/attendance` por UI operativa.
 - `present` actualiza asistencia real; `absent` y `justified` no devuelven ni descuentan creditos.
 - No se ejecuta `db push` real en este bloque.
+
+## 2026-05-14 - RANV2-07 asistencia automatica
+
+- Se ajusta el criterio funcional: Carolina no toma asistencia manual.
+- Se agrega migracion local para finalizar automaticamente reservas `booked` de clases ya terminadas y no canceladas como `present`.
+- `/admin/attendance` pasa a revisar asistencia automatica y corregir casos puntuales.
+- La automatizacion no toca creditos, pagos, Mailjet, Drive, Cloudflare ni RAN-24.
+- No se ejecuta `db push` real en este bloque.

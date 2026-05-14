@@ -4,6 +4,7 @@ import type {
   Activity,
   AttendanceSessionRow,
   AttendanceStatus,
+  AutoFinalizeAttendanceResult,
   CalendarSession,
   ClassSessionInput,
   CreateStudentInput,
@@ -325,6 +326,20 @@ export async function listAttendanceSessions(fromDate: string, toDate: string) {
   }
 
   return (data ?? []) as AttendanceSessionRow[]
+}
+
+export async function autoFinalizeAttendance(fromDate: string, toDate: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('auto_finalize_attendance', {
+    from_date: fromDate,
+    to_date: toDate,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AutoFinalizeAttendanceResult
 }
 
 export async function markAttendance(

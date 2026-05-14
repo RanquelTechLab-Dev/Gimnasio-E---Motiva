@@ -2,6 +2,8 @@ import { supabase, supabaseConfigError } from '../lib/supabase'
 import type {
   AssignMembershipInput,
   Activity,
+  AttendanceSessionRow,
+  AttendanceStatus,
   CalendarSession,
   ClassSessionInput,
   CreateStudentInput,
@@ -302,6 +304,39 @@ export async function cancelClassSession(sessionId: string, reason: string) {
   const { data, error } = await client.rpc('cancel_class_session', {
     session_id: sessionId,
     reason: reason.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function listAttendanceSessions(fromDate: string, toDate: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('list_attendance_sessions', {
+    from_date: fromDate,
+    to_date: toDate,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as AttendanceSessionRow[]
+}
+
+export async function markAttendance(
+  bookingId: string,
+  status: AttendanceStatus,
+  notes: string,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc('mark_attendance', {
+    booking_id: bookingId,
+    status,
+    notes: notes.trim() || null,
   })
 
   if (error) {

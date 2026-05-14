@@ -2,18 +2,19 @@
 
 ## Actual
 
-RAN-22 / RANV2-06: revisar PR de calendario, clases y reservas con cupos.
+RAN-23 / RANV2-07: revisar PR de asistencia y control de cupos.
 
 ## Siguiente
 
-RAN-22 / RANV2-06: mergear PR, aplicar migracion con `db push` real en bloque posterior, crear clase real y probar reserva/cancelacion con alumno.
+RAN-23 / RANV2-07: mergear PR, aplicar migracion con `db push` real en bloque posterior y probar marcado de asistencia real.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Validar bloqueo por plan, membresia, cupo y creditos.
-- Validar cancelacion 24h para personalizado 1:1.
-- Verificar audit logs de clases y reservas.
+- Validar `present`, `absent` y `justified`.
+- Validar `profiles.last_attendance_at`.
+- Validar `profiles.last_real_activity_at`.
+- Verificar audit logs de asistencia.
 - Google Drive/archivos reales quedan para RANV2-09/RANV2-11.
-- Cerrar RAN-22 despues de validar remoto y operaciones.
-- RANV2-07 asistencia queda fuera de RANV2-06.
+- Cerrar RAN-23 despues de validar remoto y operaciones.
+- RANV2-08 queda fuera de RANV2-07.

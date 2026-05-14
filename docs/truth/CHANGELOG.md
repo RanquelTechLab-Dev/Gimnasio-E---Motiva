@@ -82,3 +82,12 @@
 - Se implementa regla 24h para actividades personalizadas con `requires_24h_cancel`.
 - Se reemplazan placeholders de `/admin/calendar`, `/app/calendar` y `/app/my-bookings` por UI operativa.
 - No se ejecuta `db push` real en este bloque.
+
+## 2026-05-14 - RANV2-07 asistencia
+
+- Se agrega migracion local para asistencia operativa.
+- Se agrega `profiles.last_attendance_at`.
+- Se agregan RPCs admin-only para listar clases/reservas/asistencia y marcar/corregir asistencia.
+- Se reemplaza el placeholder `/admin/attendance` por UI operativa.
+- `present` actualiza asistencia real; `absent` y `justified` no devuelven ni descuentan creditos.
+- No se ejecuta `db push` real en este bloque.

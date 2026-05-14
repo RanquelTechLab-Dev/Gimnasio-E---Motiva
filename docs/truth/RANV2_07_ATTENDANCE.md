@@ -55,6 +55,10 @@ reservas no canceladas cuando la clase ya finalizo.
 - No actualiza `last_real_activity_at`.
 
 La cancelacion real de reservas pertenece a RANV2-06 mediante `cancel_booking`.
+RANV2-06B define la ventana de cancelacion: clases comunes hasta 12 horas antes
+y personalizado 1:1 hasta 24 horas antes. Si el alumno no cancela a tiempo, la
+reserva queda activa para que la asistencia automatica la consuma al finalizar
+la clase.
 
 ## Automatizacion
 

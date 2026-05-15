@@ -2,19 +2,19 @@
 
 ## Actual
 
-RAN-27 / RANV2-11: Google Drive storage externo y alertas.
+RAN-28 / RANV2-12: Limpieza automatica por alumno sin pago mas antiguo.
 
 ## Siguiente
 
-Configurar OAuth Google con la cuenta `e.motiva.gym@gmail.com`, cargar secrets y desplegar Edge Functions de storage.
+Revisar PR de limpieza controlada Drive, desplegar `cleanup-drive-files` y validar dry-run remoto.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Cargar `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` y `GOOGLE_DRIVE_ROOT_FOLDER_ID` como Supabase secrets.
-- Desplegar `upload-student-file` y `check-drive-status`.
-- Validar `check-drive-status`.
-- Subir archivo de prueba controlado para `ranqueltechlab@gmail.com`.
-- Verificar `files`, `drive_status` y `audit_logs`.
+- No ejecutar limpieza real en PR inicial.
+- Desplegar `cleanup-drive-files` despues de merge.
+- Validar dry-run remoto desde `/admin/storage`.
+- Verificar `drive_cleanup.dry_run` en `audit_logs`.
+- Autorizar ejecucion real solo si Drive esta en umbral critico o Walter lo confirma.
 - No cargar credenciales Google en Cloudflare o frontend.
-- Limpieza automatica, pagos online, Mailjet y WhatsApp API quedan fuera de RANV2-11.
+- Pagos online, Mailjet, WhatsApp API y RAN-29 quedan fuera de RANV2-12.

@@ -180,6 +180,53 @@ export type DriveStatusResult = {
   warning: boolean
 }
 
+export type DriveCleanupCandidate = {
+  student_id: string
+  email: string | null
+  first_name: string | null
+  last_name: string | null
+  last_payment_at: string | null
+  last_real_activity_at: string | null
+  last_attendance_at: string | null
+  derived_last_activity_at: string | null
+  eligible_file_count: number
+  eligible_bytes: number
+}
+
+export type DriveCleanupFile = {
+  id: string
+  student_id: string
+  title: string
+  kind: FileKind
+  drive_file_id: string | null
+  drive_url: string | null
+  size_bytes: number | null
+  visible_to_student: boolean
+  created_at: string
+}
+
+export type DriveCleanupResult = {
+  dryRun: boolean
+  force: boolean
+  quota: DriveStatusResult
+  threshold_reached: boolean
+  selected_student: DriveCleanupCandidate | null
+  selected_files: DriveCleanupFile[]
+  deleted_files: Array<{
+    file_id: string
+    drive_file_id: string
+    status: number
+  }>
+  archived_file_ids: string[]
+  failed_files: Array<{
+    file_id: string
+    drive_file_id: string | null
+    stage: 'drive_delete' | 'metadata_archive'
+    error: string
+  }>
+  message: string
+}
+
 export type UploadStudentFileInput = {
   student_id: string
   kind: FileKind

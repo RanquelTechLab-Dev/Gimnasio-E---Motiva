@@ -172,6 +172,28 @@ export type StudentFileMetadataInput = {
   visible_to_student: boolean
 }
 
+export type DriveStatusResult = {
+  used_bytes: number
+  total_bytes: number | null
+  remaining_bytes: number | null
+  remaining_ratio: number | null
+  warning: boolean
+}
+
+export type UploadStudentFileInput = {
+  student_id: string
+  kind: FileKind
+  title: string
+  description: string
+  visible_to_student: boolean
+  file: File
+}
+
+export type UploadStudentFileResult = {
+  file: AdminStudentFile
+  drive_status: DriveStatusResult | null
+}
+
 export type MassEmailAudience = 'recent_payers_6_months'
 
 export type MassEmailInput = {

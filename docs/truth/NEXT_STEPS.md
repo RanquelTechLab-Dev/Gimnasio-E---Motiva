@@ -2,18 +2,19 @@
 
 ## Actual
 
-RAN-26 / RANV2-10: Mailjet emails masivos y opt-in/out.
+RAN-27 / RANV2-11: Google Drive storage externo y alertas.
 
 ## Siguiente
 
-Configurar secrets Mailjet en Supabase, desplegar la Edge Function `send-mass-email` y probar dry-run/envio real controlado.
+Configurar OAuth Google con la cuenta `e.motiva.gym@gmail.com`, cargar secrets y desplegar Edge Functions de storage.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Cargar `MAILJET_API_KEY`, `MAILJET_API_SECRET`, `MAILJET_FROM_EMAIL` y `MAILJET_FROM_NAME` como Supabase secrets.
-- Desplegar `supabase/functions/send-mass-email`.
-- Validar vista previa en `/admin/emails`.
-- Enviar prueba controlada y verificar `email_logs`.
-- No cargar Mailjet, `service_role`, DB password ni Supabase JWT secret en Cloudflare o frontend.
-- Google Drive real, pagos online y WhatsApp API quedan fuera de RANV2-10.
+- Cargar `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` y `GOOGLE_DRIVE_ROOT_FOLDER_ID` como Supabase secrets.
+- Desplegar `upload-student-file` y `check-drive-status`.
+- Validar `check-drive-status`.
+- Subir archivo de prueba controlado para `ranqueltechlab@gmail.com`.
+- Verificar `files`, `drive_status` y `audit_logs`.
+- No cargar credenciales Google en Cloudflare o frontend.
+- Limpieza automatica, pagos online, Mailjet y WhatsApp API quedan fuera de RANV2-11.

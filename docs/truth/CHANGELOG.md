@@ -136,3 +136,12 @@
 - Se documenta configuracion de deploy Vite: `npm run build` y salida `dist`.
 - Se documentan variables publicas necesarias para el frontend.
 - No se agregan secrets, migraciones ni cambios funcionales.
+
+## 2026-05-14 - RANV2-10 Mailjet emails masivos
+
+- Se agrega Edge Function `send-mass-email` para enviar emails informativos con Mailjet desde backend seguro.
+- `/admin/emails` permite previsualizar audiencia y enviar a alumnos elegibles.
+- La audiencia inicial incluye alumnos activos con opt-in y pagos aprobados en los ultimos 6 meses.
+- Los envios se registran en `email_logs` y el envio masivo se audita.
+- No se agrega migracion porque se reutilizan `email_logs` y `profiles.receives_emails`.
+- Secrets Mailjet quedan pendientes de configurar en Supabase; no se guardan en Git.

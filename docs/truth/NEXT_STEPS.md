@@ -2,17 +2,18 @@
 
 ## Actual
 
-RAN-30 / RANV2-14: Cloudflare deploy preview para demo.
+RAN-26 / RANV2-10: Mailjet emails masivos y opt-in/out.
 
 ## Siguiente
 
-Crear proyecto Cloudflare Pages conectado al repo, cargar variables publicas y validar URL de demo.
+Configurar secrets Mailjet en Supabase, desplegar la Edge Function `send-mass-email` y probar dry-run/envio real controlado.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- Configurar Cloudflare Pages con build `npm run build` y output `dist`.
-- Cargar `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_WHATSAPP_NUMBER`.
-- Validar URL base, `/login`, `/admin` y `/app`.
-- No cargar `service_role`, DB password, Supabase JWT secret ni secrets de integraciones.
-- Google Drive real, pagos online, Mailjet y WhatsApp API quedan fuera de RANV2-14.
+- Cargar `MAILJET_API_KEY`, `MAILJET_API_SECRET`, `MAILJET_FROM_EMAIL` y `MAILJET_FROM_NAME` como Supabase secrets.
+- Desplegar `supabase/functions/send-mass-email`.
+- Validar vista previa en `/admin/emails`.
+- Enviar prueba controlada y verificar `email_logs`.
+- No cargar Mailjet, `service_role`, DB password ni Supabase JWT secret en Cloudflare o frontend.
+- Google Drive real, pagos online y WhatsApp API quedan fuera de RANV2-10.

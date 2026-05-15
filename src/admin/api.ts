@@ -10,6 +10,8 @@ import type {
   CalendarSession,
   ClassSessionInput,
   CreateStudentInput,
+  MassEmailInput,
+  MassEmailResult,
   Membership,
   Payment,
   PaymentStatus,
@@ -490,4 +492,22 @@ export async function archiveStudentFileMetadata(fileId: string) {
   }
 
   return data
+}
+
+export async function sendMassEmail(input: MassEmailInput) {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('send-mass-email', {
+    body: {
+      subject: input.subject,
+      body: input.body,
+      audience: input.audience,
+      dryRun: input.dryRun,
+    },
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as MassEmailResult
 }

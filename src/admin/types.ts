@@ -172,6 +172,37 @@ export type StudentFileMetadataInput = {
   visible_to_student: boolean
 }
 
+export type MassEmailAudience = 'recent_payers_6_months'
+
+export type MassEmailInput = {
+  subject: string
+  body: string
+  audience: MassEmailAudience
+  dryRun: boolean
+}
+
+export type MassEmailRecipientPreview = {
+  student_id: string
+  email: string
+  first_name?: string
+  last_name?: string
+  last_paid_at?: string
+  status?: 'sent' | 'failed'
+  provider_message_id?: string | null
+  error?: string
+}
+
+export type MassEmailResult = {
+  audience: MassEmailAudience
+  dryRun: boolean
+  eligible_count: number
+  sent_count: number
+  failed_count: number
+  skipped_count: number
+  recipients: MassEmailRecipientPreview[]
+  message?: string
+}
+
 export type CalendarSession = {
   session_id: string
   activity_id: string

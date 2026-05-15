@@ -30,7 +30,7 @@ No es fuente activa. No se copian migraciones, ramas ni codigo viejo sin auditor
 
 Proyecto: E-Motiva App Gimnasio v2
 
-Issue actual: RAN-26 - RANV2-10 - Mailjet emails masivos y opt-in/out.
+Issue actual: RAN-27 - RANV2-11 - Google Drive storage externo y alertas.
 
 ## Supabase
 
@@ -56,7 +56,8 @@ Estado actual:
 - Perfil alumno y autogestion cerrado en RANV2-08.
 - Plan de entrenamiento, observaciones y metadata de archivos cerrado funcionalmente en RANV2-09.
 - Cloudflare Pages deploy preview cerrado en RANV2-14.
-- Mailjet emails masivos en ejecucion para RANV2-10.
+- Mailjet emails masivos cerrado en RANV2-10.
+- Google Drive storage externo en ejecucion para RANV2-11.
 
 ## Stack previsto
 
@@ -78,7 +79,7 @@ Estado actual:
 
 ## Estado actual
 
-RAN-26 esta en ejecucion.
+RAN-27 esta en ejecucion.
 
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
@@ -98,3 +99,4 @@ RAN-26 esta en ejecucion.
 - RANV2-09 agrega gestion admin de plan de entrenamiento, observaciones y metadata de archivos, con lectura segura para alumno.
 - RANV2-14 prepara deploy Cloudflare Pages con fallback SPA para rutas directas.
 - RANV2-10 agrega envio masivo informativo por Mailjet desde Edge Function segura, respetando `receives_emails`.
+- RANV2-11 agrega storage externo Google Drive desde Edge Functions seguras, manteniendo metadata en Supabase.

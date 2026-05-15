@@ -22,7 +22,10 @@ import type {
   UpdateClassSessionInput,
   UpdatePlanInput,
   UpdateStudentInput,
+  UploadStudentFileInput,
+  UploadStudentFileResult,
   UpsertTrainingNoteInput,
+  DriveStatusResult,
 } from './types'
 
 function getClient() {
@@ -492,6 +495,40 @@ export async function archiveStudentFileMetadata(fileId: string) {
   }
 
   return data
+}
+
+export async function uploadStudentFile(input: UploadStudentFileInput) {
+  const client = getClient()
+  const formData = new FormData()
+  formData.append('student_id', input.student_id)
+  formData.append('kind', input.kind)
+  formData.append('title', input.title)
+  formData.append('description', input.description)
+  formData.append('visible_to_student', String(input.visible_to_student))
+  formData.append('file', input.file)
+
+  const { data, error } = await client.functions.invoke('upload-student-file', {
+    body: formData,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as UploadStudentFileResult
+}
+
+export async function checkDriveStatus() {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('check-drive-status', {
+    body: {},
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as DriveStatusResult
 }
 
 export async function sendMassEmail(input: MassEmailInput) {

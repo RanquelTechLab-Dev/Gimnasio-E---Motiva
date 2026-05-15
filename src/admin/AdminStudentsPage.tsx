@@ -4,6 +4,7 @@ import {
   archiveStudentFileMetadata,
   archiveTrainingNote,
   assignMembership,
+  checkDriveStatus,
   createStudentFileMetadata,
   createStudent,
   formatAdminError,
@@ -16,11 +17,13 @@ import {
   registerManualPayment,
   updateStudentFileMetadata,
   updateStudent,
+  uploadStudentFile,
   upsertTrainingNote,
 } from './api'
 import type {
   AdminStudentFile,
   AdminTrainingNote,
+  DriveStatusResult,
   FileKind,
   Membership,
   PaymentMethod,
@@ -80,6 +83,14 @@ type FileMetadataFormState = {
   mime_type: string
   size_bytes: string
   visible_to_student: boolean
+}
+
+type UploadFileFormState = {
+  kind: FileKind
+  title: string
+  description: string
+  visible_to_student: boolean
+  file: File | null
 }
 
 const moneyFormatter = new Intl.NumberFormat('es-AR', {
@@ -184,6 +195,16 @@ function buildFileMetadataForm(): FileMetadataFormState {
   }
 }
 
+function buildUploadFileForm(): UploadFileFormState {
+  return {
+    kind: 'attachment',
+    title: '',
+    description: '',
+    visible_to_student: false,
+    file: null,
+  }
+}
+
 function formatSize(value: number | null) {
   if (value === null) {
     return 'Sin tamano'
@@ -228,6 +249,10 @@ export function AdminStudentsPage() {
     useState<TrainingNoteFormState>(buildTrainingNoteForm())
   const [fileMetadataForm, setFileMetadataForm] =
     useState<FileMetadataFormState>(buildFileMetadataForm())
+  const [uploadFileForm, setUploadFileForm] =
+    useState<UploadFileFormState>(buildUploadFileForm())
+  const [driveStatus, setDriveStatus] = useState<DriveStatusResult | null>(null)
+  const [uploadInputKey, setUploadInputKey] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -342,6 +367,9 @@ export function AdminStudentsPage() {
     setStudentFiles([])
     setTrainingNoteForm(buildTrainingNoteForm())
     setFileMetadataForm(buildFileMetadataForm())
+    setUploadFileForm(buildUploadFileForm())
+    setDriveStatus(null)
+    setUploadInputKey((current) => current + 1)
     setMembershipForm(buildMembershipForm(plans))
     setPaymentForm((current) => ({
       ...current,
@@ -382,6 +410,9 @@ export function AdminStudentsPage() {
     setSuccess(null)
     setTrainingNoteForm(buildTrainingNoteForm())
     setFileMetadataForm(buildFileMetadataForm())
+    setUploadFileForm(buildUploadFileForm())
+    setDriveStatus(null)
+    setUploadInputKey((current) => current + 1)
     void loadSelectedStudentOperations(student.id)
   }
 
@@ -602,6 +633,64 @@ export function AdminStudentsPage() {
       await loadSelectedStudentOperations(selectedStudent.id)
     } catch (fileError) {
       setError(formatAdminError(fileError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleUploadStudentFile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedStudent) {
+      return
+    }
+
+    if (!uploadFileForm.file) {
+      setError('Selecciona un archivo para subir.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await uploadStudentFile({
+        student_id: selectedStudent.id,
+        kind: uploadFileForm.kind,
+        title: uploadFileForm.title,
+        description: uploadFileForm.description,
+        visible_to_student: uploadFileForm.visible_to_student,
+        file: uploadFileForm.file,
+      })
+      setDriveStatus(result.drive_status)
+      setSuccess(
+        result.drive_status?.warning
+          ? 'Archivo subido. Atencion: queda 10% o menos de espacio en Drive.'
+          : 'Archivo subido a Drive y registrado.',
+      )
+      setUploadFileForm(buildUploadFileForm())
+      setUploadInputKey((current) => current + 1)
+      await loadSelectedStudentOperations(selectedStudent.id)
+    } catch (uploadError) {
+      setError(formatAdminError(uploadError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleCheckDriveStatus() {
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const status = await checkDriveStatus()
+      setDriveStatus(status)
+      setSuccess(
+        status.warning
+          ? 'Drive revisado. Atencion: queda 10% o menos de espacio disponible.'
+          : 'Drive revisado sin alerta de espacio.',
+      )
+    } catch (statusError) {
+      setError(formatAdminError(statusError))
     } finally {
       setSaving(false)
     }
@@ -975,26 +1064,147 @@ export function AdminStudentsPage() {
                     Archivos
                   </p>
                   <h4 className="mt-2 font-display text-xl font-bold">
-                    Documentos y metadata
+                    Documentos en Drive
                   </h4>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    Registra documentos y enlaces. La subida de archivo real se
-                    gestiona fuera de este formulario.
+                    Sube archivos desde backend seguro y controla que puede ver
+                    el alumno.
                   </p>
                 </div>
-                <button
-                  className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-white"
-                  onClick={() => setFileMetadataForm(buildFileMetadataForm())}
-                  type="button"
-                >
-                  Nuevo documento
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-white"
+                    disabled={saving}
+                    onClick={() => void handleCheckDriveStatus()}
+                    type="button"
+                  >
+                    Revisar Drive
+                  </button>
+                  <button
+                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-white"
+                    onClick={() => setFileMetadataForm(buildFileMetadataForm())}
+                    type="button"
+                  >
+                    Nuevo documento
+                  </button>
+                </div>
               </div>
+
+              {driveStatus ? (
+                <div
+                  className={`mt-4 rounded-2xl border p-4 text-sm ${
+                    driveStatus.warning
+                      ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+                      : 'border-[var(--line)] bg-white'
+                  }`}
+                >
+                  <p className="font-semibold text-[var(--ink)]">
+                    Estado de Google Drive
+                  </p>
+                  <p className="mt-1 text-[var(--muted)]">
+                    Usado: {formatSize(driveStatus.used_bytes)} /{' '}
+                    {formatSize(driveStatus.total_bytes)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Disponible:{' '}
+                    {driveStatus.remaining_ratio === null
+                      ? 'sin limite informado'
+                      : `${Math.round(driveStatus.remaining_ratio * 100)}%`}
+                  </p>
+                </div>
+              ) : null}
+
+              <form
+                className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4"
+                onSubmit={handleUploadStudentFile}
+              >
+                <p className="text-sm font-semibold text-[var(--ink)]">
+                  Subir archivo real
+                </p>
+                <div className="grid gap-3 md:grid-cols-[0.8fr_1.2fr]">
+                  <select
+                    aria-label="Tipo de archivo a subir"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setUploadFileForm({
+                        ...uploadFileForm,
+                        kind: event.target.value as FileKind,
+                      })
+                    }
+                    value={uploadFileForm.kind}
+                  >
+                    {Object.entries(fileKindLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    aria-label="Titulo del archivo a subir"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setUploadFileForm({
+                        ...uploadFileForm,
+                        title: event.target.value,
+                      })
+                    }
+                    placeholder="Titulo"
+                    value={uploadFileForm.title}
+                  />
+                </div>
+                <textarea
+                  aria-label="Descripcion del archivo a subir"
+                  className="min-h-20 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setUploadFileForm({
+                      ...uploadFileForm,
+                      description: event.target.value,
+                    })
+                  }
+                  placeholder="Descripcion visible si se comparte"
+                  value={uploadFileForm.description}
+                />
+                <input
+                  aria-label="Archivo"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  key={uploadInputKey}
+                  onChange={(event) =>
+                    setUploadFileForm({
+                      ...uploadFileForm,
+                      file: event.target.files?.[0] ?? null,
+                    })
+                  }
+                  type="file"
+                />
+                <label className="flex items-center gap-3 text-sm font-semibold">
+                  <input
+                    checked={uploadFileForm.visible_to_student}
+                    onChange={(event) =>
+                      setUploadFileForm({
+                        ...uploadFileForm,
+                        visible_to_student: event.target.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                  Visible para alumno
+                </label>
+                <button
+                  className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                  disabled={saving}
+                  type="submit"
+                >
+                  Subir a Drive
+                </button>
+              </form>
 
               <form
                 className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4"
                 onSubmit={handleSaveFileMetadata}
               >
+                <p className="text-sm font-semibold text-[var(--ink)]">
+                  Registrar o corregir metadata
+                </p>
                 <div className="grid gap-3 md:grid-cols-[0.8fr_1.2fr]">
                   <select
                     aria-label="Tipo de documento"

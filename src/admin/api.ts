@@ -26,6 +26,7 @@ import type {
   UploadStudentFileResult,
   UpsertTrainingNoteInput,
   DriveStatusResult,
+  DriveCleanupResult,
 } from './types'
 
 function getClient() {
@@ -529,6 +530,24 @@ export async function checkDriveStatus() {
   }
 
   return data as DriveStatusResult
+}
+
+export async function previewDriveCleanup(maxFiles = 50) {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('cleanup-drive-files', {
+    body: {
+      dryRun: true,
+      force: false,
+      maxFiles,
+      studentId: null,
+    },
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as DriveCleanupResult
 }
 
 export async function sendMassEmail(input: MassEmailInput) {

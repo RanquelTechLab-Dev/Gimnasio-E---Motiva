@@ -156,3 +156,12 @@
 - Se actualiza `drive_status` y se alerta si queda 10% o menos de espacio.
 - No se agrega migracion porque se reutilizan tablas existentes.
 - Secrets Google quedan pendientes de configurar en Supabase; no se guardan en Git.
+
+## 2026-05-15 - RANV2-12 limpieza controlada Drive
+
+- Se agrega Edge Function `cleanup-drive-files` con modo `dryRun` por defecto.
+- `/admin/storage` permite previsualizar candidato y archivos seleccionados.
+- La seleccion prioriza el alumno con mayor tiempo sin pago, membresia o actividad real.
+- La limpieza real exige `dryRun=false` y `force=true`.
+- No se agrega migracion porque se reutilizan `files`, `drive_status` y `audit_logs`.
+- No se ejecuta limpieza real ni se borran archivos en la PR inicial.

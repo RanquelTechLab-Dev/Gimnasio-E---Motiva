@@ -1,11 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-type ServiceAccount = {
-  client_email: string
-  private_key: string
-  token_uri?: string
-}
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -23,78 +17,23 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-function base64UrlEncode(value: string | ArrayBuffer) {
-  const bytes =
-    typeof value === 'string'
-      ? new TextEncoder().encode(value)
-      : new Uint8Array(value)
-  let binary = ''
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte)
-  }
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-}
-
-function pemToArrayBuffer(pem: string) {
-  const base64 = pem
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\s/g, '')
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
-  }
-  return bytes.buffer
-}
-
-function decodeServiceAccount() {
-  const encoded = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64')
-  if (!encoded) {
-    throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.')
-  }
-  const json = new TextDecoder().decode(
-    Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0)),
-  )
-  const serviceAccount = JSON.parse(json) as ServiceAccount
-  if (!serviceAccount.client_email || !serviceAccount.private_key) {
-    throw new Error('Credenciales Google incompletas.')
-  }
-  return serviceAccount
-}
-
 async function getGoogleAccessToken() {
-  const serviceAccount = decodeServiceAccount()
-  const now = Math.floor(Date.now() / 1000)
-  const unsignedToken = `${base64UrlEncode(
-    JSON.stringify({ alg: 'RS256', typ: 'JWT' }),
-  )}.${base64UrlEncode(
-    JSON.stringify({
-      iss: serviceAccount.client_email,
-      scope: 'https://www.googleapis.com/auth/drive.metadata.readonly',
-      aud: serviceAccount.token_uri ?? 'https://oauth2.googleapis.com/token',
-      exp: now + 3600,
-      iat: now,
-    }),
-  )}`
-  const privateKey = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToArrayBuffer(serviceAccount.private_key),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    privateKey,
-    new TextEncoder().encode(unsignedToken),
-  )
-  const response = await fetch(serviceAccount.token_uri ?? 'https://oauth2.googleapis.com/token', {
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
+  const refreshToken = Deno.env.get('GOOGLE_REFRESH_TOKEN')
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Faltan credenciales OAuth de Google Drive.')
+  }
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: `${unsignedToken}.${base64UrlEncode(signature)}`,
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
     }),
   })
   const body = await response.json().catch(() => null)

@@ -23,21 +23,26 @@ seguro.
 MVP recomendado:
 
 - Cuenta Drive dedicada: `e.motiva.gym@gmail.com`.
-- Google Cloud service account con Drive API habilitada.
-- Carpeta raiz en Drive compartida con el email de la service account como
-  editor.
-- Edge Functions usan credentials desde Supabase secrets.
+- Proyecto Google Cloud con Drive API habilitada.
+- OAuth offline autorizado con la cuenta real `e.motiva.gym@gmail.com`.
+- Carpeta raiz en Drive de esa cuenta.
+- Edge Functions usan refresh token guardado como Supabase secret.
+- Las consultas `about.storageQuota` se ejecutan como la cuenta real, por lo que
+  miden la cuota gratuita de 15 GB de `e.motiva.gym@gmail.com`.
 
 ## Secrets requeridos
 
 No guardar valores en Git.
 
 ```text
-GOOGLE_SERVICE_ACCOUNT_JSON_BASE64
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GOOGLE_REFRESH_TOKEN
 GOOGLE_DRIVE_ROOT_FOLDER_ID
 ```
 
-El JSON base64 evita problemas con saltos de linea de la private key.
+El refresh token debe pertenecer a la cuenta dedicada `e.motiva.gym@gmail.com`
+para que la cuota consultada sea la de esa cuenta.
 
 ## Validaciones de upload
 
@@ -63,7 +68,6 @@ espacio restante es 10% o menos, devuelven `warning = true` para alerta visual.
 
 - No limpieza automatica.
 - No borrado de archivos reales.
-- No OAuth usuario.
 - No pagos online.
 - No Mailjet.
 - No Cloudflare config.
@@ -75,7 +79,7 @@ espacio restante es 10% o menos, devuelven `warning = true` para alerta visual.
 Despues del merge:
 
 ```text
-npx supabase@2.98.2 secrets set GOOGLE_SERVICE_ACCOUNT_JSON_BASE64=... GOOGLE_DRIVE_ROOT_FOLDER_ID=...
+npx supabase@2.98.2 secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... GOOGLE_REFRESH_TOKEN=... GOOGLE_DRIVE_ROOT_FOLDER_ID=...
 npx supabase@2.98.2 functions deploy upload-student-file
 npx supabase@2.98.2 functions deploy check-drive-status
 ```

@@ -151,6 +151,7 @@
 - Se agregan Edge Functions `upload-student-file` y `check-drive-status`.
 - Admin puede subir archivos reales para alumnos desde `/admin/students`.
 - La metadata queda en `public.files` y el archivo real queda en Google Drive.
+- Las funciones usan OAuth refresh token de la cuenta real `e.motiva.gym@gmail.com` para medir la cuota real de Drive.
 - Si el archivo es visible, se intenta dar permiso de lectura al email del alumno.
 - Se actualiza `drive_status` y se alerta si queda 10% o menos de espacio.
 - No se agrega migracion porque se reutilizan tablas existentes.

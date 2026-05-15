@@ -99,4 +99,4 @@ RAN-27 esta en ejecucion.
 - RANV2-09 agrega gestion admin de plan de entrenamiento, observaciones y metadata de archivos, con lectura segura para alumno.
 - RANV2-14 prepara deploy Cloudflare Pages con fallback SPA para rutas directas.
 - RANV2-10 agrega envio masivo informativo por Mailjet desde Edge Function segura, respetando `receives_emails`.
-- RANV2-11 agrega storage externo Google Drive desde Edge Functions seguras, manteniendo metadata en Supabase.
+- RANV2-11 agrega storage externo Google Drive desde Edge Functions seguras, usando OAuth de la cuenta dedicada `e.motiva.gym@gmail.com` y manteniendo metadata en Supabase.

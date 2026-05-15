@@ -28,6 +28,13 @@ type StudentCandidate = {
   eligible_bytes: number
 }
 
+type MembershipRow = {
+  student_id: string
+  end_date: string | null
+  updated_at: string | null
+  status: string
+}
+
 type CleanupFile = {
   id: string
   student_id: string
@@ -57,6 +64,22 @@ const corsHeaders = {
 const defaultMaxFiles = 50
 const maxAllowedFiles = 200
 const warningThreshold = 0.1
+const cleanupCriteria = {
+  eligible_files: ['files.archived_at is null', 'files.drive_file_id is not null'],
+  candidate_order:
+    'oldest derived activity from last_real_activity_at, last_attendance_at, approved payments and memberships',
+  excluded_students: ['profiles.role <> student', 'active membership with end_date >= current_date'],
+  protected_data: [
+    'payments',
+    'memberships',
+    'bookings',
+    'attendance',
+    'audit_logs',
+    'email_logs',
+    'profiles',
+    'training_notes',
+  ],
+}
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -170,6 +193,13 @@ function candidateSortValue(candidate: StudentCandidate) {
   return candidate.derived_last_activity_at
     ? Date.parse(candidate.derived_last_activity_at)
     : Number.NEGATIVE_INFINITY
+}
+
+function hasActiveCurrentMembership(membership: MembershipRow, today: string) {
+  return (
+    membership.status === 'active' &&
+    (!membership.end_date || membership.end_date >= today)
+  )
 }
 
 Deno.serve(async (req) => {
@@ -287,9 +317,18 @@ Deno.serve(async (req) => {
         quota,
         threshold_reached: thresholdReached,
         student_id: input.studentId,
+        criteria: cleanupCriteria,
+        excluded_active_membership_student_ids_count: 0,
+        selected_file_count: 0,
+        reclaimable_bytes: 0,
+        candidate_student_id: null,
+        candidate_email: null,
         candidates: [],
         selected_student: null,
         selected_files: [],
+        deleted_count: 0,
+        failed_count: 0,
+        archived_count: 0,
       },
     })
 
@@ -338,13 +377,21 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'No se pudieron evaluar membresias.' }, 500)
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+  const activeMembershipStudentIds = new Set(
+    ((memberships ?? []) as MembershipRow[])
+      .filter((membership) => hasActiveCurrentMembership(membership, today))
+      .map((membership) => membership.student_id),
+  )
+
   const candidates = (profiles ?? [])
+    .filter((student) => !activeMembershipStudentIds.has(student.id))
     .map((student) => {
       const studentFiles = files.filter((file) => file.student_id === student.id)
       const studentPayments = (payments ?? []).filter(
         (payment) => payment.student_id === student.id,
       )
-      const studentMemberships = (memberships ?? []).filter(
+      const studentMemberships = ((memberships ?? []) as MembershipRow[]).filter(
         (membership) => membership.student_id === student.id,
       )
       const latestPaymentAt = latestDate(
@@ -394,6 +441,10 @@ Deno.serve(async (req) => {
         .filter((file) => file.student_id === selectedStudent.student_id)
         .slice(0, input.maxFiles)
     : []
+  const reclaimableBytes = selectedFiles.reduce(
+    (sum, file) => sum + Number(file.size_bytes ?? 0),
+    0,
+  )
 
   const deletedFiles: Array<{ file_id: string; drive_file_id: string; status: number }> = []
   const archivedFileIds: string[] = []
@@ -458,8 +509,14 @@ Deno.serve(async (req) => {
       force: input.force,
       max_files: input.maxFiles,
       requested_student_id: input.studentId,
+      criteria: cleanupCriteria,
       quota,
       threshold_reached: thresholdReached,
+      excluded_active_membership_student_ids_count: activeMembershipStudentIds.size,
+      selected_file_count: selectedFiles.length,
+      reclaimable_bytes: reclaimableBytes,
+      candidate_student_id: selectedStudent?.student_id ?? null,
+      candidate_email: selectedStudent?.email ?? null,
       candidates: candidates.slice(0, 10),
       selected_student: selectedStudent,
       selected_files: selectedFiles.map((file) => ({
@@ -475,23 +532,37 @@ Deno.serve(async (req) => {
       deleted_files: deletedFiles,
       archived_file_ids: archivedFileIds,
       failed_files: failedFiles,
+      deleted_count: deletedFiles.length,
+      failed_count: failedFiles.length,
+      archived_count: archivedFileIds.length,
     },
   })
+
+  const activeMembershipMessage =
+    input.studentId && activeMembershipStudentIds.has(input.studentId)
+      ? 'El alumno indicado tiene membresia activa vigente y no es elegible para limpieza automatica.'
+      : null
 
   return jsonResponse({
     dryRun: input.dryRun,
     force: input.force,
     quota,
     threshold_reached: thresholdReached,
+    criteria: cleanupCriteria,
+    excluded_active_membership_student_ids_count: activeMembershipStudentIds.size,
     selected_student: selectedStudent,
     selected_files: selectedFiles,
+    selected_file_count: selectedFiles.length,
+    reclaimable_bytes: reclaimableBytes,
     deleted_files: deletedFiles,
     archived_file_ids: archivedFileIds,
     failed_files: failedFiles,
-    message: input.dryRun
-      ? 'Vista previa generada. No se borro ningun archivo.'
-      : failedFiles.length > 0
-        ? 'Limpieza ejecutada con incidencias auditadas.'
-        : 'Limpieza ejecutada y auditada.',
+    message:
+      activeMembershipMessage ??
+      (input.dryRun
+        ? 'Vista previa generada. No se borro ningun archivo.'
+        : failedFiles.length > 0
+          ? 'Limpieza ejecutada con incidencias auditadas.'
+          : 'Limpieza ejecutada y auditada.'),
   })
 })

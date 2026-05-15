@@ -210,8 +210,12 @@ export type DriveCleanupResult = {
   force: boolean
   quota: DriveStatusResult
   threshold_reached: boolean
+  criteria?: Record<string, unknown>
+  excluded_active_membership_student_ids_count?: number
   selected_student: DriveCleanupCandidate | null
   selected_files: DriveCleanupFile[]
+  selected_file_count?: number
+  reclaimable_bytes?: number
   deleted_files: Array<{
     file_id: string
     drive_file_id: string

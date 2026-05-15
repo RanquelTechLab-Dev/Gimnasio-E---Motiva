@@ -23,6 +23,12 @@ La funcion evalua alumnos con archivos Drive elegibles en `public.files`:
 - pagos `approved`
 - fecha de fin/actualizacion de membresias
 
+Los alumnos con membresia activa vigente no son candidatos, incluso si tienen
+archivos antiguos. La regla vigente es:
+
+- `memberships.status = active`
+- `memberships.end_date >= current_date`
+
 El candidato es el alumno con menor `derived_last_activity_at`. Si no hay
 actividad registrada, queda primero para revision.
 
@@ -67,8 +73,9 @@ La funcion registra:
 - `drive_cleanup.dry_run`
 - `drive_cleanup.executed`
 
-La metadata incluye cuota, umbral, candidatos, alumno seleccionado, archivos
-seleccionados, archivos borrados y metadata archivada.
+La metadata incluye criterio, cuota, umbral, candidatos, alumno seleccionado,
+cantidad de archivos seleccionados, bytes recuperables, archivos seleccionados,
+archivos borrados, metadata archivada y fallos si los hubiera.
 
 ## Fuera de alcance
 

@@ -165,3 +165,12 @@
 - La limpieza real exige `dryRun=false` y `force=true`.
 - No se agrega migracion porque se reutilizan `files`, `drive_status` y `audit_logs`.
 - No se ejecuta limpieza real ni se borran archivos en la PR inicial.
+
+## 2026-05-15 - RANV2-13 UX responsive baseline
+
+- Se auditan assets fuente para logo, calendario y precios; no estan versionados en el repo activo.
+- Se mejora el layout admin/alumno para desktop maximizado, tablet y mobile.
+- Se agrega marca visual provisoria en login sin inventar assets.
+- Calendario alumno y admin pasan de lista simple a tarjetas agrupadas por dia.
+- Pagos admin muestran plan, periodo y creditos asociados a la membresia.
+- No se agrega migracion ni se cargan precios hardcodeados.

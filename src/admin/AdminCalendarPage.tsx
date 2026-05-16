@@ -57,10 +57,18 @@ function dateTimeLocalToIso(value: string) {
   return new Date(value).toISOString()
 }
 
-function formatDateTime(value: string) {
+function formatDayTitle(value: string) {
   return new Intl.DateTimeFormat('es-AR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+  }).format(new Date(value))
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(value))
 }
 
@@ -127,6 +135,27 @@ export function AdminCalendarPage() {
       null,
     [selectedSessionId, sessions],
   )
+
+  const sessionsByDay = useMemo(() => {
+    const sortedSessions = [...sessions].sort(
+      (left, right) =>
+        new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime(),
+    )
+
+    return sortedSessions.reduce<Array<{ dayKey: string; sessions: CalendarSession[] }>>(
+      (days, session) => {
+        const dayKey = formatLocalDate(new Date(session.starts_at))
+        const currentDay = days.find((day) => day.dayKey === dayKey)
+        if (currentDay) {
+          currentDay.sessions.push(session)
+        } else {
+          days.push({ dayKey, sessions: [session] })
+        }
+        return days
+      },
+      [],
+    )
+  }, [sessions])
 
   async function loadData() {
     setLoading(true)
@@ -284,50 +313,62 @@ export function AdminCalendarPage() {
             No hay clases cargadas para este rango.
           </div>
         ) : (
-          <div className="mt-5 grid gap-3">
-            {sessions.map((session) => (
-              <button
-                className={`rounded-[20px] border p-4 text-left transition ${
-                  selectedSessionId === session.session_id
-                    ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
-                    : 'border-[var(--line)] bg-[var(--surface-strong)] hover:border-[var(--brand)]'
-                }`}
-                key={session.session_id}
-                onClick={() => selectSession(session)}
-                type="button"
+          <div className="mt-5 grid gap-4 2xl:grid-cols-2">
+            {sessionsByDay.map((day) => (
+              <article
+                className="rounded-[22px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
+                key={day.dayKey}
               >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="font-semibold text-[var(--ink)]">
-                      {session.title}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      {session.activity_name} · {formatDateTime(session.starts_at)}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      Hasta {formatDateTime(session.ends_at)}
-                    </p>
-                  </div>
-                  <div className="text-sm font-semibold text-[var(--ink)]">
-                    {session.reserved_count}/{session.capacity} reservados
-                  </div>
+                <p className="font-display text-lg font-bold capitalize text-[var(--ink)]">
+                  {formatDayTitle(`${day.dayKey}T00:00:00`)}
+                </p>
+                <div className="mt-4 grid gap-3">
+                  {day.sessions.map((session) => (
+                    <button
+                      className={`rounded-[18px] border p-3 text-left transition ${
+                        selectedSessionId === session.session_id
+                          ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
+                          : 'border-[var(--line)] bg-white hover:border-[var(--brand)]'
+                      }`}
+                      key={session.session_id}
+                      onClick={() => selectSession(session)}
+                      type="button"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--brand)]">
+                            {formatTime(session.starts_at)} - {formatTime(session.ends_at)}
+                          </p>
+                          <p className="mt-1 font-semibold text-[var(--ink)]">
+                            {session.title}
+                          </p>
+                          <p className="mt-1 text-sm text-[var(--muted)]">
+                            {session.activity_name}
+                          </p>
+                        </div>
+                        <div className="text-sm font-semibold text-[var(--ink)]">
+                          {session.reserved_count}/{session.capacity}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                        <span className="rounded-full bg-[var(--surface)] px-3 py-1">
+                          {session.spots_left} cupos libres
+                        </span>
+                        <span className="rounded-full bg-[var(--surface)] px-3 py-1">
+                          {session.active && !session.cancelled_at
+                            ? 'Activa'
+                            : 'Cancelada/inactiva'}
+                        </span>
+                        {session.requires_24h_cancel ? (
+                          <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[var(--accent)]">
+                            Regla 24h
+                          </span>
+                        ) : null}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                  <span className="rounded-full bg-white px-3 py-1">
-                    {session.spots_left} cupos libres
-                  </span>
-                  <span className="rounded-full bg-white px-3 py-1">
-                    {session.active && !session.cancelled_at
-                      ? 'Activa'
-                      : 'Cancelada/inactiva'}
-                  </span>
-                  {session.requires_24h_cancel ? (
-                    <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[var(--accent)]">
-                      Regla 24h
-                    </span>
-                  ) : null}
-                </div>
-              </button>
+              </article>
             ))}
           </div>
         )}

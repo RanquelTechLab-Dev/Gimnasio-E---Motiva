@@ -38,14 +38,41 @@ export function LoginPage() {
   }
 
   return (
-    <section className="w-full max-w-md">
+    <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
+      <div className="hidden lg:block">
+        <div className="inline-flex items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-4 py-3 shadow-[var(--shadow)]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--ink)] font-display text-lg font-bold text-white">
+            EM
+          </div>
+          <div>
+            <p className="font-display text-sm font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+              E-Motiva
+            </p>
+            <p className="text-sm text-[var(--muted)]">
+              Gestion del gimnasio y autogestion de alumnos.
+            </p>
+          </div>
+        </div>
+        <h1 className="mt-8 max-w-2xl font-display text-5xl font-bold leading-tight text-[var(--ink)]">
+          Acceso ordenado para entrenar, reservar y administrar.
+        </h1>
+        <p className="mt-5 max-w-xl text-base text-[var(--muted)]">
+          Tu panel queda separado por rol: administracion para el equipo y
+          espacio alumno para reservas, pagos, asistencia y archivos.
+        </p>
+      </div>
       <form
-        className="rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] p-6 shadow-[var(--shadow)] sm:p-8"
+        className="w-full rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] p-6 shadow-[var(--shadow)] sm:p-8"
         onSubmit={handleSubmit}
       >
-        <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
-          E-Motiva
-        </p>
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--ink)] font-display text-base font-bold text-white">
+            EM
+          </div>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
+            E-Motiva
+          </p>
+        </div>
         <h1 className="mt-4 font-display text-4xl font-bold text-[var(--ink)]">
           Acceso E-Motiva
         </h1>

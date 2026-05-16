@@ -50,6 +50,15 @@ function todayDate() {
   return `${year}-${month}-${day}`
 }
 
+function describeMembership(membership: Membership, plan?: Plan | null) {
+  const credits =
+    membership.remaining_credits === null
+      ? 'uso ilimitado'
+      : `${membership.remaining_credits} creditos`
+
+  return `${plan?.name ?? 'Plan'} · ${credits} · ${membership.start_date} a ${membership.end_date}`
+}
+
 export function AdminPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [students, setStudents] = useState<StudentProfile[]>([])
@@ -271,6 +280,11 @@ export function AdminPaymentsPage() {
                           ? 'Efectivo'
                           : 'Transferencia'}
                       </p>
+                      {membership ? (
+                        <p className="mt-1 text-xs text-[var(--muted)]">
+                          {describeMembership(membership, plan)}
+                        </p>
+                      ) : null}
                       <p className="mt-2 text-xs text-[var(--muted)]">
                         Nota/comprobante:{' '}
                         {payment.notes?.trim() || 'Sin nota cargada'}
@@ -360,7 +374,7 @@ export function AdminPaymentsPage() {
               className="text-sm font-semibold"
               htmlFor="payment-membership"
             >
-              Membresia
+              Plan / membresia
             </label>
             <select
               className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
@@ -375,12 +389,15 @@ export function AdminPaymentsPage() {
                 const plan = plansById.get(membership.plan_id)
                 return (
                   <option key={membership.id} value={membership.id}>
-                    {plan?.name ?? 'Plan'} · {membership.start_date} a{' '}
-                    {membership.end_date}
+                    {describeMembership(membership, plan)}
                   </option>
                 )
               })}
             </select>
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              El pago queda asociado al plan, periodo y creditos de esta
+              membresia.
+            </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>

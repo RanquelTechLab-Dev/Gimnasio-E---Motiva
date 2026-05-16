@@ -30,7 +30,7 @@ No es fuente activa. No se copian migraciones, ramas ni codigo viejo sin auditor
 
 Proyecto: E-Motiva App Gimnasio v2
 
-Issue actual: RAN-28 - RANV2-12 - Limpieza automatica por alumno sin pago mas antiguo.
+Issue actual: RAN-29 - RANV2-13 - PWA + responsive + UX final.
 
 ## Supabase
 
@@ -58,7 +58,8 @@ Estado actual:
 - Cloudflare Pages deploy preview cerrado en RANV2-14.
 - Mailjet emails masivos cerrado en RANV2-10.
 - Google Drive storage externo cerrado en RANV2-11.
-- Limpieza controlada de Drive en ejecucion para RANV2-12.
+- Limpieza controlada de Drive cerrada en RANV2-12.
+- UX responsive final en ejecucion para RANV2-13.
 
 ## Stack previsto
 
@@ -80,7 +81,7 @@ Estado actual:
 
 ## Estado actual
 
-RAN-28 esta en ejecucion.
+RAN-29 esta en ejecucion.
 
 - Frontend base creado con React, Vite, TypeScript y Tailwind.
 - Router base y layouts iniciales creados.
@@ -102,3 +103,4 @@ RAN-28 esta en ejecucion.
 - RANV2-10 agrega envio masivo informativo por Mailjet desde Edge Function segura, respetando `receives_emails`.
 - RANV2-11 agrega storage externo Google Drive desde Edge Functions seguras, usando OAuth de la cuenta dedicada `e.motiva.gym@gmail.com` y manteniendo metadata en Supabase.
 - RANV2-12 agrega limpieza controlada de Drive con dry-run obligatorio y auditoria.
+- RANV2-13 inicia ajuste visual/responsive: layout ancho, marca en login, calendarios agrupados por dia y pagos con plan/creditos mas claros.

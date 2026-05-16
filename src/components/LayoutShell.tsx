@@ -24,27 +24,29 @@ export function LayoutShell({
 }: LayoutShellProps) {
   return (
     <div className="min-h-screen bg-transparent">
-      <div className="mx-auto grid min-h-screen max-w-7xl gap-6 px-4 py-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-6">
-        <aside className="rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] p-5 shadow-[var(--shadow)]">
-          <div className="rounded-[24px] bg-[var(--ink)] p-5 text-white">
+      <div className="mx-auto grid min-h-screen w-full max-w-[1760px] gap-4 px-3 py-3 sm:px-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-5 lg:px-5 2xl:grid-cols-[300px_minmax(0,1fr)] 2xl:px-8">
+        <aside className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          <div className="rounded-[20px] bg-[var(--ink)] p-4 text-white">
             <p className="font-display text-xs font-bold uppercase tracking-[0.3em] text-white/70">
               E-Motiva
             </p>
-            <h1 className="mt-3 font-display text-2xl font-bold">{title}</h1>
+            <h1 className="mt-3 font-display text-2xl font-bold leading-tight">
+              {title}
+            </h1>
             <p className="mt-2 text-sm text-white/76">{subtitle}</p>
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4">
+          <div className="mt-4 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-3">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
               Navegacion
             </p>
-            <nav className="mt-3 flex flex-col gap-2">
+            <nav className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   className={({ isActive }) =>
-                    `rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                    `rounded-2xl px-3 py-2.5 text-sm font-medium transition ${
                       isActive
                         ? 'bg-[var(--brand)] text-white'
                         : 'bg-transparent text-[var(--ink)] hover:bg-[var(--brand-soft)]'
@@ -57,7 +59,7 @@ export function LayoutShell({
             </nav>
           </div>
 
-          <div className="mt-5 rounded-[24px] bg-[var(--accent-soft)] p-4 text-sm text-[var(--ink)]">
+          <div className="mt-4 rounded-[20px] bg-[var(--accent-soft)] p-4 text-sm text-[var(--ink)]">
             <p className="font-display text-xs font-bold uppercase tracking-[0.26em] text-[var(--accent)]">
               Estado
             </p>
@@ -65,17 +67,17 @@ export function LayoutShell({
           </div>
         </aside>
 
-        <main className="flex min-h-[80vh] flex-col gap-5 rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] p-5 shadow-[var(--shadow)] sm:p-7">
-          <header className="flex flex-col gap-3 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 sm:flex-row sm:items-end sm:justify-between">
+        <main className="flex min-h-[80vh] min-w-0 flex-col gap-4 rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] sm:p-5 xl:p-6">
+          <header className="grid gap-3 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,520px)] lg:items-end">
             <div>
               <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
                 {section}
               </p>
-              <h2 className="mt-3 font-display text-3xl font-bold text-[var(--ink)]">
+              <h2 className="mt-3 font-display text-3xl font-bold leading-tight text-[var(--ink)]">
                 {title}
               </h2>
             </div>
-            <div className="flex w-full max-w-xl flex-col gap-3">
+            <div className="flex w-full flex-col gap-3">
               <p className="text-sm text-[var(--muted)]">{subtitle}</p>
               <SessionBadge />
             </div>

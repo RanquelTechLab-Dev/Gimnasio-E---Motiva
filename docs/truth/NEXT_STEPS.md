@@ -2,19 +2,19 @@
 
 ## Actual
 
-RAN-28 / RANV2-12: Limpieza automatica por alumno sin pago mas antiguo.
+RAN-29 / RANV2-13: PWA + responsive + UX final.
 
 ## Siguiente
 
-Revisar PR de limpieza controlada Drive, desplegar `cleanup-drive-files` y validar dry-run remoto.
+Revisar PR de UX responsive baseline y cargar assets fuente faltantes.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- No ejecutar limpieza real en PR inicial.
-- Desplegar `cleanup-drive-files` despues de merge.
-- Validar dry-run remoto desde `/admin/storage`.
-- Verificar `drive_cleanup.dry_run` en `audit_logs`.
-- Autorizar ejecucion real solo si Drive esta en umbral critico o Walter lo confirma.
-- No cargar credenciales Google en Cloudflare o frontend.
-- Pagos online, Mailjet, WhatsApp API y RAN-29 quedan fuera de RANV2-12.
+- Agregar al repo los assets reales: `2.png`, `Plan Actividades.jpeg` y `Precios.jpeg`.
+- RAN-29-B: calendario visual completo alumno/admin.
+- RAN-29-C: planes, precios reales y personalizado por clases/paquetes.
+- RAN-29-D: pagos manuales editables y vinculados claramente a plan/clases.
+- RAN-29-E: CRUD actividades.
+- RAN-29-F: reset password admin, eliminar archivos y eliminar/modificar pagos.
+- RAN-31 QA final recien despues de cerrar los subbloques UX.

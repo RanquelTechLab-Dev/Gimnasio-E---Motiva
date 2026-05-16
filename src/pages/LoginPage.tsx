@@ -44,7 +44,7 @@ export function LoginPage() {
           <img
             alt="E-Motiva"
             className="h-12 w-12 rounded-2xl bg-white object-contain p-1 shadow-sm"
-            src="/brand/2.png"
+            src="/brand/logo-small.png"
           />
           <div>
             <p className="font-display text-sm font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -71,7 +71,7 @@ export function LoginPage() {
           <img
             alt="E-Motiva"
             className="h-14 w-14 rounded-2xl bg-white object-contain p-1 shadow-sm sm:h-16 sm:w-16"
-            src="/brand/2.png"
+            src="/brand/logo-small.png"
           />
           <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
             E-Motiva

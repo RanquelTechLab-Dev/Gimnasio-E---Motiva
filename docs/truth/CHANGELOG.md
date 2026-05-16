@@ -179,4 +179,5 @@
 
 - Se usa el logo real `public/brand/2.png` en el login.
 - Se agrega el logo real al sidebar admin/alumno en tamano contenido.
+- Se agrega `public/brand/logo-small.png` como variante liviana para UI chica.
 - No se cambia auth, guards, backend, schema ni datos productivos.

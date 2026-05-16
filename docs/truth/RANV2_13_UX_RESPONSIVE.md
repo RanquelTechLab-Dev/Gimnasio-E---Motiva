@@ -7,17 +7,18 @@ RANV2-13 inicia la mejora visual del MVP ya funcional.
 Los assets reales ya quedaron versionados en ubicaciones estables:
 
 - `public/brand/2.png`: logo real para login y branding de la app.
+- `public/brand/logo-small.png`: variante liviana para iconos de UI.
 - `docs/source-assets/Plan Actividades.jpeg`: referencia visual para calendario.
 - `docs/source-assets/Precios.jpeg`: referencia para precios, planes y paquetes.
 
-El branding ya usa `public/brand/2.png` en el login y en los layouts
-admin/alumno. El asset no se modifica: los ajustes visuales se hacen desde CSS.
+El branding usa `public/brand/logo-small.png` en el login y en los layouts
+admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 
 ## Cambios de este slice
 
 - Layout admin/alumno mas ancho para desktop maximizado.
 - Navegacion responsive en mobile/tablet y sidebar estable en desktop.
-- Login con logo real de E-Motiva desde `public/brand/2.png`.
+- Login con logo real de E-Motiva desde `public/brand/logo-small.png`.
 - Sidebar admin/alumno con logo real en tamano contenido.
 - Calendario alumno agrupado por dia, con tarjetas por horario, cupo y regla
   12h/24h.

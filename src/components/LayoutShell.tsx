@@ -31,7 +31,7 @@ export function LayoutShell({
               <img
                 alt="E-Motiva"
                 className="h-10 w-10 rounded-2xl bg-white object-contain p-1"
-                src="/brand/2.png"
+                src="/brand/logo-small.png"
               />
               <p className="font-display text-xs font-bold uppercase tracking-[0.3em] text-white/70">
                 E-Motiva

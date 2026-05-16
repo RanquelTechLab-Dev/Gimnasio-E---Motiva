@@ -2,17 +2,16 @@
 
 RANV2-13 inicia la mejora visual del MVP ya funcional.
 
-## Auditoria de assets
+## Assets fuente
 
-No se encontraron dentro del repo activo:
+Los assets reales ya quedaron versionados en ubicaciones estables:
 
-- `2.png`
-- `Plan Actividades.jpeg`
-- `Precios.jpeg`
+- `public/brand/2.png`: logo real para login y branding de la app.
+- `docs/source-assets/Plan Actividades.jpeg`: referencia visual para calendario.
+- `docs/source-assets/Precios.jpeg`: referencia para precios, planes y paquetes.
 
-Tampoco se encontraron `jpg`, `jpeg` o `png` utiles fuera de `node_modules`
-dentro del repo. El login usa una marca textual provisoria `EM` hasta que se
-agregue el logo real.
+El baseline actual todavia usa una marca textual provisoria `EM`; el siguiente
+slice de branding debe reemplazarla por `public/brand/2.png`.
 
 ## Cambios de este slice
 

@@ -174,3 +174,10 @@
 - Calendario alumno y admin pasan de lista simple a tarjetas agrupadas por dia.
 - Pagos admin muestran plan, periodo y creditos asociados a la membresia.
 - No se agrega migracion ni se cargan precios hardcodeados.
+
+## 2026-05-15 - RANV2-13 branding real
+
+- Se usa el logo real `public/brand/2.png` en el login.
+- Se agrega el logo real al sidebar admin/alumno en tamano contenido.
+- Se agrega `public/brand/logo-small.png` como variante liviana para UI chica.
+- No se cambia auth, guards, backend, schema ni datos productivos.

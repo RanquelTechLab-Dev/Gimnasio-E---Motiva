@@ -41,9 +41,11 @@ export function LoginPage() {
     <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
       <div className="hidden lg:block">
         <div className="inline-flex items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-4 py-3 shadow-[var(--shadow)]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--ink)] font-display text-lg font-bold text-white">
-            EM
-          </div>
+          <img
+            alt="E-Motiva"
+            className="h-12 w-12 rounded-2xl bg-white object-contain p-1 shadow-sm"
+            src="/brand/logo-small.png"
+          />
           <div>
             <p className="font-display text-sm font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
               E-Motiva
@@ -66,9 +68,11 @@ export function LoginPage() {
         onSubmit={handleSubmit}
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--ink)] font-display text-base font-bold text-white">
-            EM
-          </div>
+          <img
+            alt="E-Motiva"
+            className="h-14 w-14 rounded-2xl bg-white object-contain p-1 shadow-sm sm:h-16 sm:w-16"
+            src="/brand/logo-small.png"
+          />
           <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
             E-Motiva
           </p>

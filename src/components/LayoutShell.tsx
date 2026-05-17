@@ -27,9 +27,16 @@ export function LayoutShell({
       <div className="mx-auto grid min-h-screen w-full max-w-[1760px] gap-4 px-3 py-3 sm:px-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-5 lg:px-5 2xl:grid-cols-[300px_minmax(0,1fr)] 2xl:px-8">
         <aside className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <div className="rounded-[20px] bg-[var(--ink)] p-4 text-white">
-            <p className="font-display text-xs font-bold uppercase tracking-[0.3em] text-white/70">
-              E-Motiva
-            </p>
+            <div className="flex items-center gap-3">
+              <img
+                alt="E-Motiva"
+                className="h-10 w-10 rounded-2xl bg-white object-contain p-1"
+                src="/brand/logo-small.png"
+              />
+              <p className="font-display text-xs font-bold uppercase tracking-[0.3em] text-white/70">
+                E-Motiva
+              </p>
+            </div>
             <h1 className="mt-3 font-display text-2xl font-bold leading-tight">
               {title}
             </h1>

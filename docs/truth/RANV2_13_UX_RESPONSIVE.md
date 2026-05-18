@@ -40,6 +40,14 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   desde la RPC de reserva.
 - Los paquetes personalizados mantienen clases restantes del paquete.
 - La UI admin/alumno evita hablar de saldo tecnico visible.
+- El calendario admin agrega creacion recurrente limitada, evita duplicados
+  exactos por actividad/horario y separa fecha/hora para reducir errores de
+  carga.
+- La cancelacion admin de clases se corrige en RPC para procesar reservas
+  activas y devolver clases de paquetes sin tocar la logica semanal.
+- Las clases se colorean por actividad para acercar la lectura visual al plan
+  semanal fuente.
+- Personalizado 1:1 fuerza cupo maximo 1 en UI y en base de datos.
 
 ## Auditoria funcional
 
@@ -59,6 +67,7 @@ Requieren subbloques especificos:
 
 - CRUD completo de actividades;
 - aplicar y validar remotamente la migracion de limites semanales/paquetes;
+- aplicar y validar remotamente la migracion de fixes de calendario admin;
 - editar/eliminar pagos y montos;
 - reset de contrasena de alumno desde admin;
 - eliminar archivos reales y/o metadata desde admin.

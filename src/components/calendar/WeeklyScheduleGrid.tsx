@@ -46,6 +46,16 @@ const activityTones = [
   'border-rose-300 bg-rose-50',
 ]
 
+const activityToneBySlug: Record<string, string> = {
+  cognitivo: 'border-red-300 bg-red-50',
+  funcional: 'border-yellow-300 bg-yellow-50',
+  neurofuncional: 'border-lime-300 bg-lime-50',
+  ninos: 'border-violet-300 bg-violet-50',
+  personalizado_1_1: 'border-fuchsia-300 bg-fuchsia-50',
+  plan_entrenamiento: 'border-slate-300 bg-slate-50',
+  semi_personalizado: 'border-sky-300 bg-sky-50',
+}
+
 function formatLocalDate(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -99,6 +109,11 @@ function getTimeKey(value: string) {
 }
 
 function toneForSession(session: ScheduleSession) {
+  const knownTone = activityToneBySlug[session.activity_slug]
+  if (knownTone) {
+    return knownTone
+  }
+
   const seed = session.activity_slug
     .split('')
     .reduce((sum, letter) => sum + letter.charCodeAt(0), 0)

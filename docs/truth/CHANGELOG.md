@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-18 - RANV2-13 fixes calendario admin
+
+- Se agrega migracion local para corregir la cancelacion admin de clases y
+  procesar reservas activas sin tocar la logica de limites semanales.
+- Admin puede preparar clases recurrentes con fecha fin, dia de semana y limite
+  de 52 clases por tanda.
+- El formulario de clase separa fecha y hora de inicio/fin para evitar cargas
+  confusas.
+- La grilla colorea clases por actividad con tonos estables.
+- Personalizado 1:1 queda limitado a cupo 1 en el formulario y protegido por
+  trigger en base de datos.
+- No se ejecuta `db push` real.
+
 ## 2026-05-18 - RANV2-13 limites semanales y paquetes
 
 - Se agrega migracion local para diferenciar planes semanales, paquetes

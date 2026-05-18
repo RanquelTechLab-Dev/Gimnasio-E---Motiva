@@ -27,6 +27,25 @@ type ClassFormState = {
   active: boolean
 }
 
+type RecurrenceFormState = {
+  enabled: boolean
+  weekday: string
+  date_from: string
+  date_to: string
+  start_time: string
+  end_time: string
+}
+
+const weekdayLabels = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miercoles',
+  'Jueves',
+  'Viernes',
+  'Sabado',
+]
+
 function formatLocalDate(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -38,6 +57,12 @@ function formatDateTimeLocal(date: Date) {
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${formatLocalDate(date)}T${hours}:${minutes}`
+}
+
+function formatLocalTime(date: Date) {
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 function addDays(date: Date, days: number) {
@@ -56,6 +81,53 @@ function dateInputToRangeEnd(value: string) {
 
 function dateTimeLocalToIso(value: string) {
   return new Date(value).toISOString()
+}
+
+function localDateTimeToIso(dateValue: string, timeValue: string) {
+  return dateTimeLocalToIso(`${dateValue}T${timeValue}`)
+}
+
+function getDateTimeParts(value: string) {
+  const [date = '', time = ''] = value.split('T')
+  return {
+    date,
+    time: time.slice(0, 5),
+  }
+}
+
+function buildRecurrenceForm(form: ClassFormState): RecurrenceFormState {
+  const start = new Date(form.starts_at)
+  const end = new Date(form.ends_at)
+  return {
+    enabled: false,
+    weekday: String(start.getDay()),
+    date_from: formatLocalDate(start),
+    date_to: formatLocalDate(addDays(start, 28)),
+    start_time: formatLocalTime(start),
+    end_time: formatLocalTime(end),
+  }
+}
+
+function buildRecurringDates(
+  dateFrom: string,
+  dateTo: string,
+  weekday: number,
+) {
+  const start = new Date(`${dateFrom}T00:00:00`)
+  const end = new Date(`${dateTo}T00:00:00`)
+  const dates: string[] = []
+
+  for (
+    let cursor = start;
+    cursor <= end && dates.length <= 80;
+    cursor = addDays(cursor, 1)
+  ) {
+    if (cursor.getDay() === weekday) {
+      dates.push(formatLocalDate(cursor))
+    }
+  }
+
+  return dates
 }
 
 function buildEmptyForm(activities: Activity[]): ClassFormState {
@@ -109,6 +181,9 @@ export function AdminCalendarPage() {
   const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 6)))
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [form, setForm] = useState<ClassFormState>(buildEmptyForm([]))
+  const [recurrence, setRecurrence] = useState<RecurrenceFormState>(
+    buildRecurrenceForm(buildEmptyForm([])),
+  )
   const [cancelReason, setCancelReason] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -121,6 +196,14 @@ export function AdminCalendarPage() {
       null,
     [selectedSessionId, sessions],
   )
+  const selectedActivity = useMemo(
+    () => activities.find((activity) => activity.id === form.activity_id) ?? null,
+    [activities, form.activity_id],
+  )
+  const isPersonalizedOneOnOne =
+    selectedActivity?.slug === 'personalizado_1_1'
+  const startParts = getDateTimeParts(form.starts_at)
+  const endParts = getDateTimeParts(form.ends_at)
 
   async function loadData() {
     setLoading(true)
@@ -162,23 +245,72 @@ export function AdminCalendarPage() {
 
   function selectSession(session: CalendarSession) {
     setSelectedSessionId(session.session_id)
-    setForm(sessionToForm(session))
+    const nextForm = {
+      ...sessionToForm(session),
+      capacity:
+        session.activity_slug === 'personalizado_1_1'
+          ? '1'
+          : String(session.capacity),
+    }
+    setForm(nextForm)
+    setRecurrence(buildRecurrenceForm(nextForm))
     setCancelReason('')
     setError(null)
     setSuccess(null)
   }
 
   function resetForm() {
+    const nextForm = buildEmptyForm(activities)
     setSelectedSessionId(null)
-    setForm(buildEmptyForm(activities))
+    setForm(nextForm)
+    setRecurrence(buildRecurrenceForm(nextForm))
     setCancelReason('')
     setError(null)
     setSuccess(null)
   }
 
+  function updateStartDateTime(dateValue: string, timeValue: string) {
+    const nextStartsAt = `${dateValue}T${timeValue}`
+    const previousStart = new Date(form.starts_at)
+    const previousEnd = new Date(form.ends_at)
+    const durationMs = Math.max(
+      previousEnd.getTime() - previousStart.getTime(),
+      30 * 60 * 1000,
+    )
+    const nextEnd = new Date(new Date(nextStartsAt).getTime() + durationMs)
+
+    setForm({
+      ...form,
+      starts_at: nextStartsAt,
+      ends_at: formatDateTimeLocal(nextEnd),
+    })
+    setRecurrence({
+      ...recurrence,
+      date_from: dateValue,
+      start_time: timeValue,
+      end_time: formatLocalTime(nextEnd),
+      weekday: String(new Date(`${dateValue}T00:00:00`).getDay()),
+    })
+  }
+
+  function updateEndDateTime(dateValue: string, timeValue: string) {
+    setForm({
+      ...form,
+      ends_at: `${dateValue}T${timeValue}`,
+    })
+    setRecurrence({
+      ...recurrence,
+      end_time: timeValue,
+    })
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const capacity = Number(form.capacity)
+    const normalizedForm = {
+      ...form,
+      capacity: isPersonalizedOneOnOne ? '1' : form.capacity,
+    }
+    const capacity = Number(normalizedForm.capacity)
 
     if (!form.activity_id || !form.title.trim()) {
       setError('Selecciona actividad y titulo para la clase.')
@@ -190,11 +322,53 @@ export function AdminCalendarPage() {
       return
     }
 
+    if (isPersonalizedOneOnOne && capacity > 1) {
+      setError('Personalizado 1:1 permite maximo 1 alumno.')
+      return
+    }
+
+    if (recurrence.enabled && !selectedSession) {
+      const weekday = Number(recurrence.weekday)
+      const recurringDates = buildRecurringDates(
+        recurrence.date_from,
+        recurrence.date_to,
+        weekday,
+      )
+
+      if (
+        !Number.isInteger(weekday) ||
+        !recurrence.date_from ||
+        !recurrence.date_to ||
+        recurrence.date_to < recurrence.date_from
+      ) {
+        setError('Completa un rango valido para repetir la clase.')
+        return
+      }
+
+      if (recurringDates.length === 0) {
+        setError('No hay fechas para crear con ese dia de semana y rango.')
+        return
+      }
+
+      if (recurringDates.length > 52) {
+        setError('La recurrencia no puede crear mas de 52 clases por vez.')
+        return
+      }
+
+      if (
+        new Date(`${recurrence.date_from}T${recurrence.start_time}`) >=
+        new Date(`${recurrence.date_from}T${recurrence.end_time}`)
+      ) {
+        setError('La hora de fin debe ser posterior a la hora de inicio.')
+        return
+      }
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
     try {
-      const input = formToInput(form)
+      const input = formToInput(normalizedForm)
       if (selectedSession) {
         await updateClassSession({
           ...input,
@@ -202,6 +376,59 @@ export function AdminCalendarPage() {
           active: form.active,
         } satisfies UpdateClassSessionInput)
         setSuccess('Clase actualizada.')
+      } else if (recurrence.enabled) {
+        const recurringDates = buildRecurringDates(
+          recurrence.date_from,
+          recurrence.date_to,
+          Number(recurrence.weekday),
+        )
+        const existingSessions = await listCalendarSessions(
+          dateInputToRangeStart(recurrence.date_from),
+          dateInputToRangeEnd(recurrence.date_to),
+        )
+        const existingKeys = new Set(
+          existingSessions.map((session) => {
+            return [
+              session.activity_id,
+              formatDateTimeLocal(new Date(session.starts_at)),
+              formatDateTimeLocal(new Date(session.ends_at)),
+            ].join('|')
+          }),
+        )
+        const createdDates: string[] = []
+        const skippedDates: string[] = []
+
+        for (const dateValue of recurringDates) {
+          const startsAt = localDateTimeToIso(dateValue, recurrence.start_time)
+          const endsAt = localDateTimeToIso(dateValue, recurrence.end_time)
+          const duplicateKey = [
+            form.activity_id,
+            `${dateValue}T${recurrence.start_time}`,
+            `${dateValue}T${recurrence.end_time}`,
+          ].join('|')
+
+          if (existingKeys.has(duplicateKey)) {
+            skippedDates.push(dateValue)
+            continue
+          }
+
+          await createClassSession({
+            ...input,
+            starts_at: startsAt,
+            ends_at: endsAt,
+          })
+          createdDates.push(dateValue)
+        }
+
+        if (createdDates.length === 0) {
+          setError('No se crearon clases nuevas porque ya existian en ese rango.')
+        } else {
+          setSuccess(
+            skippedDates.length > 0
+              ? `Se crearon ${createdDates.length} clases. Se omitieron ${skippedDates.length} duplicadas.`
+              : `Se crearon ${createdDates.length} clases recurrentes.`,
+          )
+        }
       } else {
         await createClassSession(input)
         setSuccess('Clase creada.')
@@ -316,9 +543,19 @@ export function AdminCalendarPage() {
             <select
               aria-label="Actividad"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-              onChange={(event) =>
-                setForm({ ...form, activity_id: event.target.value })
-              }
+              onChange={(event) => {
+                const nextActivity = activities.find(
+                  (activity) => activity.id === event.target.value,
+                )
+                setForm({
+                  ...form,
+                  activity_id: event.target.value,
+                  capacity:
+                    nextActivity?.slug === 'personalizado_1_1'
+                      ? '1'
+                      : form.capacity,
+                })
+              }}
               value={form.activity_id}
             >
               <option value="">Seleccionar actividad</option>
@@ -335,37 +572,182 @@ export function AdminCalendarPage() {
               placeholder="Titulo"
               value={form.title}
             />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                aria-label="Inicio"
-                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) =>
-                  setForm({ ...form, starts_at: event.target.value })
-                }
-                type="datetime-local"
-                value={form.starts_at}
-              />
-              <input
-                aria-label="Fin"
-                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) =>
-                  setForm({ ...form, ends_at: event.target.value })
-                }
-                type="datetime-local"
-                value={form.ends_at}
-              />
+            <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+                Fecha y hora
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                  Fecha de inicio
+                  <input
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                    onChange={(event) =>
+                      updateStartDateTime(event.target.value, startParts.time)
+                    }
+                    type="date"
+                    value={startParts.date}
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                  Hora de inicio
+                  <input
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                    onChange={(event) =>
+                      updateStartDateTime(startParts.date, event.target.value)
+                    }
+                    type="time"
+                    value={startParts.time}
+                  />
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                  Fecha de fin
+                  <input
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                    onChange={(event) =>
+                      updateEndDateTime(event.target.value, endParts.time)
+                    }
+                    type="date"
+                    value={endParts.date}
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                  Hora de fin
+                  <input
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                    onChange={(event) =>
+                      updateEndDateTime(endParts.date, event.target.value)
+                    }
+                    type="time"
+                    value={endParts.time}
+                  />
+                </label>
+              </div>
             </div>
+            {!selectedSession ? (
+              <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3">
+                <label className="flex items-start gap-3 text-sm font-semibold text-[var(--ink)]">
+                  <input
+                    checked={recurrence.enabled}
+                    className="mt-1"
+                    onChange={(event) =>
+                      setRecurrence({
+                        ...recurrence,
+                        enabled: event.target.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                  <span>
+                    Crear clase recurrente
+                    <span className="block text-xs font-normal text-[var(--muted)]">
+                      Repite la clase en el dia elegido, evita duplicados exactos
+                      y crea hasta 52 clases por vez.
+                    </span>
+                  </span>
+                </label>
+                {recurrence.enabled ? (
+                  <div className="grid gap-3">
+                    <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                      Dia de semana
+                      <select
+                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                        onChange={(event) =>
+                          setRecurrence({
+                            ...recurrence,
+                            weekday: event.target.value,
+                          })
+                        }
+                        value={recurrence.weekday}
+                      >
+                        {weekdayLabels.map((label, index) => (
+                          <option key={label} value={String(index)}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                        Fecha desde
+                        <input
+                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                          onChange={(event) =>
+                            setRecurrence({
+                              ...recurrence,
+                              date_from: event.target.value,
+                            })
+                          }
+                          type="date"
+                          value={recurrence.date_from}
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                        Fecha hasta
+                        <input
+                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                          onChange={(event) =>
+                            setRecurrence({
+                              ...recurrence,
+                              date_to: event.target.value,
+                            })
+                          }
+                          type="date"
+                          value={recurrence.date_to}
+                        />
+                      </label>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                        Hora inicio
+                        <input
+                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                          onChange={(event) =>
+                            setRecurrence({
+                              ...recurrence,
+                              start_time: event.target.value,
+                            })
+                          }
+                          type="time"
+                          value={recurrence.start_time}
+                        />
+                      </label>
+                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                        Hora fin
+                        <input
+                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                          onChange={(event) =>
+                            setRecurrence({
+                              ...recurrence,
+                              end_time: event.target.value,
+                            })
+                          }
+                          type="time"
+                          value={recurrence.end_time}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 aria-label="Cupo"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                disabled={isPersonalizedOneOnOne}
+                max={isPersonalizedOneOnOne ? '1' : undefined}
                 min="1"
-                onChange={(event) =>
-                  setForm({ ...form, capacity: event.target.value })
-                }
+                onChange={(event) => {
+                  const nextCapacity = isPersonalizedOneOnOne
+                    ? '1'
+                    : event.target.value
+                  setForm({ ...form, capacity: nextCapacity })
+                }}
                 placeholder="Cupo"
                 type="number"
-                value={form.capacity}
+                value={isPersonalizedOneOnOne ? '1' : form.capacity}
               />
               <input
                 aria-label="Entrenador"
@@ -377,6 +759,11 @@ export function AdminCalendarPage() {
                 value={form.coach_name}
               />
             </div>
+            {isPersonalizedOneOnOne ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                Personalizado 1:1 permite maximo 1 alumno.
+              </p>
+            ) : null}
             <textarea
               aria-label="Notas"
               className="min-h-24 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
@@ -401,7 +788,13 @@ export function AdminCalendarPage() {
               disabled={saving}
               type="submit"
             >
-              {saving ? 'Guardando...' : selectedSession ? 'Guardar clase' : 'Crear clase'}
+              {saving
+                ? 'Guardando...'
+                : selectedSession
+                  ? 'Guardar clase'
+                  : recurrence.enabled
+                    ? 'Crear clases recurrentes'
+                    : 'Crear clase'}
             </button>
           </div>
         </form>

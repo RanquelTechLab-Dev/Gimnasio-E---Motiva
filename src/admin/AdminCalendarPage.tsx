@@ -273,11 +273,28 @@ export function AdminCalendarPage() {
     const nextStartsAt = `${dateValue}T${timeValue}`
     const previousStart = new Date(form.starts_at)
     const previousEnd = new Date(form.ends_at)
+    const previousRecurrenceStart = new Date(`${recurrence.date_from}T00:00:00`)
+    const previousRecurrenceEnd = new Date(`${recurrence.date_to}T00:00:00`)
+    const dayMs = 24 * 60 * 60 * 1000
+    const previousSpanDays =
+      Number.isFinite(previousRecurrenceStart.getTime()) &&
+      Number.isFinite(previousRecurrenceEnd.getTime()) &&
+      previousRecurrenceEnd >= previousRecurrenceStart
+        ? Math.round(
+            (previousRecurrenceEnd.getTime() -
+              previousRecurrenceStart.getTime()) /
+              dayMs,
+          )
+        : 28
     const durationMs = Math.max(
       previousEnd.getTime() - previousStart.getTime(),
       30 * 60 * 1000,
     )
     const nextEnd = new Date(new Date(nextStartsAt).getTime() + durationMs)
+    const nextRecurrenceEnd = addDays(
+      new Date(`${dateValue}T00:00:00`),
+      previousSpanDays,
+    )
 
     setForm({
       ...form,
@@ -287,6 +304,7 @@ export function AdminCalendarPage() {
     setRecurrence({
       ...recurrence,
       date_from: dateValue,
+      date_to: formatLocalDate(nextRecurrenceEnd),
       start_time: timeValue,
       end_time: formatLocalTime(nextEnd),
       weekday: String(new Date(`${dateValue}T00:00:00`).getDay()),

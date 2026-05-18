@@ -23,6 +23,14 @@ function planToForm(plan: Plan): PlanFormState {
   }
 }
 
+function planCreditsLabel(plan: Plan) {
+  const credits = (plan.plan_activities ?? []).reduce((total, item) => {
+    return total + (item.monthly_credits ?? 0)
+  }, 0)
+
+  return credits > 0 ? `${credits} clases por periodo` : 'Sin limite definido'
+}
+
 export function AdminPlansPage() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
@@ -156,9 +164,12 @@ export function AdminPlansPage() {
                     {moneyFormatter.format(plan.price)}
                   </div>
                 </div>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--brand)]">
+                  {planCreditsLabel(plan)}
+                </p>
                 {plan.price === 0 ? (
                   <p className="mt-3 rounded-2xl bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent)]">
-                    Pendiente de definir precio real
+                    Sin precio vigente en el catalogo actual
                   </p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">

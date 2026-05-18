@@ -30,6 +30,11 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - Admin puede crear, editar y cancelar clases desde el calendario visual.
 - Pagos admin muestran mejor el plan, periodo y creditos asociados a la
   membresia.
+- Se prepara catalogo real de planes/precios desde `Precios.jpeg` mediante
+  migracion de datos, sin cambiar schema.
+- Los planes nuevos incluyen precio, descripcion fuente y creditos por paquete
+  para cargar membresias con clases disponibles.
+- Los planes base anteriores quedan inactivos y conservados por historial.
 
 ## Auditoria funcional
 
@@ -41,12 +46,13 @@ El schema actual permite:
 - registrar pagos contra `membership_id`;
 - ver el plan asociado a una membresia/pago;
 - reservar y cancelar clases con las reglas existentes.
+- representar paquetes personalizados de 1, 4, 8 y 12 clases con planes
+  separados y creditos finitos.
 
 Requieren subbloques especificos:
 
 - CRUD completo de actividades;
-- precios reales desde referencia `Precios.jpeg`;
-- personalizado por clases/paquetes si requiere nuevos planes o reglas;
+- aplicar y validar remotamente la migracion de catalogo real de precios;
 - editar/eliminar pagos y montos;
 - reset de contrasena de alumno desde admin;
 - eliminar archivos reales y/o metadata desde admin.

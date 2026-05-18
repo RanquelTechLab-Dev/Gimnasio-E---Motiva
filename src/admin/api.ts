@@ -110,6 +110,7 @@ export async function listPlans() {
     .select(
       'id, name, slug, description, price, billing_period_days, active, plan_activities(monthly_credits, activities(id, name, slug, active))',
     )
+    .order('active', { ascending: false })
     .order('name', { ascending: true })
 
   if (error) {

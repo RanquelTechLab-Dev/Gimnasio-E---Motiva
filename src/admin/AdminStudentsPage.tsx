@@ -161,14 +161,45 @@ function studentToEditForm(student: StudentProfile): EditStudentState {
   }
 }
 
+function planDefaultCredits(plan?: Plan | null) {
+  if (!plan?.plan_activities?.length) {
+    return ''
+  }
+
+  const credits = plan.plan_activities.reduce((total, item) => {
+    return total + (item.monthly_credits ?? 0)
+  }, 0)
+
+  return credits > 0 ? String(credits) : ''
+}
+
+function describePlanOption(plan: Plan) {
+  const credits = planDefaultCredits(plan)
+  const price = moneyFormatter.format(plan.price)
+
+  return credits
+    ? `${plan.name} · ${price} · ${credits} clases`
+    : `${plan.name} · ${price}`
+}
+
+function describeMembershipOption(membership: Membership, plan?: Plan | null) {
+  const credits =
+    membership.remaining_credits === null
+      ? 'creditos libres'
+      : `${membership.remaining_credits} creditos`
+  const price = plan ? ` · ${moneyFormatter.format(plan.price)}` : ''
+
+  return `${plan?.name ?? 'Plan'}${price} · ${credits} · ${membership.start_date} a ${membership.end_date}`
+}
+
 function buildMembershipForm(plans: Plan[]): MembershipFormState {
   const startDate = todayDate()
-  const firstPlan = plans[0]
+  const firstPlan = plans.find((plan) => plan.active) ?? plans[0]
   return {
     plan_id: firstPlan?.id ?? '',
     start_date: startDate,
     end_date: addDays(startDate, (firstPlan?.billing_period_days ?? 30) - 1),
-    remaining_credits: '',
+    remaining_credits: planDefaultCredits(firstPlan),
   }
 }
 
@@ -294,6 +325,7 @@ export function AdminStudentsPage() {
   const selectedStudentFiles = studentFiles.filter(
     (file) => file.student_id === selectedStudent?.id,
   )
+  const activePlans = plans.filter((plan) => plan.active)
 
   async function loadData() {
     setLoading(true)
@@ -471,6 +503,7 @@ export function AdminStudentsPage() {
         membershipForm.start_date,
         (plan?.billing_period_days ?? 30) - 1,
       ),
+      remaining_credits: planDefaultCredits(plan),
     })
   }
 
@@ -1588,9 +1621,9 @@ export function AdminStudentsPage() {
                 value={membershipForm.plan_id}
               >
                 <option value="">Seleccionar plan</option>
-                {plans.map((plan) => (
+                {activePlans.map((plan) => (
                   <option key={plan.id} value={plan.id}>
-                    {plan.name}
+                    {describePlanOption(plan)}
                   </option>
                 ))}
               </select>
@@ -1627,10 +1660,14 @@ export function AdminStudentsPage() {
                     remaining_credits: event.target.value,
                   })
                 }
-                placeholder="Creditos opcionales"
+                placeholder="Creditos del paquete"
                 type="number"
                 value={membershipForm.remaining_credits}
               />
+              <p className="-mt-1 text-xs text-[var(--muted)]">
+                Los creditos se cargan desde el paquete elegido y pueden
+                ajustarse antes de asignar la membresia.
+              </p>
               <button
                 className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
                 disabled={saving}
@@ -1670,8 +1707,7 @@ export function AdminStudentsPage() {
                   const plan = plansById.get(membership.plan_id)
                   return (
                     <option key={membership.id} value={membership.id}>
-                      {plan?.name ?? 'Plan'} · {membership.start_date} a{' '}
-                      {membership.end_date}
+                      {describeMembershipOption(membership, plan)}
                     </option>
                   )
                 })}

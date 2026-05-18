@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-05-18 - RANV2-13 precios y paquetes
+
+- Se agrega migracion local de catalogo para precios reales desde
+  `docs/source-assets/Precios.jpeg`.
+- Se agregan planes vigentes para neurofuncional, semipersonalizado,
+  combo funcional/semipersonalizado, programa kids, plan de entrenamiento y
+  personalizado por paquetes de 1, 4, 8 y 12 clases.
+- Se conservan los planes base anteriores como inactivos para historial.
+- Admin asigna membresias solo desde planes activos y precarga creditos segun
+  el paquete elegido.
+- No se ejecuta `db push` real.
+
 ## 2026-05-13 - RANV2-01 iniciado
 
 - Se inicia reboot limpio de E-Motiva App Gimnasio v2.

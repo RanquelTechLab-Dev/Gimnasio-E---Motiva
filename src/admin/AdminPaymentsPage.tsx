@@ -55,8 +55,9 @@ function describeMembership(membership: Membership, plan?: Plan | null) {
     membership.remaining_credits === null
       ? 'uso ilimitado'
       : `${membership.remaining_credits} creditos`
+  const price = plan ? ` · ${moneyFormatter.format(plan.price)}` : ''
 
-  return `${plan?.name ?? 'Plan'} · ${credits} · ${membership.start_date} a ${membership.end_date}`
+  return `${plan?.name ?? 'Plan'}${price} · ${credits} · ${membership.start_date} a ${membership.end_date}`
 }
 
 export function AdminPaymentsPage() {

@@ -105,4 +105,5 @@ RAN-29 esta en ejecucion.
 - RANV2-12 agrega limpieza controlada de Drive con dry-run obligatorio y auditoria.
 - RANV2-13 inicia ajuste visual/responsive: layout ancho, marca real,
   calendario visual interactivo mergeado, catalogo real de precios/planes
-  aplicado y limites semanales/paquetes en preparacion.
+  aplicado, limites semanales/paquetes aplicados y fixes de calendario admin
+  en preparacion.

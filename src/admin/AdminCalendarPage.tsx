@@ -412,8 +412,8 @@ export function AdminCalendarPage() {
               Cancelacion
             </p>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              Cancela la clase y procesa reservas activas. Los creditos se
-              devuelven desde la RPC.
+              Cancela la clase y procesa reservas activas segun las reglas del
+              plan.
             </p>
             <textarea
               className="mt-4 min-h-20 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"

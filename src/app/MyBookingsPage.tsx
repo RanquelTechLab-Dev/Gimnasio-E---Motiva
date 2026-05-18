@@ -104,11 +104,19 @@ export function MyBookingsPage() {
                   <p className="mt-1 text-sm text-[var(--muted)]">
                     {booking.activity_name} · {formatDateTime(booking.starts_at)}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    Creditos usados: {booking.credits_charged}
-                    {booking.credit_returned_at ? ' · credito devuelto' : ''}
-                    {booking.charged_as_attended ? ' · cobrada como asistida' : ''}
-                  </p>
+                  {booking.credits_charged > 0 ||
+                  booking.credit_returned_at ||
+                  booking.charged_as_attended ? (
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {booking.credits_charged > 0
+                        ? `Clases descontadas: ${booking.credits_charged}`
+                        : 'Reserva semanal'}
+                      {booking.credit_returned_at ? ' · clase devuelta' : ''}
+                      {booking.charged_as_attended
+                        ? ' · cobrada como asistida'
+                        : ''}
+                    </p>
+                  ) : null}
                 </div>
                 <p className="text-sm font-semibold text-[var(--ink)]">
                   {statusLabels[booking.booking_status]}

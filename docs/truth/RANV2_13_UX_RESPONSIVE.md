@@ -28,13 +28,18 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   `Plan Actividades.jpeg`, usando sesiones reales de Supabase.
 - Alumno puede reservar y cancelar desde el calendario con las RPCs existentes.
 - Admin puede crear, editar y cancelar clases desde el calendario visual.
-- Pagos admin muestran mejor el plan, periodo y creditos asociados a la
+- Pagos admin muestran mejor el plan, periodo y clases asociadas a la
   membresia.
 - Se prepara catalogo real de planes/precios desde `Precios.jpeg` mediante
   migracion de datos, sin cambiar schema.
-- Los planes nuevos incluyen precio, descripcion fuente y creditos por paquete
+- Los planes nuevos incluyen precio, descripcion fuente y clases por paquete
   para cargar membresias con clases disponibles.
 - Los planes base anteriores quedan inactivos y conservados por historial.
+- Se agrega modelo explicito de `plan_type`: semanal, paquete o manual.
+- Los planes semanales muestran clases por semana y se controlan por semana
+  desde la RPC de reserva.
+- Los paquetes personalizados mantienen clases restantes del paquete.
+- La UI admin/alumno evita hablar de saldo tecnico visible.
 
 ## Auditoria funcional
 
@@ -47,12 +52,13 @@ El schema actual permite:
 - ver el plan asociado a una membresia/pago;
 - reservar y cancelar clases con las reglas existentes.
 - representar paquetes personalizados de 1, 4, 8 y 12 clases con planes
-  separados y creditos finitos.
+  separados y clases finitas.
+- bloquear reservas cuando el alumno ya uso el limite semanal de esa actividad.
 
 Requieren subbloques especificos:
 
 - CRUD completo de actividades;
-- aplicar y validar remotamente la migracion de catalogo real de precios;
+- aplicar y validar remotamente la migracion de limites semanales/paquetes;
 - editar/eliminar pagos y montos;
 - reset de contrasena de alumno desde admin;
 - eliminar archivos reales y/o metadata desde admin.

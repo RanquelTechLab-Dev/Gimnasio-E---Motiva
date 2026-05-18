@@ -21,8 +21,11 @@ export type Activity = {
   active: boolean
 }
 
+export type PlanType = 'weekly' | 'package' | 'manual'
+
 export type PlanActivity = {
   monthly_credits: number | null
+  weekly_class_limit: number | null
   activities: Activity | null
 }
 
@@ -33,6 +36,8 @@ export type Plan = {
   description: string | null
   price: number
   billing_period_days: number
+  plan_type: PlanType
+  package_class_count: number | null
   active: boolean
   plan_activities?: PlanActivity[]
 }
@@ -296,6 +301,11 @@ export type CalendarSession = {
   own_booking_status: 'booked' | 'cancelled' | 'attended' | 'no_show' | null
   can_book: boolean
   block_reason: string | null
+  plan_type: PlanType | null
+  weekly_class_limit: number | null
+  weekly_classes_used: number | null
+  weekly_classes_remaining: number | null
+  package_classes_remaining: number | null
 }
 
 export type ClassSessionInput = {

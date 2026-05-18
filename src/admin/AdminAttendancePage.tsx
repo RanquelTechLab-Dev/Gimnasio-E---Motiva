@@ -143,7 +143,8 @@ export function AdminAttendancePage() {
             <p className="mt-2 text-sm text-[var(--muted)]">
               La asistencia se genera automaticamente para reservas no
               canceladas cuando la clase finaliza. Este panel solo revisa y
-              corrige casos puntuales; los creditos no se ajustan desde aca.
+              corrige casos puntuales; las clases disponibles no se ajustan
+              desde aca.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">

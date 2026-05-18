@@ -161,35 +161,62 @@ function studentToEditForm(student: StudentProfile): EditStudentState {
   }
 }
 
-function planDefaultCredits(plan?: Plan | null) {
-  if (!plan?.plan_activities?.length) {
+function weeklyPlanLabel(plan: Plan) {
+  const total = (plan.plan_activities ?? []).reduce((sum, item) => {
+    return sum + (item.weekly_class_limit ?? 0)
+  }, 0)
+
+  return total > 0 ? `${total} por semana` : 'limite semanal pendiente'
+}
+
+function planDefaultPackageClasses(plan?: Plan | null) {
+  if (!plan || plan.plan_type === 'weekly') {
     return ''
   }
 
-  const credits = plan.plan_activities.reduce((total, item) => {
+  if (plan.plan_type === 'package') {
+    return plan.package_class_count ? String(plan.package_class_count) : ''
+  }
+
+  const classes = (plan.plan_activities ?? []).reduce((total, item) => {
     return total + (item.monthly_credits ?? 0)
   }, 0)
 
-  return credits > 0 ? String(credits) : ''
+  return classes > 0 ? String(classes) : ''
 }
 
 function describePlanOption(plan: Plan) {
-  const credits = planDefaultCredits(plan)
   const price = moneyFormatter.format(plan.price)
 
-  return credits
-    ? `${plan.name} · ${price} · ${credits} clases`
+  if (plan.plan_type === 'weekly') {
+    return `${plan.name} · ${price} · ${weeklyPlanLabel(plan)}`
+  }
+
+  if (plan.plan_type === 'package') {
+    return `${plan.name} · ${price} · ${plan.package_class_count ?? 0} clases`
+  }
+
+  const classes = planDefaultPackageClasses(plan)
+  return classes
+    ? `${plan.name} · ${price} · ${classes} clases`
     : `${plan.name} · ${price}`
 }
 
 function describeMembershipOption(membership: Membership, plan?: Plan | null) {
-  const credits =
-    membership.remaining_credits === null
-      ? 'creditos libres'
-      : `${membership.remaining_credits} creditos`
+  const classes = (() => {
+    if (plan?.plan_type === 'weekly') {
+      return weeklyPlanLabel(plan)
+    }
+
+    if (membership.remaining_credits === null) {
+      return 'clases segun plan'
+    }
+
+    return `${membership.remaining_credits} clases restantes`
+  })()
   const price = plan ? ` · ${moneyFormatter.format(plan.price)}` : ''
 
-  return `${plan?.name ?? 'Plan'}${price} · ${credits} · ${membership.start_date} a ${membership.end_date}`
+  return `${plan?.name ?? 'Plan'}${price} · ${classes} · ${membership.start_date} a ${membership.end_date}`
 }
 
 function buildMembershipForm(plans: Plan[]): MembershipFormState {
@@ -199,7 +226,7 @@ function buildMembershipForm(plans: Plan[]): MembershipFormState {
     plan_id: firstPlan?.id ?? '',
     start_date: startDate,
     end_date: addDays(startDate, (firstPlan?.billing_period_days ?? 30) - 1),
-    remaining_credits: planDefaultCredits(firstPlan),
+    remaining_credits: planDefaultPackageClasses(firstPlan),
   }
 }
 
@@ -326,6 +353,7 @@ export function AdminStudentsPage() {
     (file) => file.student_id === selectedStudent?.id,
   )
   const activePlans = plans.filter((plan) => plan.active)
+  const selectedMembershipPlan = plansById.get(membershipForm.plan_id) ?? null
 
   async function loadData() {
     setLoading(true)
@@ -503,7 +531,7 @@ export function AdminStudentsPage() {
         membershipForm.start_date,
         (plan?.billing_period_days ?? 30) - 1,
       ),
-      remaining_credits: planDefaultCredits(plan),
+      remaining_credits: planDefaultPackageClasses(plan),
     })
   }
 
@@ -1236,7 +1264,7 @@ export function AdminStudentsPage() {
                 onSubmit={handleSaveFileMetadata}
               >
                 <p className="text-sm font-semibold text-[var(--ink)]">
-                  Registrar o corregir metadata
+                  Registrar o corregir datos del documento
                 </p>
                 <div className="grid gap-3 md:grid-cols-[0.8fr_1.2fr]">
                   <select
@@ -1652,21 +1680,27 @@ export function AdminStudentsPage() {
                 value={membershipForm.end_date}
               />
               <input
-                aria-label="Creditos opcionales de membresia"
+                aria-label="Clases del paquete de membresia"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                disabled={selectedMembershipPlan?.plan_type === 'weekly'}
                 onChange={(event) =>
                   setMembershipForm({
                     ...membershipForm,
                     remaining_credits: event.target.value,
                   })
                 }
-                placeholder="Creditos del paquete"
+                placeholder={
+                  selectedMembershipPlan?.plan_type === 'weekly'
+                    ? 'Se controla por semana'
+                    : 'Clases del paquete'
+                }
                 type="number"
                 value={membershipForm.remaining_credits}
               />
               <p className="-mt-1 text-xs text-[var(--muted)]">
-                Los creditos se cargan desde el paquete elegido y pueden
-                ajustarse antes de asignar la membresia.
+                {selectedMembershipPlan?.plan_type === 'weekly'
+                  ? 'Los planes semanales limitan reservas por semana y no usan saldo visible.'
+                  : 'Las clases se cargan desde el paquete elegido y pueden ajustarse antes de asignar la membresia.'}
               </p>
               <button
                 className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"

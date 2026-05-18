@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-05-18 - RANV2-13 limites semanales y paquetes
+
+- Se agrega migracion local para diferenciar planes semanales, paquetes
+  personalizados y planes manuales.
+- Los planes semanales se controlan por clases por semana y ya no consumen
+  saldo visible de membresia.
+- Los paquetes personalizados mantienen clases restantes del paquete.
+- El calendario de alumno muestra clases restantes de la semana o del paquete
+  segun corresponda.
+- Se ajusta copy de admin/alumno para hablar de clases y no de saldo tecnico.
+- No se ejecuta `db push` real.
+
 ## 2026-05-18 - RANV2-13 precios y paquetes
 
 - Se agrega migracion local de catalogo para precios reales desde
@@ -8,7 +20,7 @@
   combo funcional/semipersonalizado, programa kids, plan de entrenamiento y
   personalizado por paquetes de 1, 4, 8 y 12 clases.
 - Se conservan los planes base anteriores como inactivos para historial.
-- Admin asigna membresias solo desde planes activos y precarga creditos segun
+- Admin asigna membresias solo desde planes activos y precarga clases segun
   el paquete elegido.
 - No se ejecuta `db push` real.
 
@@ -184,7 +196,7 @@
 - Se mejora el layout admin/alumno para desktop maximizado, tablet y mobile.
 - Se agrega marca visual provisoria en login sin inventar assets.
 - Calendario alumno y admin pasan de lista simple a tarjetas agrupadas por dia.
-- Pagos admin muestran plan, periodo y creditos asociados a la membresia.
+- Pagos admin muestran plan, periodo y clases asociadas a la membresia.
 - No se agrega migracion ni se cargan precios hardcodeados.
 
 ## 2026-05-15 - RANV2-13 branding real

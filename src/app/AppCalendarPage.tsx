@@ -69,7 +69,7 @@ export function AppCalendarPage() {
     setSuccess(null)
     try {
       await bookClassSession(session.session_id)
-      setSuccess('Reserva creada. El credito se desconto al reservar si correspondia.')
+      setSuccess('Reserva creada.')
       await loadData()
     } catch (bookError) {
       setError(formatAppError(bookError))
@@ -109,7 +109,7 @@ export function AppCalendarPage() {
           </h3>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Las reservas se confirman segun tu plan, membresia, cupo disponible
-            y creditos.
+            y clases disponibles.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">

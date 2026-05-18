@@ -18,6 +18,11 @@ export type CalendarSession = {
   own_booking_status: 'booked' | 'cancelled' | 'attended' | 'no_show' | null
   can_book: boolean
   block_reason: string | null
+  plan_type: 'weekly' | 'package' | 'manual' | null
+  weekly_class_limit: number | null
+  weekly_classes_used: number | null
+  weekly_classes_remaining: number | null
+  package_classes_remaining: number | null
 }
 
 export type MyBooking = {
@@ -61,6 +66,8 @@ export type StudentMembershipSummary = {
   plan_id: string
   plan_name: string
   plan_slug: string
+  plan_type: 'weekly' | 'package' | 'manual'
+  package_class_count: number | null
   billing_period_days: number
 }
 

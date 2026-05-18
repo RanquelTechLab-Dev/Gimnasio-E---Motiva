@@ -56,11 +56,10 @@ export function LoginPage() {
           </div>
         </div>
         <h1 className="mt-8 max-w-2xl font-display text-5xl font-bold leading-tight text-[var(--ink)]">
-          Acceso ordenado para entrenar, reservar y administrar.
+          Acceso E-Motiva
         </h1>
         <p className="mt-5 max-w-xl text-base text-[var(--muted)]">
-          Tu panel queda separado por rol: administracion para el equipo y
-          espacio alumno para reservas, pagos, asistencia y archivos.
+          Ingresa con tu cuenta para gestionar clases, alumnos y reservas.
         </p>
       </div>
       <form
@@ -81,8 +80,8 @@ export function LoginPage() {
           Acceso E-Motiva
         </h1>
         <p className="mt-3 text-sm text-[var(--muted)]">
-          Acceso para cuentas creadas por administracion. No hay registro
-          publico.
+          Ingresa con tu cuenta para continuar. Las cuentas son creadas por
+          administracion.
         </p>
 
         {location.state ? (

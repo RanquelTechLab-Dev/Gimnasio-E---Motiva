@@ -246,6 +246,7 @@ declare
   v_membership_selection record;
   v_weekly_limit int;
   v_weekly_used int := 0;
+  v_weekly_exhausted boolean := false;
   v_week_start timestamp;
   v_week_end timestamp;
   v_active_bookings integer;
@@ -310,10 +311,27 @@ begin
     raise exception 'No hay cupos disponibles para esta clase.';
   end if;
 
+  v_week_start := date_trunc('week', v_session.starts_at at time zone 'America/Argentina/Buenos_Aires');
+  v_week_end := v_week_start + interval '7 days';
+
   select
     m.id as membership_id,
     p.id as plan_id,
-    pa.weekly_class_limit
+    pa.weekly_class_limit,
+    case
+      when p.plan_type = 'weekly' then (
+        select count(*)::int
+        from public.bookings b
+        join public.class_sessions s on s.id = b.session_id
+        where b.student_id = v_actor
+          and b.membership_id = m.id
+          and s.activity_id = v_session.activity_id
+          and b.status in ('booked'::public.booking_status, 'attended'::public.booking_status, 'no_show'::public.booking_status)
+          and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') >= v_week_start
+          and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') < v_week_end
+      )
+      else null
+    end as weekly_classes_used
   into v_membership_selection
   from public.memberships m
   join public.plans p on p.id = m.plan_id
@@ -327,11 +345,62 @@ begin
       or m.remaining_credits is null
       or m.remaining_credits > 0
     )
+    and (
+      p.plan_type <> 'weekly'
+      or (
+        pa.weekly_class_limit is not null
+        and (
+          select count(*)::int
+          from public.bookings b
+          join public.class_sessions s on s.id = b.session_id
+          where b.student_id = v_actor
+            and b.membership_id = m.id
+            and s.activity_id = v_session.activity_id
+            and b.status in ('booked'::public.booking_status, 'attended'::public.booking_status, 'no_show'::public.booking_status)
+            and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') >= v_week_start
+            and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') < v_week_end
+        ) < pa.weekly_class_limit
+      )
+    )
   order by m.end_date asc, m.created_at asc
   limit 1
   for update of m;
 
   if not found then
+    select exists (
+      select 1
+      from (
+        select
+          pa.weekly_class_limit,
+          (
+            select count(*)::int
+            from public.bookings b
+            join public.class_sessions s on s.id = b.session_id
+            where b.student_id = v_actor
+              and b.membership_id = m.id
+              and s.activity_id = v_session.activity_id
+              and b.status in ('booked'::public.booking_status, 'attended'::public.booking_status, 'no_show'::public.booking_status)
+              and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') >= v_week_start
+              and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') < v_week_end
+          ) as weekly_classes_used
+        from public.memberships m
+        join public.plans p on p.id = m.plan_id
+        join public.plan_activities pa on pa.plan_id = m.plan_id
+        where m.student_id = v_actor
+          and m.status = 'active'
+          and p.plan_type = 'weekly'
+          and v_session.starts_at::date between m.start_date and m.end_date
+          and pa.activity_id = v_session.activity_id
+      ) exhausted
+      where exhausted.weekly_class_limit is not null
+        and exhausted.weekly_classes_used >= exhausted.weekly_class_limit
+    )
+    into v_weekly_exhausted;
+
+    if v_weekly_exhausted then
+      raise exception 'Ya alcanzaste el limite de clases de esta semana para este plan.';
+    end if;
+
     raise exception 'No hay membresia activa que permita esta clase.';
   end if;
 
@@ -344,24 +413,12 @@ begin
   where p.id = v_membership_selection.plan_id;
 
   v_weekly_limit := v_membership_selection.weekly_class_limit;
+  v_weekly_used := coalesce(v_membership_selection.weekly_classes_used, 0);
 
   if v_plan.plan_type = 'weekly' then
     if v_weekly_limit is null then
       raise exception 'El plan semanal no tiene limite de clases configurado.';
     end if;
-
-    v_week_start := date_trunc('week', v_session.starts_at at time zone 'America/Argentina/Buenos_Aires');
-    v_week_end := v_week_start + interval '7 days';
-
-    select count(*) into v_weekly_used
-    from public.bookings b
-    join public.class_sessions s on s.id = b.session_id
-    where b.student_id = v_actor
-      and b.membership_id = v_membership.id
-      and s.activity_id = v_session.activity_id
-      and b.status in ('booked'::public.booking_status, 'attended'::public.booking_status, 'no_show'::public.booking_status)
-      and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') >= v_week_start
-      and (s.starts_at at time zone 'America/Argentina/Buenos_Aires') < v_week_end;
 
     if v_weekly_used >= v_weekly_limit then
       raise exception 'Ya alcanzaste el limite de clases de esta semana para este plan.';
@@ -492,17 +549,68 @@ begin
           em.plan_type <> 'weekly'
           or coalesce(em.weekly_classes_used, 0) < coalesce(em.weekly_class_limit, 0)
         )
-      ) as has_eligible_membership
+      ) as has_eligible_membership,
+      coalesce(exhausted.weekly_limit_exhausted, false) as weekly_limit_exhausted
     from public.class_sessions s
     join public.activities a on a.id = s.activity_id
     left join lateral (
       select
-        m.id as membership_id,
-        m.remaining_credits,
-        p.plan_type,
-        pa.weekly_class_limit,
-        case
-          when p.plan_type = 'weekly' then (
+        candidate.membership_id,
+        candidate.remaining_credits,
+        candidate.plan_type,
+        candidate.weekly_class_limit,
+        candidate.weekly_classes_used
+      from (
+        select
+          m.id as membership_id,
+          m.remaining_credits,
+          m.end_date,
+          m.created_at,
+          p.plan_type,
+          pa.weekly_class_limit,
+          case
+            when p.plan_type = 'weekly' then (
+              select count(*)::int
+              from public.bookings b
+              join public.class_sessions bs on bs.id = b.session_id
+              where b.student_id = v_actor
+                and b.membership_id = m.id
+                and bs.activity_id = s.activity_id
+                and b.status in ('booked'::public.booking_status, 'attended'::public.booking_status, 'no_show'::public.booking_status)
+                and (bs.starts_at at time zone 'America/Argentina/Buenos_Aires') >= date_trunc('week', s.starts_at at time zone 'America/Argentina/Buenos_Aires')
+                and (bs.starts_at at time zone 'America/Argentina/Buenos_Aires') < date_trunc('week', s.starts_at at time zone 'America/Argentina/Buenos_Aires') + interval '7 days'
+            )
+            else null
+          end as weekly_classes_used
+        from public.memberships m
+        join public.plans p on p.id = m.plan_id
+        join public.plan_activities pa on pa.plan_id = m.plan_id
+        where m.student_id = v_actor
+          and m.status = 'active'
+          and s.starts_at::date between m.start_date and m.end_date
+          and pa.activity_id = s.activity_id
+          and (
+            p.plan_type = 'weekly'
+            or m.remaining_credits is null
+            or m.remaining_credits > 0
+          )
+      ) candidate
+      where candidate.plan_type <> 'weekly'
+        or (
+          candidate.weekly_class_limit is not null
+          and coalesce(candidate.weekly_classes_used, 0) < candidate.weekly_class_limit
+        )
+      order by candidate.end_date asc, candidate.created_at asc
+      limit 1
+    ) em on v_is_admin is false
+    left join lateral (
+      select true as weekly_limit_exhausted
+      from (
+        select
+          m.end_date,
+          m.created_at,
+          pa.weekly_class_limit,
+          (
             select count(*)::int
             from public.bookings b
             join public.class_sessions bs on bs.id = b.session_id
@@ -512,24 +620,21 @@ begin
               and b.status in ('booked'::public.booking_status, 'attended'::public.booking_status, 'no_show'::public.booking_status)
               and (bs.starts_at at time zone 'America/Argentina/Buenos_Aires') >= date_trunc('week', s.starts_at at time zone 'America/Argentina/Buenos_Aires')
               and (bs.starts_at at time zone 'America/Argentina/Buenos_Aires') < date_trunc('week', s.starts_at at time zone 'America/Argentina/Buenos_Aires') + interval '7 days'
-          )
-          else null
-        end as weekly_classes_used
-      from public.memberships m
-      join public.plans p on p.id = m.plan_id
-      join public.plan_activities pa on pa.plan_id = m.plan_id
-      where m.student_id = v_actor
-        and m.status = 'active'
-        and s.starts_at::date between m.start_date and m.end_date
-        and pa.activity_id = s.activity_id
-        and (
-          p.plan_type = 'weekly'
-          or m.remaining_credits is null
-          or m.remaining_credits > 0
-        )
-      order by m.end_date asc, m.created_at asc
+          ) as weekly_classes_used
+        from public.memberships m
+        join public.plans p on p.id = m.plan_id
+        join public.plan_activities pa on pa.plan_id = m.plan_id
+        where m.student_id = v_actor
+          and m.status = 'active'
+          and p.plan_type = 'weekly'
+          and s.starts_at::date between m.start_date and m.end_date
+          and pa.activity_id = s.activity_id
+      ) candidate
+      where candidate.weekly_class_limit is not null
+        and candidate.weekly_classes_used >= candidate.weekly_class_limit
+      order by candidate.end_date asc, candidate.created_at asc
       limit 1
-    ) em on v_is_admin is false
+    ) exhausted on v_is_admin is false
     where s.starts_at >= list_calendar_sessions.from_date
       and s.starts_at < list_calendar_sessions.to_date
       and (v_is_admin or (s.active = true and s.cancelled_at is null))
@@ -570,6 +675,7 @@ begin
       when sr.own_booking_id is not null then 'Ya tenes una reserva activa'
       when sr.active_bookings >= sr.capacity then 'Sin cupos disponibles'
       when sr.plan_type = 'weekly' and coalesce(sr.weekly_classes_remaining, 0) <= 0 then 'Ya usaste las clases disponibles de esta semana para esta actividad'
+      when sr.has_eligible_membership is not true and sr.weekly_limit_exhausted then 'Ya usaste las clases disponibles de esta semana para esta actividad'
       when sr.has_eligible_membership is not true then 'Tu membresia no permite esta clase o no tiene clases disponibles'
       else null
     end as block_reason,

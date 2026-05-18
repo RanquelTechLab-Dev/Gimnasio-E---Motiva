@@ -3,6 +3,31 @@ import { formatAppError, getMyProfileSummary } from '../../app/api'
 import { formatDate } from '../../app/format'
 import type { StudentProfileSummary } from '../../app/types'
 
+function classesLabel(membership: StudentProfileSummary['active_membership']) {
+  if (!membership) {
+    return 'Sin datos'
+  }
+
+  if (membership.plan_type === 'weekly') {
+    return 'El calendario muestra las clases disponibles por semana.'
+  }
+
+  if (membership.plan_type === 'package') {
+    const remaining =
+      membership.remaining_credits === null
+        ? 'Sin datos'
+        : `${membership.remaining_credits} restantes`
+
+    return membership.package_class_count
+      ? `${remaining} de ${membership.package_class_count}`
+      : remaining
+  }
+
+  return membership.remaining_credits === null
+    ? 'Segun plan'
+    : `${membership.remaining_credits} restantes`
+}
+
 export function StudentPlanPage() {
   const [summary, setSummary] = useState<StudentProfileSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -77,11 +102,9 @@ export function StudentPlanPage() {
             </p>
           </div>
           <div>
-            <p className="text-sm font-semibold text-[var(--muted)]">Creditos</p>
+            <p className="text-sm font-semibold text-[var(--muted)]">Clases</p>
             <p className="mt-1 text-[var(--ink)]">
-              {membership.remaining_credits === null
-                ? 'Ilimitados'
-                : membership.remaining_credits}
+              {classesLabel(membership)}
             </p>
           </div>
         </div>

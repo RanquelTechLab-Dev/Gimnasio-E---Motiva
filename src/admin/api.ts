@@ -108,7 +108,7 @@ export async function listPlans() {
   const { data, error } = await client
     .from('plans')
     .select(
-      'id, name, slug, description, price, billing_period_days, active, plan_activities(monthly_credits, activities(id, name, slug, active))',
+      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, plan_activities(monthly_credits, weekly_class_limit, activities(id, name, slug, active))',
     )
     .order('active', { ascending: false })
     .order('name', { ascending: true })

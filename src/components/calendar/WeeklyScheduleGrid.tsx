@@ -18,6 +18,11 @@ export type ScheduleSession = {
   can_book: boolean
   block_reason: string | null
   requires_24h_cancel: boolean
+  plan_type: 'weekly' | 'package' | 'manual' | null
+  weekly_class_limit: number | null
+  weekly_classes_used: number | null
+  weekly_classes_remaining: number | null
+  package_classes_remaining: number | null
 }
 
 type WeeklyScheduleGridProps<TSession extends ScheduleSession> = {
@@ -142,6 +147,26 @@ function getCancelBlockReason(session: ScheduleSession) {
   return null
 }
 
+function getPlanUsageLabel(session: ScheduleSession) {
+  if (session.plan_type === 'weekly' && session.weekly_class_limit !== null) {
+    const used = session.weekly_classes_used ?? 0
+    const remaining =
+      session.weekly_classes_remaining ??
+      Math.max(session.weekly_class_limit - used, 0)
+
+    return `${remaining}/${session.weekly_class_limit} esta semana`
+  }
+
+  if (
+    session.plan_type === 'package' &&
+    session.package_classes_remaining !== null
+  ) {
+    return `${session.package_classes_remaining} clases del paquete`
+  }
+
+  return null
+}
+
 export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
   sessions,
   fromDate,
@@ -212,6 +237,8 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                         const selected = selectedSessionId === session.session_id
                         const busy = savingSessionId === session.session_id
                         const cancelBlockReason = getCancelBlockReason(session)
+                        const planUsageLabel =
+                          mode === 'student' ? getPlanUsageLabel(session) : null
                         return (
                           <article
                             className={`rounded-2xl border p-3 text-left shadow-sm transition ${toneForSession(session)} ${
@@ -251,6 +278,11 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                               {session.trainer_name ? (
                                 <span className="rounded-full bg-white/80 px-2.5 py-1">
                                   {session.trainer_name}
+                                </span>
+                              ) : null}
+                              {planUsageLabel ? (
+                                <span className="rounded-full bg-white/80 px-2.5 py-1">
+                                  {planUsageLabel}
                                 </span>
                               ) : null}
                             </div>

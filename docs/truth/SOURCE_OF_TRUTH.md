@@ -104,5 +104,5 @@ RAN-29 esta en ejecucion.
 - RANV2-11 agrega storage externo Google Drive desde Edge Functions seguras, usando OAuth de la cuenta dedicada `e.motiva.gym@gmail.com` y manteniendo metadata en Supabase.
 - RANV2-12 agrega limpieza controlada de Drive con dry-run obligatorio y auditoria.
 - RANV2-13 inicia ajuste visual/responsive: layout ancho, marca real,
-  calendario visual interactivo mergeado y catalogo real de precios/planes en
-  preparacion desde `docs/source-assets/Precios.jpeg`.
+  calendario visual interactivo mergeado, catalogo real de precios/planes
+  aplicado y limites semanales/paquetes en preparacion.

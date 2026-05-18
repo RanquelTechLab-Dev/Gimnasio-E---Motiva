@@ -51,13 +51,26 @@ function todayDate() {
 }
 
 function describeMembership(membership: Membership, plan?: Plan | null) {
-  const credits =
-    membership.remaining_credits === null
-      ? 'uso ilimitado'
-      : `${membership.remaining_credits} creditos`
+  const classes = (() => {
+    if (plan?.plan_type === 'weekly') {
+      const weeklyTotal = (plan.plan_activities ?? []).reduce((sum, item) => {
+        return sum + (item.weekly_class_limit ?? 0)
+      }, 0)
+
+      return weeklyTotal > 0
+        ? `${weeklyTotal} clases por semana`
+        : 'limite semanal pendiente'
+    }
+
+    if (membership.remaining_credits === null) {
+      return 'clases segun plan'
+    }
+
+    return `${membership.remaining_credits} clases restantes`
+  })()
   const price = plan ? ` · ${moneyFormatter.format(plan.price)}` : ''
 
-  return `${plan?.name ?? 'Plan'}${price} · ${credits} · ${membership.start_date} a ${membership.end_date}`
+  return `${plan?.name ?? 'Plan'}${price} · ${classes} · ${membership.start_date} a ${membership.end_date}`
 }
 
 export function AdminPaymentsPage() {
@@ -396,8 +409,7 @@ export function AdminPaymentsPage() {
               })}
             </select>
             <p className="mt-2 text-xs text-[var(--muted)]">
-              El pago queda asociado al plan, periodo y creditos de esta
-              membresia.
+              El pago queda asociado al plan, periodo y clases de esta membresia.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

@@ -24,6 +24,48 @@ function SummaryCard({
   )
 }
 
+function membershipClassesSummary(
+  membership: StudentProfileSummary['active_membership'],
+) {
+  if (!membership) {
+    return {
+      label: 'Clases',
+      value: 'Sin datos',
+      detail: undefined,
+    }
+  }
+
+  if (membership.plan_type === 'weekly') {
+    return {
+      label: 'Plan semanal',
+      value: 'Por semana',
+      detail: 'El calendario muestra cuantas clases quedan por actividad.',
+    }
+  }
+
+  if (membership.plan_type === 'package') {
+    return {
+      label: 'Clases restantes',
+      value:
+        membership.remaining_credits === null
+          ? 'Sin datos'
+          : String(membership.remaining_credits),
+      detail: membership.package_class_count
+        ? `${membership.package_class_count} clases del paquete`
+        : undefined,
+    }
+  }
+
+  return {
+    label: 'Clases',
+    value:
+      membership.remaining_credits === null
+        ? 'Segun plan'
+        : String(membership.remaining_credits),
+    detail: undefined,
+  }
+}
+
 export function StudentDashboardPage() {
   const [summary, setSummary] = useState<StudentProfileSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -82,6 +124,7 @@ export function StudentDashboardPage() {
   const nextBooking = summary.next_booking
   const lastPayment = summary.last_payment
   const lastAttendance = summary.last_attendance
+  const classesSummary = membershipClassesSummary(membership)
 
   return (
     <section className="grid gap-5">
@@ -92,15 +135,9 @@ export function StudentDashboardPage() {
           value={membership?.plan_name ?? 'Sin membresia activa'}
         />
         <SummaryCard
-          detail={membership?.remaining_credits === null ? 'Uso ilimitado' : undefined}
-          label="Creditos"
-          value={
-            membership
-              ? membership.remaining_credits === null
-                ? 'Ilimitados'
-                : String(membership.remaining_credits)
-              : 'Sin datos'
-          }
+          detail={classesSummary.detail}
+          label={classesSummary.label}
+          value={classesSummary.value}
         />
         <SummaryCard
           detail={nextBooking?.activity_name}

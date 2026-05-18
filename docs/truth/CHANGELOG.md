@@ -181,3 +181,11 @@
 - Se agrega el logo real al sidebar admin/alumno en tamano contenido.
 - Se agrega `public/brand/logo-small.png` como variante liviana para UI chica.
 - No se cambia auth, guards, backend, schema ni datos productivos.
+
+## 2026-05-17 - RANV2-13 calendario interactivo
+
+- Se agrega grilla semanal interactiva inspirada en `Plan Actividades.jpeg`.
+- `/app/calendar` permite reservar y cancelar reservas desde el calendario usando RPCs existentes.
+- `/admin/calendar` permite crear, editar y cancelar clases desde la grilla visual.
+- No se agrega migracion: se reutilizan las RPCs de calendario/reservas existentes.
+- No se implementa delete fisico de clases con historial.

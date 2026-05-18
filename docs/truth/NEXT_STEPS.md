@@ -6,13 +6,11 @@ RAN-29 / RANV2-13: PWA + responsive + UX final.
 
 ## Siguiente
 
-Usar las referencias reales ya versionadas para avanzar con calendario visual
-completo y precios/planes.
+Revisar PR de calendario visual interactivo y avanzar luego con precios/planes.
 
 ## Pendiente
 
 - No guardar secrets en el repo.
-- RAN-29-B: calendario visual completo alumno/admin.
 - RAN-29-C: planes, precios reales y personalizado por clases/paquetes.
 - RAN-29-D: pagos manuales editables y vinculados claramente a plan/clases.
 - RAN-29-E: CRUD actividades.

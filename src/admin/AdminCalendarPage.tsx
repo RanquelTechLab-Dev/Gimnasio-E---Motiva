@@ -14,6 +14,7 @@ import type {
   ClassSessionInput,
   UpdateClassSessionInput,
 } from './types'
+import { WeeklyScheduleGrid } from '../components/calendar/WeeklyScheduleGrid'
 
 type ClassFormState = {
   activity_id: string
@@ -55,21 +56,6 @@ function dateInputToRangeEnd(value: string) {
 
 function dateTimeLocalToIso(value: string) {
   return new Date(value).toISOString()
-}
-
-function formatDayTitle(value: string) {
-  return new Intl.DateTimeFormat('es-AR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-  }).format(new Date(value))
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
 }
 
 function buildEmptyForm(activities: Activity[]): ClassFormState {
@@ -120,7 +106,7 @@ export function AdminCalendarPage() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [sessions, setSessions] = useState<CalendarSession[]>([])
   const [fromDate, setFromDate] = useState(formatLocalDate(today))
-  const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 14)))
+  const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 6)))
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [form, setForm] = useState<ClassFormState>(buildEmptyForm([]))
   const [cancelReason, setCancelReason] = useState('')
@@ -135,27 +121,6 @@ export function AdminCalendarPage() {
       null,
     [selectedSessionId, sessions],
   )
-
-  const sessionsByDay = useMemo(() => {
-    const sortedSessions = [...sessions].sort(
-      (left, right) =>
-        new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime(),
-    )
-
-    return sortedSessions.reduce<Array<{ dayKey: string; sessions: CalendarSession[] }>>(
-      (days, session) => {
-        const dayKey = formatLocalDate(new Date(session.starts_at))
-        const currentDay = days.find((day) => day.dayKey === dayKey)
-        if (currentDay) {
-          currentDay.sessions.push(session)
-        } else {
-          days.push({ dayKey, sessions: [session] })
-        }
-        return days
-      },
-      [],
-    )
-  }, [sessions])
 
   async function loadData() {
     setLoading(true)
@@ -306,72 +271,20 @@ export function AdminCalendarPage() {
           </div>
         </div>
 
-        {loading ? (
-          <p className="mt-5 text-sm text-[var(--muted)]">Cargando clases...</p>
-        ) : sessions.length === 0 ? (
-          <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
-            No hay clases cargadas para este rango.
-          </div>
-        ) : (
-          <div className="mt-5 grid gap-4 2xl:grid-cols-2">
-            {sessionsByDay.map((day) => (
-              <article
-                className="rounded-[22px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
-                key={day.dayKey}
-              >
-                <p className="font-display text-lg font-bold capitalize text-[var(--ink)]">
-                  {formatDayTitle(`${day.dayKey}T00:00:00`)}
-                </p>
-                <div className="mt-4 grid gap-3">
-                  {day.sessions.map((session) => (
-                    <button
-                      className={`rounded-[18px] border p-3 text-left transition ${
-                        selectedSessionId === session.session_id
-                          ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
-                          : 'border-[var(--line)] bg-white hover:border-[var(--brand)]'
-                      }`}
-                      key={session.session_id}
-                      onClick={() => selectSession(session)}
-                      type="button"
-                    >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--brand)]">
-                            {formatTime(session.starts_at)} - {formatTime(session.ends_at)}
-                          </p>
-                          <p className="mt-1 font-semibold text-[var(--ink)]">
-                            {session.title}
-                          </p>
-                          <p className="mt-1 text-sm text-[var(--muted)]">
-                            {session.activity_name}
-                          </p>
-                        </div>
-                        <div className="text-sm font-semibold text-[var(--ink)]">
-                          {session.reserved_count}/{session.capacity}
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                        <span className="rounded-full bg-[var(--surface)] px-3 py-1">
-                          {session.spots_left} cupos libres
-                        </span>
-                        <span className="rounded-full bg-[var(--surface)] px-3 py-1">
-                          {session.active && !session.cancelled_at
-                            ? 'Activa'
-                            : 'Cancelada/inactiva'}
-                        </span>
-                        {session.requires_24h_cancel ? (
-                          <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[var(--accent)]">
-                            Regla 24h
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+        <div className="mt-5">
+          {loading ? (
+            <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
+          ) : (
+            <WeeklyScheduleGrid
+              fromDate={fromDate}
+              mode="admin"
+              onSelectSession={selectSession}
+              selectedSessionId={selectedSessionId}
+              sessions={sessions}
+              toDate={toDate}
+            />
+          )}
+        </div>
       </div>
 
       <aside className="grid gap-5">

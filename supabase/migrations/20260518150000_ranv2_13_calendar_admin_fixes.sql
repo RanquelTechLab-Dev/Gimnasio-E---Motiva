@@ -1,6 +1,34 @@
 -- RANV2-13: admin calendar fixes.
 -- Fixes class cancellation ambiguity without touching weekly plan limit logic.
 
+create or replace function private.enforce_personalized_session_capacity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, private
+as $$
+declare
+  v_activity_slug text;
+begin
+  select a.slug into v_activity_slug
+  from public.activities a
+  where a.id = new.activity_id;
+
+  if v_activity_slug = 'personalizado_1_1' and new.capacity > 1 then
+    raise exception 'Personalizado 1:1 permite maximo 1 alumno.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists class_sessions_personalized_capacity_guard on public.class_sessions;
+
+create trigger class_sessions_personalized_capacity_guard
+before insert or update of activity_id, capacity on public.class_sessions
+for each row
+execute function private.enforce_personalized_session_capacity();
+
 create or replace function public.cancel_class_session(
   session_id uuid,
   reason text default null

@@ -196,6 +196,12 @@ export function AdminCalendarPage() {
       null,
     [selectedSessionId, sessions],
   )
+  const selectedActivity = useMemo(
+    () => activities.find((activity) => activity.id === form.activity_id) ?? null,
+    [activities, form.activity_id],
+  )
+  const isPersonalizedOneOnOne =
+    selectedActivity?.slug === 'personalizado_1_1'
   const startParts = getDateTimeParts(form.starts_at)
   const endParts = getDateTimeParts(form.ends_at)
 
@@ -239,7 +245,13 @@ export function AdminCalendarPage() {
 
   function selectSession(session: CalendarSession) {
     setSelectedSessionId(session.session_id)
-    const nextForm = sessionToForm(session)
+    const nextForm = {
+      ...sessionToForm(session),
+      capacity:
+        session.activity_slug === 'personalizado_1_1'
+          ? '1'
+          : String(session.capacity),
+    }
     setForm(nextForm)
     setRecurrence(buildRecurrenceForm(nextForm))
     setCancelReason('')
@@ -261,11 +273,28 @@ export function AdminCalendarPage() {
     const nextStartsAt = `${dateValue}T${timeValue}`
     const previousStart = new Date(form.starts_at)
     const previousEnd = new Date(form.ends_at)
+    const previousRecurrenceStart = new Date(`${recurrence.date_from}T00:00:00`)
+    const previousRecurrenceEnd = new Date(`${recurrence.date_to}T00:00:00`)
+    const dayMs = 24 * 60 * 60 * 1000
+    const previousSpanDays =
+      Number.isFinite(previousRecurrenceStart.getTime()) &&
+      Number.isFinite(previousRecurrenceEnd.getTime()) &&
+      previousRecurrenceEnd >= previousRecurrenceStart
+        ? Math.round(
+            (previousRecurrenceEnd.getTime() -
+              previousRecurrenceStart.getTime()) /
+              dayMs,
+          )
+        : 28
     const durationMs = Math.max(
       previousEnd.getTime() - previousStart.getTime(),
       30 * 60 * 1000,
     )
     const nextEnd = new Date(new Date(nextStartsAt).getTime() + durationMs)
+    const nextRecurrenceEnd = addDays(
+      new Date(`${dateValue}T00:00:00`),
+      previousSpanDays,
+    )
 
     setForm({
       ...form,
@@ -275,6 +304,7 @@ export function AdminCalendarPage() {
     setRecurrence({
       ...recurrence,
       date_from: dateValue,
+      date_to: formatLocalDate(nextRecurrenceEnd),
       start_time: timeValue,
       end_time: formatLocalTime(nextEnd),
       weekday: String(new Date(`${dateValue}T00:00:00`).getDay()),
@@ -294,7 +324,11 @@ export function AdminCalendarPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const capacity = Number(form.capacity)
+    const normalizedForm = {
+      ...form,
+      capacity: isPersonalizedOneOnOne ? '1' : form.capacity,
+    }
+    const capacity = Number(normalizedForm.capacity)
 
     if (!form.activity_id || !form.title.trim()) {
       setError('Selecciona actividad y titulo para la clase.')
@@ -303,6 +337,11 @@ export function AdminCalendarPage() {
 
     if (!Number.isFinite(capacity) || capacity <= 0) {
       setError('El cupo debe ser mayor a cero.')
+      return
+    }
+
+    if (isPersonalizedOneOnOne && capacity > 1) {
+      setError('Personalizado 1:1 permite maximo 1 alumno.')
       return
     }
 
@@ -347,7 +386,7 @@ export function AdminCalendarPage() {
     setError(null)
     setSuccess(null)
     try {
-      const input = formToInput(form)
+      const input = formToInput(normalizedForm)
       if (selectedSession) {
         await updateClassSession({
           ...input,
@@ -522,9 +561,19 @@ export function AdminCalendarPage() {
             <select
               aria-label="Actividad"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-              onChange={(event) =>
-                setForm({ ...form, activity_id: event.target.value })
-              }
+              onChange={(event) => {
+                const nextActivity = activities.find(
+                  (activity) => activity.id === event.target.value,
+                )
+                setForm({
+                  ...form,
+                  activity_id: event.target.value,
+                  capacity:
+                    nextActivity?.slug === 'personalizado_1_1'
+                      ? '1'
+                      : form.capacity,
+                })
+              }}
               value={form.activity_id}
             >
               <option value="">Seleccionar actividad</option>
@@ -705,13 +754,18 @@ export function AdminCalendarPage() {
               <input
                 aria-label="Cupo"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                disabled={isPersonalizedOneOnOne}
+                max={isPersonalizedOneOnOne ? '1' : undefined}
                 min="1"
-                onChange={(event) =>
-                  setForm({ ...form, capacity: event.target.value })
-                }
+                onChange={(event) => {
+                  const nextCapacity = isPersonalizedOneOnOne
+                    ? '1'
+                    : event.target.value
+                  setForm({ ...form, capacity: nextCapacity })
+                }}
                 placeholder="Cupo"
                 type="number"
-                value={form.capacity}
+                value={isPersonalizedOneOnOne ? '1' : form.capacity}
               />
               <input
                 aria-label="Entrenador"
@@ -723,6 +777,11 @@ export function AdminCalendarPage() {
                 value={form.coach_name}
               />
             </div>
+            {isPersonalizedOneOnOne ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                Personalizado 1:1 permite maximo 1 alumno.
+              </p>
+            ) : null}
             <textarea
               aria-label="Notas"
               className="min-h-24 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"

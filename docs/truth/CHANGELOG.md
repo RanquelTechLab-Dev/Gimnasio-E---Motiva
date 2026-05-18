@@ -9,6 +9,8 @@
 - El formulario de clase separa fecha y hora de inicio/fin para evitar cargas
   confusas.
 - La grilla colorea clases por actividad con tonos estables.
+- Personalizado 1:1 queda limitado a cupo 1 en el formulario y protegido por
+  trigger en base de datos.
 - No se ejecuta `db push` real.
 
 ## 2026-05-18 - RANV2-13 limites semanales y paquetes

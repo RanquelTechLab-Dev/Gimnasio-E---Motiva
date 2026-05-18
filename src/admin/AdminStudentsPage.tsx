@@ -7,6 +7,8 @@ import {
   checkDriveStatus,
   createStudentFileMetadata,
   createStudent,
+  deactivateStudent,
+  deleteStudent,
   formatAdminError,
   listStudentFiles,
   listStudentTrainingNotes,
@@ -517,6 +519,60 @@ export function AdminStudentsPage() {
       await loadData()
     } catch (updateError) {
       setError(formatAdminError(updateError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeactivateStudent() {
+    if (!selectedStudent) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Este alumno quedara inactivo y no podra operar en la app. El historial se conserva. ¿Continuar?',
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deactivateStudent(selectedStudent.id)
+      setSuccess('Alumno desactivado. El historial se conserva.')
+      await loadData()
+    } catch (deactivateError) {
+      setError(formatAdminError(deactivateError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteStudent() {
+    if (!selectedStudent) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Esta accion elimina el alumno de prueba definitivamente solo si no tiene historial. ¿Continuar?',
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deleteStudent(selectedStudent.id)
+      setSuccess('Alumno eliminado definitivamente.')
+      setSelectedStudentId(null)
+      setEditForm(null)
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
     } finally {
       setSaving(false)
     }
@@ -1606,6 +1662,10 @@ export function AdminStudentsPage() {
                 />
                 Alumno activo
               </label>
+              <p className="-mt-2 text-xs text-[var(--muted)]">
+                Alumno activo puede iniciar sesion, reservar y operar. Si se
+                desactiva, conserva su historial pero no puede usar la app.
+              </p>
               <label className="flex items-center gap-3 text-sm font-semibold">
                 <input
                   checked={editForm.receives_emails}
@@ -1619,6 +1679,9 @@ export function AdminStudentsPage() {
                 />
                 Recibe emails
               </label>
+              <p className="-mt-2 text-xs text-[var(--muted)]">
+                Recibe emails indica si acepta comunicaciones informativas.
+              </p>
               <button
                 className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
                 disabled={saving}
@@ -1626,6 +1689,33 @@ export function AdminStudentsPage() {
               >
                 Guardar alumno
               </button>
+              <div className="grid gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+                  Baja segura
+                </p>
+                <p className="text-xs text-[var(--muted)]">
+                  Si el alumno tiene membresias, pagos, reservas, asistencia,
+                  archivos, notas o auditoria, no se elimina fisicamente.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-white disabled:opacity-60"
+                    disabled={saving || !selectedStudent.active}
+                    onClick={() => void handleDeactivateStudent()}
+                    type="button"
+                  >
+                    Desactivar alumno
+                  </button>
+                  <button
+                    className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                    disabled={saving}
+                    onClick={() => void handleDeleteStudent()}
+                    type="button"
+                  >
+                    Eliminar alumno
+                  </button>
+                </div>
+              </div>
             </div>
           </form>
         ) : null}

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import {
   cancelClassSession,
   createClassSession,
+  deleteClassSession,
   formatAdminError,
   listActivities,
   listCalendarSessions,
@@ -479,6 +480,33 @@ export function AdminCalendarPage() {
     }
   }
 
+  async function handleDeleteSession() {
+    if (!selectedSession) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Solo se eliminara si la clase no tiene reservas ni asistencia. Si tiene historial, cancelala. ¿Continuar?',
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deleteClassSession(selectedSession.session_id)
+      setSuccess('Clase eliminada definitivamente.')
+      resetForm()
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
       <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -840,6 +868,23 @@ export function AdminCalendarPage() {
             >
               Cancelar clase
             </button>
+            <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+                Eliminacion segura
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Esta clase solo se elimina si no tiene reservas ni asistencia.
+                Si tiene historial, no se puede eliminar; podes cancelarla.
+              </p>
+              <button
+                className="mt-3 rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                disabled={saving}
+                onClick={() => void handleDeleteSession()}
+                type="button"
+              >
+                Eliminar clase
+              </button>
+            </div>
           </div>
         ) : null}
 

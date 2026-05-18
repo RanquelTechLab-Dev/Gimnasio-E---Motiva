@@ -2,6 +2,7 @@ import { supabase, supabaseConfigError } from '../lib/supabase'
 import type {
   AssignMembershipInput,
   Activity,
+  AdminActionResult,
   AdminStudentFile,
   AdminTrainingNote,
   AttendanceSessionRow,
@@ -103,6 +104,32 @@ export async function updateStudent(
   }
 }
 
+export async function deactivateStudent(studentId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_deactivate_student', {
+    p_student_id: studentId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function deleteStudent(studentId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_delete_student', {
+    p_student_id: studentId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
 export async function listPlans() {
   const client = getClient()
   const { data, error } = await client
@@ -149,6 +176,32 @@ export async function updatePlan(planId: string, input: UpdatePlanInput) {
   if (error) {
     throw error
   }
+}
+
+export async function archivePlan(planId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_archive_plan', {
+    p_plan_id: planId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function deletePlan(planId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_delete_plan', {
+    p_plan_id: planId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
 }
 
 export async function listMemberships(studentId?: string) {
@@ -323,6 +376,19 @@ export async function cancelClassSession(sessionId: string, reason: string) {
   }
 
   return data
+}
+
+export async function deleteClassSession(sessionId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_delete_class_session', {
+    p_session_id: sessionId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
 }
 
 export async function listAttendanceSessions(fromDate: string, toDate: string) {

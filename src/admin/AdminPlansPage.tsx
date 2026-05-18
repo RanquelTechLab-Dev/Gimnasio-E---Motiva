@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { formatAdminError, listPlans, updatePlan } from './api'
+import {
+  archivePlan,
+  deletePlan,
+  formatAdminError,
+  listPlans,
+  updatePlan,
+} from './api'
 import type { Plan } from './types'
 
 const moneyFormatter = new Intl.NumberFormat('es-AR', {
@@ -136,6 +142,58 @@ export function AdminPlansPage() {
       await loadData()
     } catch (saveError) {
       setError(formatAdminError(saveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleArchivePlan() {
+    if (!selectedPlan) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Este plan se archivara para que no aparezca en nuevas asignaciones. El historial se conserva. ¿Continuar?',
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await archivePlan(selectedPlan.id)
+      setSuccess('Plan archivado. No aparecera en nuevas asignaciones.')
+      await loadData()
+    } catch (archiveError) {
+      setError(formatAdminError(archiveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeletePlan() {
+    if (!selectedPlan) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Solo se eliminara si nunca fue usado. Si tiene historial, hay que archivarlo. ¿Continuar?',
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deletePlan(selectedPlan.id)
+      setSuccess('Plan eliminado definitivamente.')
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
     } finally {
       setSaving(false)
     }
@@ -299,6 +357,33 @@ export function AdminPlansPage() {
             >
               {saving ? 'Guardando...' : 'Guardar plan'}
             </button>
+            <div className="grid gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+                Baja segura
+              </p>
+              <p className="text-xs text-[var(--muted)]">
+                Si el plan tiene historial, no se elimina: se archiva para que
+                no aparezca en nuevas asignaciones.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-white disabled:opacity-60"
+                  disabled={saving || !selectedPlan.active}
+                  onClick={() => void handleArchivePlan()}
+                  type="button"
+                >
+                  Archivar plan
+                </button>
+                <button
+                  className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void handleDeletePlan()}
+                  type="button"
+                >
+                  Eliminar plan
+                </button>
+              </div>
+            </div>
           </form>
         )}
 

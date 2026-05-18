@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   bookClassSession,
+  cancelBooking,
   formatAppError,
   listCalendarSessions,
 } from './api'
 import type { CalendarSession } from './types'
+import { WeeklyScheduleGrid } from '../components/calendar/WeeklyScheduleGrid'
 
 function formatLocalDate(date: Date) {
   const year = date.getFullYear()
@@ -27,29 +29,13 @@ function dateInputToRangeEnd(value: string) {
   return new Date(`${value}T23:59:59.999`).toISOString()
 }
 
-function formatDayTitle(value: string) {
-  const date = new Date(value)
-  return new Intl.DateTimeFormat('es-AR', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-  }).format(date)
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
-
 export function AppCalendarPage() {
   const today = useMemo(() => new Date(), [])
   const [sessions, setSessions] = useState<CalendarSession[]>([])
   const [fromDate, setFromDate] = useState(formatLocalDate(today))
-  const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 14)))
+  const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 6)))
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [savingSessionId, setSavingSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -78,7 +64,7 @@ export function AppCalendarPage() {
   }, [])
 
   async function handleBook(session: CalendarSession) {
-    setSaving(true)
+    setSavingSessionId(session.session_id)
     setError(null)
     setSuccess(null)
     try {
@@ -88,30 +74,28 @@ export function AppCalendarPage() {
     } catch (bookError) {
       setError(formatAppError(bookError))
     } finally {
-      setSaving(false)
+      setSavingSessionId(null)
     }
   }
 
-  const sessionsByDay = useMemo(() => {
-    const sortedSessions = [...sessions].sort(
-      (left, right) =>
-        new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime(),
-    )
+  async function handleCancel(session: CalendarSession) {
+    if (!session.own_booking_id) {
+      return
+    }
 
-    return sortedSessions.reduce<Array<{ dayKey: string; sessions: CalendarSession[] }>>(
-      (days, session) => {
-        const dayKey = formatLocalDate(new Date(session.starts_at))
-        const currentDay = days.find((day) => day.dayKey === dayKey)
-        if (currentDay) {
-          currentDay.sessions.push(session)
-        } else {
-          days.push({ dayKey, sessions: [session] })
-        }
-        return days
-      },
-      [],
-    )
-  }, [sessions])
+    setSavingSessionId(session.session_id)
+    setError(null)
+    setSuccess(null)
+    try {
+      await cancelBooking(session.own_booking_id, 'Cancelada desde calendario.')
+      setSuccess('Reserva cancelada.')
+      await loadData()
+    } catch (cancelError) {
+      setError(formatAppError(cancelError))
+    } finally {
+      setSavingSessionId(null)
+    }
+  }
 
   return (
     <section className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -153,76 +137,21 @@ export function AppCalendarPage() {
         </div>
       </div>
 
-      {loading ? (
-        <p className="mt-5 text-sm text-[var(--muted)]">Cargando clases...</p>
-      ) : sessions.length === 0 ? (
-        <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
-          No hay clases disponibles en este rango.
-        </div>
-      ) : (
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {sessionsByDay.map((day) => (
-            <article
-              className="min-w-0 rounded-[22px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
-              key={day.dayKey}
-            >
-              <p className="font-display text-lg font-bold capitalize text-[var(--ink)]">
-                {formatDayTitle(`${day.dayKey}T00:00:00`)}
-              </p>
-              <div className="mt-4 grid gap-3">
-                {day.sessions.map((session) => (
-                  <div
-                    className="rounded-[18px] border border-[var(--line)] bg-white p-3"
-                    key={session.session_id}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--brand)]">
-                          {formatTime(session.starts_at)} - {formatTime(session.ends_at)}
-                        </p>
-                        <p className="mt-1 font-semibold text-[var(--ink)]">
-                          {session.title}
-                        </p>
-                        <p className="mt-1 text-sm text-[var(--muted)]">
-                          {session.activity_name}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-[var(--brand-soft)] px-3 py-1 text-xs font-bold text-[var(--brand)]">
-                        {session.spots_left}/{session.capacity}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                      <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[var(--accent)]">
-                        {session.requires_24h_cancel
-                          ? 'Cancelacion 24h'
-                          : 'Cancelacion 12h'}
-                      </span>
-                      {session.own_booking_id ? (
-                        <span className="rounded-full bg-[var(--brand-soft)] px-3 py-1 text-[var(--brand)]">
-                          Ya reservada
-                        </span>
-                      ) : null}
-                      {session.block_reason ? (
-                        <span className="rounded-full bg-[var(--surface)] px-3 py-1 text-[var(--muted)]">
-                          {session.block_reason}
-                        </span>
-                      ) : null}
-                    </div>
-                    <button
-                      className="mt-3 w-full rounded-2xl bg-[var(--brand)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
-                      disabled={saving || !session.can_book}
-                      onClick={() => void handleBook(session)}
-                      type="button"
-                    >
-                      Reservar
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+      <div className="mt-5">
+        {loading ? (
+          <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
+        ) : (
+          <WeeklyScheduleGrid
+            fromDate={fromDate}
+            mode="student"
+            onBookSession={(session) => void handleBook(session)}
+            onCancelBooking={(session) => void handleCancel(session)}
+            savingSessionId={savingSessionId}
+            sessions={sessions}
+            toDate={toDate}
+          />
+        )}
+      </div>
 
       {error ? (
         <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">

@@ -24,6 +24,10 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   12h/24h.
 - Calendario admin agrupado por dia para revisar clases y cupos con menos
   ruido visual.
+- Calendario alumno/admin convertido a grilla semanal interactiva inspirada en
+  `Plan Actividades.jpeg`, usando sesiones reales de Supabase.
+- Alumno puede reservar y cancelar desde el calendario con las RPCs existentes.
+- Admin puede crear, editar y cancelar clases desde el calendario visual.
 - Pagos admin muestran mejor el plan, periodo y creditos asociados a la
   membresia.
 
@@ -32,6 +36,7 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 El schema actual permite:
 
 - listar actividades activas;
+- crear, editar y cancelar clases mediante RPCs admin existentes;
 - editar precio, descripcion y estado de planes;
 - registrar pagos contra `membership_id`;
 - ver el plan asociado a una membresia/pago;

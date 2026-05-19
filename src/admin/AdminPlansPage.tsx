@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  archiveActivity,
   archivePlan,
-  createActivity,
   createPlan,
-  deleteActivity,
   deletePlan,
   formatAdminError,
   listActivities,
   listPlans,
-  updateActivity,
   updatePlan,
 } from './api'
 import type {
   Activity,
-  ActivityInput,
   Plan,
   PlanActivityInput,
   PlanInput,
@@ -44,18 +39,6 @@ type PlanFormState = {
   }>
 }
 
-type ActivityFormState = {
-  id: string | null
-  name: string
-  description: string
-  requires_24h_cancel: boolean
-  flexible_schedule: boolean
-  active: boolean
-  color_hex: string
-  default_capacity: string
-  max_capacity: string
-}
-
 const emptyPlanForm: PlanFormState = {
   id: null,
   name: '',
@@ -66,18 +49,6 @@ const emptyPlanForm: PlanFormState = {
   package_class_count: '',
   active: true,
   activities: [],
-}
-
-const emptyActivityForm: ActivityFormState = {
-  id: null,
-  name: '',
-  description: '',
-  requires_24h_cancel: false,
-  flexible_schedule: false,
-  active: true,
-  color_hex: '',
-  default_capacity: '',
-  max_capacity: '',
 }
 
 function planToForm(plan: Plan): PlanFormState {
@@ -101,22 +72,6 @@ function planToForm(plan: Plan): PlanFormState {
           : '',
         monthly_credits: item.monthly_credits ? String(item.monthly_credits) : '',
       })),
-  }
-}
-
-function activityToForm(activity: Activity): ActivityFormState {
-  return {
-    id: activity.id,
-    name: activity.name,
-    description: activity.description ?? '',
-    requires_24h_cancel: activity.requires_24h_cancel,
-    flexible_schedule: activity.flexible_schedule,
-    active: activity.active,
-    color_hex: activity.color_hex ?? '',
-    default_capacity: activity.default_capacity
-      ? String(activity.default_capacity)
-      : '',
-    max_capacity: activity.max_capacity ? String(activity.max_capacity) : '',
   }
 }
 
@@ -184,6 +139,27 @@ function planActivityLabel(item: NonNullable<Plan['plan_activities']>[number]) {
   return item.activities.name
 }
 
+function activitySummary(activity: Activity | null | undefined) {
+  if (!activity) {
+    return null
+  }
+
+  const parts = [
+    activity.active ? 'Activa' : 'Archivada',
+    activity.requires_24h_cancel ? 'Cancelacion 24h' : 'Cancelacion 12h',
+  ]
+
+  if (activity.default_capacity) {
+    parts.push(`cupo ${activity.default_capacity}`)
+  }
+
+  if (activity.max_capacity) {
+    parts.push(`maximo ${activity.max_capacity}`)
+  }
+
+  return parts.join(' · ')
+}
+
 function planHasHistory(plan: Plan | null) {
   return Boolean(plan?.memberships?.length)
 }
@@ -238,35 +214,10 @@ function toPlanInput(form: PlanFormState): PlanInput {
   }
 }
 
-function toActivityInput(form: ActivityFormState): ActivityInput {
-  const defaultCapacity = parsePositiveInteger(
-    form.default_capacity,
-    'El cupo por defecto',
-  )
-  const maxCapacity = parsePositiveInteger(form.max_capacity, 'El cupo maximo')
-
-  if (defaultCapacity && maxCapacity && defaultCapacity > maxCapacity) {
-    throw new Error('El cupo por defecto no puede superar el cupo maximo.')
-  }
-
-  return {
-    name: form.name,
-    description: form.description,
-    requires_24h_cancel: form.requires_24h_cancel,
-    flexible_schedule: form.flexible_schedule,
-    active: form.active,
-    color_hex: form.color_hex,
-    default_capacity: defaultCapacity,
-    max_capacity: maxCapacity,
-  }
-}
-
 export function AdminPlansPage() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [activities, setActivities] = useState<Activity[]>([])
   const [planForm, setPlanForm] = useState<PlanFormState>(emptyPlanForm)
-  const [activityForm, setActivityForm] =
-    useState<ActivityFormState>(emptyActivityForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -275,11 +226,6 @@ export function AdminPlansPage() {
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === planForm.id) ?? null,
     [plans, planForm.id],
-  )
-  const selectedActivity = useMemo(
-    () =>
-      activities.find((activity) => activity.id === activityForm.id) ?? null,
-    [activities, activityForm.id],
   )
   const selectedPlanHasHistory = planHasHistory(selectedPlan)
 
@@ -301,14 +247,6 @@ export function AdminPlansPage() {
         }
       }
 
-      if (activityForm.id) {
-        const nextSelected = nextActivities.find(
-          (activity) => activity.id === activityForm.id,
-        )
-        if (nextSelected) {
-          setActivityForm(activityToForm(nextSelected))
-        }
-      }
     } catch (loadError) {
       setError(formatAdminError(loadError))
     } finally {
@@ -326,12 +264,6 @@ export function AdminPlansPage() {
 
   function selectPlan(plan: Plan) {
     setPlanForm(planToForm(plan))
-    setSuccess(null)
-    setError(null)
-  }
-
-  function selectActivity(activity: Activity) {
-    setActivityForm(activityToForm(activity))
     setSuccess(null)
     setError(null)
   }
@@ -458,84 +390,6 @@ export function AdminPlansPage() {
     }
   }
 
-  async function handleActivitySubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      const input = toActivityInput(activityForm)
-      const result = activityForm.id
-        ? await updateActivity(activityForm.id, input)
-        : await createActivity(input)
-      setSuccess(
-        result.has_history
-          ? 'Actividad guardada. Tiene historial: los cambios aplican a nuevos usos.'
-          : activityForm.id
-            ? 'Actividad actualizada.'
-            : 'Actividad creada.',
-      )
-      await loadData()
-    } catch (saveError) {
-      setError(formatAdminError(saveError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleArchiveActivity() {
-    if (!selectedActivity) {
-      return
-    }
-
-    const confirmed = window.confirm(
-      'Archivar oculta para nuevas clases y nuevos planes, pero conserva historial. ¿Continuar?',
-    )
-    if (!confirmed) {
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      await archiveActivity(selectedActivity.id)
-      setSuccess('Actividad archivada.')
-      await loadData()
-    } catch (archiveError) {
-      setError(formatAdminError(archiveError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleDeleteActivity() {
-    if (!selectedActivity) {
-      return
-    }
-
-    const confirmed = window.confirm(
-      'Eliminar solo esta disponible si nunca fue usada ni vinculada a planes. Esta accion es definitiva. ¿Continuar?',
-    )
-    if (!confirmed) {
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      await deleteActivity(selectedActivity.id)
-      setSuccess('Actividad eliminada definitivamente.')
-      setActivityForm(emptyActivityForm)
-      await loadData()
-    } catch (deleteError) {
-      setError(formatAdminError(deleteError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const planFormActivityIds = new Set(
     planForm.activities.map((item) => item.activity_id).filter(Boolean),
   )
@@ -624,59 +478,6 @@ export function AdminPlansPage() {
           )}
         </div>
 
-        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-                Actividades
-              </p>
-              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-                Actividades del gimnasio
-              </h3>
-            </div>
-            <button
-              className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
-              onClick={() => setActivityForm(emptyActivityForm)}
-              type="button"
-            >
-              Nueva actividad
-            </button>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {activities.map((activity) => (
-              <button
-                className={`rounded-[20px] border p-4 text-left transition ${
-                  activityForm.id === activity.id
-                    ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
-                    : 'border-[var(--line)] bg-[var(--surface-strong)] hover:border-[var(--brand)]'
-                }`}
-                key={activity.id}
-                onClick={() => selectActivity(activity)}
-                type="button"
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className="mt-1 h-4 w-4 rounded-full border border-[var(--line)]"
-                    style={{ backgroundColor: activity.color_hex ?? '#75cfc2' }}
-                  />
-                  <div>
-                    <p className="font-semibold text-[var(--ink)]">
-                      {activity.name}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      {activity.active ? 'Activa' : 'Archivada'} ·{' '}
-                      {activity.requires_24h_cancel ? 'Cancela 24h' : 'Cancela 12h'}
-                      {activity.max_capacity
-                        ? ` · maximo ${activity.max_capacity}`
-                        : ''}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <aside className="grid gap-5">
@@ -811,9 +612,14 @@ export function AdminPlansPage() {
 
             <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-bold text-[var(--ink)]">
-                  Actividades incluidas
-                </p>
+                <div>
+                  <p className="text-sm font-bold text-[var(--ink)]">
+                    Actividades incluidas
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Los planes solo indican que actividades incluye el alumno.
+                  </p>
+                </div>
                 <button
                   className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
                   disabled={selectedPlanHasHistory}
@@ -830,63 +636,80 @@ export function AdminPlansPage() {
               ) : null}
               {planForm.activities.map((item, index) => (
                 <div className="grid gap-2 rounded-2xl bg-white p-3" key={index}>
-                  <select
-                    className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
-                    disabled={selectedPlanHasHistory}
-                    onChange={(event) =>
-                      updatePlanActivity(index, {
-                        activity_id: event.target.value,
-                      })
-                    }
-                    value={item.activity_id}
-                  >
-                    {selectableActivities.map((activity) => (
-                      <option key={activity.id} value={activity.id}>
-                        {activity.name}
-                      </option>
-                    ))}
-                  </select>
-                  {planForm.plan_type === 'weekly' ? (
-                    <label className="text-xs font-semibold">
-                      Clases por semana para esta actividad
-                      <input
-                        className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
-                        disabled={selectedPlanHasHistory}
-                        min="1"
-                        onChange={(event) =>
-                          updatePlanActivity(index, {
-                            weekly_class_limit: event.target.value,
-                          })
-                        }
-                        type="number"
-                        value={item.weekly_class_limit}
-                      />
-                    </label>
-                  ) : (
-                    <label className="text-xs font-semibold">
-                      Clases asociadas opcionales
-                      <input
-                        className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
-                        disabled={selectedPlanHasHistory}
-                        min="1"
-                        onChange={(event) =>
-                          updatePlanActivity(index, {
-                            monthly_credits: event.target.value,
-                          })
-                        }
-                        type="number"
-                        value={item.monthly_credits}
-                      />
-                    </label>
-                  )}
-                  <button
-                    className="justify-self-start rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
-                    disabled={selectedPlanHasHistory}
-                    onClick={() => removePlanActivity(index)}
-                    type="button"
-                  >
-                    Quitar actividad
-                  </button>
+                  {(() => {
+                    const selectedPlanActivity =
+                      activities.find(
+                        (activity) => activity.id === item.activity_id,
+                      ) ?? null
+                    const summary = activitySummary(selectedPlanActivity)
+
+                    return (
+                      <>
+                        <select
+                          className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
+                          disabled={selectedPlanHasHistory}
+                          onChange={(event) =>
+                            updatePlanActivity(index, {
+                              activity_id: event.target.value,
+                            })
+                          }
+                          value={item.activity_id}
+                        >
+                          {selectableActivities.map((activity) => (
+                            <option key={activity.id} value={activity.id}>
+                              {activity.name}
+                            </option>
+                          ))}
+                        </select>
+                        {summary ? (
+                          <p className="text-xs text-[var(--muted)]">
+                            {summary}
+                          </p>
+                        ) : null}
+                        {planForm.plan_type === 'weekly' ? (
+                          <label className="text-xs font-semibold">
+                            Clases por semana para esta actividad
+                            <input
+                              className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
+                              disabled={selectedPlanHasHistory}
+                              min="1"
+                              onChange={(event) =>
+                                updatePlanActivity(index, {
+                                  weekly_class_limit: event.target.value,
+                                })
+                              }
+                              type="number"
+                              value={item.weekly_class_limit}
+                            />
+                          </label>
+                        ) : (
+                          <label className="text-xs font-semibold">
+                            Clases asociadas opcionales
+                            <input
+                              className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
+                              disabled={selectedPlanHasHistory}
+                              min="1"
+                              onChange={(event) =>
+                                updatePlanActivity(index, {
+                                  monthly_credits: event.target.value,
+                                })
+                              }
+                              type="number"
+                              value={item.monthly_credits}
+                            />
+                          </label>
+                        )}
+                        <button
+                          className="justify-self-start rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
+                          disabled={selectedPlanHasHistory}
+                          onClick={() => removePlanActivity(index)}
+                          type="button"
+                        >
+                          Quitar actividad
+                        </button>
+                      </>
+                    )
+                  })()}
                 </div>
               ))}
             </div>
@@ -930,183 +753,6 @@ export function AdminPlansPage() {
                     type="button"
                   >
                     Eliminar plan
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </form>
-
-        <form
-          className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
-          onSubmit={handleActivitySubmit}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-                Actividades
-              </p>
-              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-                {activityForm.id ? 'Editar actividad' : 'Nueva actividad'}
-              </h3>
-            </div>
-            <button
-              className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
-              onClick={() => setActivityForm(emptyActivityForm)}
-              type="button"
-            >
-              Nueva
-            </button>
-          </div>
-          <div className="mt-5 grid gap-4">
-            <label className="text-sm font-semibold">
-              Nombre
-              <input
-                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) =>
-                  setActivityForm({ ...activityForm, name: event.target.value })
-                }
-                value={activityForm.name}
-              />
-            </label>
-            <label className="text-sm font-semibold">
-              Descripcion
-              <textarea
-                className="mt-2 min-h-20 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) =>
-                  setActivityForm({
-                    ...activityForm,
-                    description: event.target.value,
-                  })
-                }
-                value={activityForm.description}
-              />
-            </label>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm font-semibold">
-                Color
-                <input
-                  className="mt-2 h-11 w-full rounded-2xl border border-[var(--line)] bg-white px-2 py-1"
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      color_hex: event.target.value,
-                    })
-                  }
-                  type="color"
-                  value={activityForm.color_hex || '#75cfc2'}
-                />
-              </label>
-              <label className="text-sm font-semibold">
-                Cupo por defecto
-                <input
-                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                  min="1"
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      default_capacity: event.target.value,
-                    })
-                  }
-                  type="number"
-                  value={activityForm.default_capacity}
-                />
-              </label>
-              <label className="text-sm font-semibold">
-                Cupo maximo
-                <input
-                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                  min="1"
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      max_capacity: event.target.value,
-                    })
-                  }
-                  type="number"
-                  value={activityForm.max_capacity}
-                />
-              </label>
-            </div>
-            <div className="grid gap-2">
-              <label className="flex items-center gap-3 text-sm font-semibold">
-                <input
-                  checked={activityForm.requires_24h_cancel}
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      requires_24h_cancel: event.target.checked,
-                    })
-                  }
-                  type="checkbox"
-                />
-                Requiere cancelacion con 24h
-              </label>
-              <label className="flex items-center gap-3 text-sm font-semibold">
-                <input
-                  checked={activityForm.flexible_schedule}
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      flexible_schedule: event.target.checked,
-                    })
-                  }
-                  type="checkbox"
-                />
-                Horario flexible
-              </label>
-              <label className="flex items-center gap-3 text-sm font-semibold">
-                <input
-                  checked={activityForm.active}
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      active: event.target.checked,
-                    })
-                  }
-                  type="checkbox"
-                />
-                Actividad activa
-              </label>
-            </div>
-            {activityForm.max_capacity === '1' ? (
-              <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-xs font-semibold text-[var(--brand)]">
-                Personalizado 1:1 permite maximo 1 alumno.
-              </p>
-            ) : null}
-            <button
-              className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
-              disabled={saving}
-              type="submit"
-            >
-              {saving
-                ? 'Guardando...'
-                : activityForm.id
-                  ? 'Guardar actividad'
-                  : 'Crear actividad'}
-            </button>
-            {selectedActivity ? (
-              <div className="grid gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
-                <p className="text-xs text-[var(--muted)]">
-                  La actividad usada por clases o planes no se elimina: se
-                  archiva para conservar historial.
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button
-                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-white disabled:opacity-60"
-                    disabled={saving || !selectedActivity.active}
-                    onClick={() => void handleArchiveActivity()}
-                    type="button"
-                  >
-                    Archivar actividad
-                  </button>
-                  <button
-                    className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
-                    disabled={saving}
-                    onClick={() => void handleDeleteActivity()}
-                    type="button"
-                  >
-                    Eliminar actividad
                   </button>
                 </div>
               </div>

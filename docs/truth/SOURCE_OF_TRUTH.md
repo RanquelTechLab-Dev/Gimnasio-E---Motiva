@@ -108,5 +108,6 @@ RAN-29 esta en ejecucion.
   aplicado, limites semanales/paquetes aplicados, fixes de calendario admin
   aplicados, bajas seguras admin aplicadas y limpieza segura de archivos en
   produccion. Pagos editables/anulables aplicados y UX de anulacion ajustada.
-  CRUD admin de planes/actividades queda en preparacion con migracion pendiente
-  de aplicar.
+  CRUD admin de planes/actividades aplicado; la UX queda en ajuste para que
+  planes administre la oferta comercial y calendario administre actividades,
+  cupos, colores y reglas de tipos de clase.

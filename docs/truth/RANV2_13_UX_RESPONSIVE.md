@@ -62,8 +62,11 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   creacion, edicion, archivo y eliminacion fisica solo cuando no hay uso.
 - Los planes se configuran desde UI como semanales, paquetes o manuales, con
   actividades incluidas y limite semanal por actividad.
-- Las actividades se pueden crear/editar con estado, color, ventana de
-  cancelacion, cupo por defecto y cupo maximo.
+- La UX se reordena para que `/admin/plans` quede enfocado en planes
+  comerciales y solo muestre un resumen de actividades incluidas.
+- La gestion completa de actividades/tipos de clase queda en `/admin/calendar`,
+  donde se configuran estado, color, ventana de cancelacion, cupo por defecto y
+  cupo maximo.
 
 ## Auditoria funcional
 
@@ -74,8 +77,8 @@ El schema actual permite:
 - editar precio, descripcion y estado de planes;
 - crear y editar planes mediante RPCs admin-only;
 - archivar planes usados y eliminar fisicamente solo planes sin historial;
-- crear, editar y archivar actividades, y eliminar fisicamente solo actividades
-  sin vinculos a planes/clases/reservas/asistencia;
+- crear, editar y archivar actividades desde el calendario, y eliminar
+  fisicamente solo actividades sin vinculos a planes/clases/reservas/asistencia;
 - registrar pagos contra `membership_id`;
 - ver el plan asociado a una membresia/pago;
 - reservar y cancelar clases con las reglas existentes.
@@ -85,13 +88,8 @@ El schema actual permite:
 
 Requieren subbloques especificos:
 
-- aplicar y validar remotamente la migracion de CRUD planes/actividades;
-- aplicar y validar remotamente la migracion de limites semanales/paquetes;
-- aplicar y validar remotamente la migracion de fixes de calendario admin;
-- desplegar y validar remotamente la Edge Function actualizada de limpieza de
-  archivos;
-- aplicar y validar remotamente la migracion de pagos editables/anulables;
 - reset de contrasena de alumno desde admin;
+- validacion final de UX despues de reubicar actividades en calendario;
 - politicas futuras para purga tecnica de logs si alguna vez hiciera falta.
 
 ## Fuera de alcance de este slice

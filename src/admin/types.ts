@@ -57,7 +57,7 @@ export type Membership = {
 }
 
 export type PaymentMethod = 'cash' | 'transfer'
-export type PaymentStatus = 'pending' | 'approved' | 'rejected'
+export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'voided'
 export type AttendanceStatus = 'present' | 'absent' | 'justified'
 export type FileKind = 'training_plan' | 'observation' | 'attachment'
 export type TrainingNoteType =
@@ -76,6 +76,9 @@ export type Payment = {
   paid_at: string
   approved_at: string | null
   rejected_at: string | null
+  voided_at: string | null
+  voided_by: string | null
+  void_reason: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -113,6 +116,14 @@ export type RegisterPaymentInput = {
   method: PaymentMethod
   notes: string
   payment_date: string
+}
+
+export type UpdatePaymentInput = {
+  payment_id: string
+  amount: number
+  method: PaymentMethod
+  payment_date: string
+  notes: string
 }
 
 export type UpdatePlanInput = {

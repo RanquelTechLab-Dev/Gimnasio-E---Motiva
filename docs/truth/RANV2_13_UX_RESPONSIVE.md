@@ -56,6 +56,8 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - `/admin/storage` agrega limpieza segura de archivos: vista previa, limpieza
   confirmada e individual de archivos reales de Drive, conservando historial
   operativo en pagos, membresias, reservas y asistencia.
+- `/admin/payments` agrega edicion auditada de monto, metodo, fecha y notas, y
+  anulacion con motivo obligatorio sin borrado fisico.
 
 ## Auditoria funcional
 
@@ -78,7 +80,7 @@ Requieren subbloques especificos:
 - aplicar y validar remotamente la migracion de fixes de calendario admin;
 - desplegar y validar remotamente la Edge Function actualizada de limpieza de
   archivos;
-- editar/eliminar pagos y montos;
+- aplicar y validar remotamente la migracion de pagos editables/anulables;
 - reset de contrasena de alumno desde admin;
 - politicas futuras para purga tecnica de logs si alguna vez hiciera falta.
 

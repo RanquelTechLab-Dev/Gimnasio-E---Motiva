@@ -247,3 +247,12 @@
 - No se eliminan pagos, membresias, reservas, asistencia ni perfiles desde esta limpieza.
 - No se agrega migracion: se reutilizan `files.archived_at`, `drive_status` y `audit_logs`.
 - Queda pendiente desplegar la Edge Function actualizada antes de probar borrados reales remotos.
+
+## 2026-05-19 - RANV2-13 pagos editables y anulables
+
+- Se agrega migracion local para permitir estado `voided` en pagos.
+- Se agregan columnas `voided_at`, `voided_by` y `void_reason`.
+- Se agregan RPCs admin-only `admin_update_payment` y `admin_void_payment` con auditoria.
+- `/admin/payments` permite editar monto, metodo, fecha y notas, y anular pagos con motivo obligatorio.
+- No se borran pagos fisicamente y anular un pago no elimina automaticamente la membresia vinculada.
+- Queda pendiente `db push` real y validacion manual remota.

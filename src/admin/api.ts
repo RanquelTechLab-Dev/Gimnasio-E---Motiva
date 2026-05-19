@@ -18,12 +18,13 @@ import type {
   Payment,
   PaymentStatus,
   Plan,
+  ActivityInput,
+  PlanInput,
   RegisterPaymentInput,
   StudentFileMetadataInput,
   StudentProfile,
   UpdateClassSessionInput,
   UpdatePaymentInput,
-  UpdatePlanInput,
   UpdateStudentInput,
   UploadStudentFileInput,
   UploadStudentFileResult,
@@ -160,7 +161,7 @@ export async function listPlans() {
   const { data, error } = await client
     .from('plans')
     .select(
-      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, plan_activities(monthly_credits, weekly_class_limit, activities(id, name, slug, active))',
+      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, memberships(id), plan_activities(activity_id, monthly_credits, weekly_class_limit, activities(id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity))',
     )
     .order('active', { ascending: false })
     .order('name', { ascending: true })
@@ -172,13 +173,20 @@ export async function listPlans() {
   return (data ?? []) as unknown as Plan[]
 }
 
-export async function listActivities() {
+export async function listActivities(includeInactive = false) {
   const client = getClient()
-  const { data, error } = await client
+  let query = client
     .from('activities')
-    .select('id, name, slug, active')
-    .eq('active', true)
+    .select(
+      'id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity',
+    )
     .order('name', { ascending: true })
+
+  if (!includeInactive) {
+    query = query.eq('active', true)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     throw error
@@ -187,20 +195,57 @@ export async function listActivities() {
   return (data ?? []) as Activity[]
 }
 
-export async function updatePlan(planId: string, input: UpdatePlanInput) {
+function planRpcInput(input: PlanInput) {
+  return {
+    p_name: input.name.trim(),
+    p_description: input.description.trim() || null,
+    p_price: input.price,
+    p_billing_period_days: input.billing_period_days,
+    p_plan_type: input.plan_type,
+    p_package_class_count: input.package_class_count,
+    p_active: input.active,
+    p_activities: input.activities,
+  }
+}
+
+function activityRpcInput(input: ActivityInput) {
+  return {
+    p_name: input.name.trim(),
+    p_description: input.description.trim() || null,
+    p_requires_24h_cancel: input.requires_24h_cancel,
+    p_flexible_schedule: input.flexible_schedule,
+    p_active: input.active,
+    p_color_hex: input.color_hex.trim() || null,
+    p_default_capacity: input.default_capacity,
+    p_max_capacity: input.max_capacity,
+  }
+}
+
+export async function createPlan(input: PlanInput) {
   const client = getClient()
-  const { error } = await client
-    .from('plans')
-    .update({
-      description: input.description.trim() || null,
-      price: input.price,
-      active: input.active,
-    })
-    .eq('id', planId)
+  const { data, error } = await client.rpc('admin_create_plan', {
+    ...planRpcInput(input),
+  })
 
   if (error) {
     throw error
   }
+
+  return data as AdminActionResult
+}
+
+export async function updatePlan(planId: string, input: PlanInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_update_plan', {
+    p_plan_id: planId,
+    ...planRpcInput(input),
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
 }
 
 export async function archivePlan(planId: string) {
@@ -220,6 +265,59 @@ export async function deletePlan(planId: string) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_delete_plan', {
     p_plan_id: planId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function createActivity(input: ActivityInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_create_activity', {
+    ...activityRpcInput(input),
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function updateActivity(activityId: string, input: ActivityInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_update_activity', {
+    p_activity_id: activityId,
+    ...activityRpcInput(input),
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function archiveActivity(activityId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_archive_activity', {
+    p_activity_id: activityId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function deleteActivity(activityId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_delete_activity', {
+    p_activity_id: activityId,
   })
 
   if (error) {

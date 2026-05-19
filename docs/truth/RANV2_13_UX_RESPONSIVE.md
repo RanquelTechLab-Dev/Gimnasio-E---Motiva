@@ -58,6 +58,12 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   operativo en pagos, membresias, reservas y asistencia.
 - `/admin/payments` agrega edicion auditada de monto, metodo, fecha y notas, y
   anulacion con motivo obligatorio sin borrado fisico.
+- `/admin/plans` agrega gestion admin segura de planes y actividades:
+  creacion, edicion, archivo y eliminacion fisica solo cuando no hay uso.
+- Los planes se configuran desde UI como semanales, paquetes o manuales, con
+  actividades incluidas y limite semanal por actividad.
+- Las actividades se pueden crear/editar con estado, color, ventana de
+  cancelacion, cupo por defecto y cupo maximo.
 
 ## Auditoria funcional
 
@@ -66,6 +72,10 @@ El schema actual permite:
 - listar actividades activas;
 - crear, editar y cancelar clases mediante RPCs admin existentes;
 - editar precio, descripcion y estado de planes;
+- crear y editar planes mediante RPCs admin-only;
+- archivar planes usados y eliminar fisicamente solo planes sin historial;
+- crear, editar y archivar actividades, y eliminar fisicamente solo actividades
+  sin vinculos a planes/clases/reservas/asistencia;
 - registrar pagos contra `membership_id`;
 - ver el plan asociado a una membresia/pago;
 - reservar y cancelar clases con las reglas existentes.
@@ -75,7 +85,7 @@ El schema actual permite:
 
 Requieren subbloques especificos:
 
-- CRUD completo de actividades;
+- aplicar y validar remotamente la migracion de CRUD planes/actividades;
 - aplicar y validar remotamente la migracion de limites semanales/paquetes;
 - aplicar y validar remotamente la migracion de fixes de calendario admin;
 - desplegar y validar remotamente la Edge Function actualizada de limpieza de
@@ -86,7 +96,6 @@ Requieren subbloques especificos:
 
 ## Fuera de alcance de este slice
 
-- No schema nuevo.
-- No `db push`.
+- No `db push` real sin dry-run previo y autorizacion de Walter.
 - No cambios en Mailjet, Google Drive, Cloudflare, WhatsApp API ni pagos online.
 - No carga de precios hardcodeados sin fuente.

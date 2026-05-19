@@ -238,3 +238,12 @@
 - `/admin/calendar` permite crear, editar y cancelar clases desde la grilla visual.
 - No se agrega migracion: se reutilizan las RPCs de calendario/reservas existentes.
 - No se implementa delete fisico de clases con historial.
+
+## 2026-05-19 - RANV2-13 limpieza segura de archivos
+
+- Se extiende `cleanup-drive-files` para soportar limpieza por archivo puntual con `fileId`.
+- `/admin/storage` suma acciones de vista previa, limpieza confirmada y eliminacion definitiva de archivo real de Drive.
+- La eliminacion real sigue exigiendo admin activo, `force=true`, backend seguro y auditoria.
+- No se eliminan pagos, membresias, reservas, asistencia ni perfiles desde esta limpieza.
+- No se agrega migracion: se reutilizan `files.archived_at`, `drive_status` y `audit_logs`.
+- Queda pendiente desplegar la Edge Function actualizada antes de probar borrados reales remotos.

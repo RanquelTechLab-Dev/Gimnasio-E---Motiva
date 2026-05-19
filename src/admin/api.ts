@@ -3,6 +3,7 @@ import type {
   AssignMembershipInput,
   Activity,
   AdminActionResult,
+  AdminStorageFile,
   AdminStudentFile,
   AdminTrainingNote,
   AttendanceSessionRow,
@@ -48,6 +49,22 @@ function getErrorMessage(error: unknown) {
 
 export function formatAdminError(error: unknown) {
   return getErrorMessage(error)
+}
+
+async function throwEdgeFunctionError(error: unknown): Promise<never> {
+  const response =
+    error && typeof error === 'object' && 'context' in error
+      ? error.context
+      : null
+
+  if (response instanceof Response) {
+    const body = await response.json().catch(() => null)
+    if (body && typeof body.error === 'string') {
+      throw new Error(body.error)
+    }
+  }
+
+  throw error instanceof Error ? error : new Error(getErrorMessage(error))
 }
 
 export async function listStudents() {
@@ -618,7 +635,93 @@ export async function previewDriveCleanup(maxFiles = 50) {
   })
 
   if (error) {
-    throw error
+    await throwEdgeFunctionError(error)
+  }
+
+  return data as DriveCleanupResult
+}
+
+export async function listDriveStorageFiles() {
+  const client = getClient()
+  const { data: files, error: filesError } = await client
+    .from('files')
+    .select(
+      'id, student_id, title, kind, drive_file_id, drive_url, size_bytes, visible_to_student, created_at, archived_at',
+    )
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (filesError) {
+    throw filesError
+  }
+
+  const studentIds = [
+    ...new Set((files ?? []).map((file) => file.student_id).filter(Boolean)),
+  ]
+
+  const { data: students, error: studentsError } =
+    studentIds.length > 0
+      ? await client
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', studentIds)
+      : { data: [], error: null }
+
+  if (studentsError) {
+    throw studentsError
+  }
+
+  const studentsById = new Map(
+    (students ?? []).map((student) => [
+      student.id,
+      {
+        name: [student.first_name, student.last_name].filter(Boolean).join(' '),
+        email: student.email as string | null,
+      },
+    ]),
+  )
+
+  return (files ?? []).map((file) => {
+    const student = studentsById.get(file.student_id)
+    return {
+      ...file,
+      student_name: student?.name || null,
+      student_email: student?.email ?? null,
+    }
+  }) as AdminStorageFile[]
+}
+
+export async function runDriveCleanup(fileIds: string[], maxFiles = 50) {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('cleanup-drive-files', {
+    body: {
+      dryRun: false,
+      force: true,
+      maxFiles,
+      studentId: null,
+      fileIds,
+    },
+  })
+
+  if (error) {
+    await throwEdgeFunctionError(error)
+  }
+
+  return data as DriveCleanupResult
+}
+
+export async function deleteStudentDriveFile(fileId: string) {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('cleanup-drive-files', {
+    body: {
+      dryRun: false,
+      force: true,
+      fileId,
+    },
+  })
+
+  if (error) {
+    await throwEdgeFunctionError(error)
   }
 
   return data as DriveCleanupResult

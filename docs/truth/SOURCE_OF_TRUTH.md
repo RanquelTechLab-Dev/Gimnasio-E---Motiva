@@ -106,4 +106,5 @@ RAN-29 esta en ejecucion.
 - RANV2-13 inicia ajuste visual/responsive: layout ancho, marca real,
   calendario visual interactivo mergeado, catalogo real de precios/planes
   aplicado, limites semanales/paquetes aplicados, fixes de calendario admin
-  aplicados y bajas seguras admin en preparacion.
+  aplicados, bajas seguras admin aplicadas y limpieza segura de archivos en
+  preparacion.

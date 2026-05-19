@@ -272,6 +272,7 @@ export function AdminCalendarPage() {
   )
   const [activityForm, setActivityForm] =
     useState<ActivityFormState>(emptyActivityForm)
+  const [showActivityEditor, setShowActivityEditor] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -393,6 +394,7 @@ export function AdminCalendarPage() {
 
   function selectManagedActivity(activity: Activity) {
     setActivityForm(activityToForm(activity))
+    setShowActivityEditor(true)
     setError(null)
     setSuccess(null)
   }
@@ -668,6 +670,7 @@ export function AdminCalendarPage() {
             ? 'Actividad actualizada.'
             : 'Actividad creada.',
       )
+      setShowActivityEditor(false)
       await loadData()
     } catch (saveError) {
       setError(formatAdminError(saveError))
@@ -694,6 +697,7 @@ export function AdminCalendarPage() {
     try {
       await archiveActivity(activity.id)
       setSuccess('Actividad archivada. No aparecera para nuevas clases.')
+      setShowActivityEditor(false)
       await loadData()
     } catch (archiveError) {
       setError(formatAdminError(archiveError))
@@ -721,6 +725,7 @@ export function AdminCalendarPage() {
       await deleteActivity(activity.id)
       setSuccess('Tipo de clase eliminado definitivamente.')
       setActivityForm(emptyActivityForm)
+      setShowActivityEditor(false)
       await loadData()
     } catch (deleteError) {
       setError(formatAdminError(deleteError))
@@ -730,9 +735,9 @@ export function AdminCalendarPage() {
   }
 
   return (
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
-      <div className="grid gap-5">
-        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+    <section className="grid gap-5 pb-24">
+      <div className="contents">
+        <div className="order-1 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -783,7 +788,7 @@ export function AdminCalendarPage() {
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+        <div className="order-3 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -802,6 +807,7 @@ export function AdminCalendarPage() {
               className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
               onClick={() => {
                 setActivityForm(emptyActivityForm)
+                setShowActivityEditor(true)
                 setError(null)
                 setSuccess(null)
               }}
@@ -879,10 +885,11 @@ export function AdminCalendarPage() {
             ))}
           </div>
 
-          <form
-            className="mt-5 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
-            onSubmit={handleActivitySubmit}
-          >
+          {showActivityEditor ? (
+            <form
+              className="mt-5 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
+              onSubmit={handleActivitySubmit}
+            >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
@@ -896,7 +903,10 @@ export function AdminCalendarPage() {
               </div>
               <button
                 className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
-                onClick={() => setActivityForm(emptyActivityForm)}
+                onClick={() => {
+                  setActivityForm(emptyActivityForm)
+                  setShowActivityEditor(true)
+                }}
                 type="button"
               >
                 Nuevo tipo
@@ -1041,13 +1051,14 @@ export function AdminCalendarPage() {
                     : 'Crear tipo'}
               </button>
             </div>
-          </form>
+            </form>
+          ) : null}
         </div>
       </div>
 
-      <aside className="grid gap-5">
+      <div className="order-2 grid gap-5">
         <form
-          className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
+          className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5"
           onSubmit={handleSubmit}
         >
           <div className="flex items-start justify-between gap-3">
@@ -1151,9 +1162,10 @@ export function AdminCalendarPage() {
                 {selectedActivity ? (
                   <button
                     className="shrink-0 rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-white"
-                    onClick={() =>
+                    onClick={() => {
                       setActivityForm(activityToForm(selectedActivity))
-                    }
+                      setShowActivityEditor(true)
+                    }}
                     type="button"
                   >
                     Configurar tipo
@@ -1400,7 +1412,7 @@ export function AdminCalendarPage() {
         </form>
 
         {selectedSession ? (
-          <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
               Cancelacion
             </p>
@@ -1452,7 +1464,7 @@ export function AdminCalendarPage() {
             {success}
           </p>
         ) : null}
-      </aside>
+      </div>
     </section>
   )
 }

@@ -209,17 +209,17 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
   return (
     <div className="overflow-x-auto pb-2">
       <div
-        className="grid min-w-[920px] gap-2"
+        className="grid min-w-[720px] gap-1.5 sm:min-w-[920px] sm:gap-2"
         style={{
-          gridTemplateColumns: `90px repeat(${days.length}, minmax(170px, 1fr))`,
+          gridTemplateColumns: `76px repeat(${days.length}, minmax(132px, 1fr))`,
         }}
       >
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-3 text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted)] sm:px-3 sm:py-3 sm:text-xs sm:tracking-[0.18em]">
           Horario
         </div>
         {days.map((day) => (
           <div
-            className="rounded-2xl border border-[var(--line)] bg-[var(--brand)] px-3 py-3 text-center font-display text-sm font-bold capitalize text-white"
+            className="rounded-2xl border border-[var(--line)] bg-[var(--brand)] px-2 py-2 text-center font-display text-xs font-bold capitalize text-white sm:px-3 sm:py-3 sm:text-sm"
             key={day}
           >
             {formatDayTitle(day)}
@@ -228,7 +228,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
         {timeSlots.map((timeSlot) => (
           <div className="contents" key={timeSlot}>
-            <div className="flex min-h-[118px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-4 text-sm font-bold text-[var(--ink)]">
+            <div className="flex min-h-[96px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] sm:min-h-[118px] sm:px-3 sm:py-4 sm:text-sm">
               {timeSlot}
             </div>
             {days.map((day) => {
@@ -240,7 +240,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
               return (
                 <div
-                  className="min-h-[118px] rounded-2xl border border-[var(--line)] bg-white/70 p-2"
+                  className="min-h-[96px] rounded-2xl border border-[var(--line)] bg-white/70 p-1.5 sm:min-h-[118px] sm:p-2"
                   key={`${day}-${timeSlot}`}
                 >
                   {daySessions.length === 0 ? (
@@ -256,7 +256,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                           mode === 'student' ? getPlanUsageLabel(session) : null
                         return (
                           <article
-                            className={`rounded-2xl border p-3 text-left shadow-sm transition ${toneForSession(session)} ${
+                            className={`rounded-2xl border p-2 text-left shadow-sm transition sm:p-3 ${toneForSession(session)} ${
                               selected
                                 ? 'ring-2 ring-[var(--brand)]'
                                 : 'ring-0'
@@ -265,38 +265,38 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ink)]/70">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink)]/70 sm:text-[11px] sm:tracking-[0.12em]">
                                   {formatTime(session.starts_at)} -{' '}
                                   {formatTime(session.ends_at)}
                                 </p>
-                                <h4 className="mt-1 text-sm font-bold leading-tight text-[var(--ink)]">
+                                <h4 className="mt-1 text-xs font-bold leading-tight text-[var(--ink)] sm:text-sm">
                                   {session.title}
                                 </h4>
-                                <p className="mt-1 text-xs font-semibold text-[var(--ink)]/75">
+                                <p className="mt-1 text-[11px] font-semibold text-[var(--ink)]/75 sm:text-xs">
                                   {session.activity_name}
                                 </p>
                               </div>
                               <span
-                                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${status.className}`}
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:px-2.5 sm:py-1 sm:text-[11px] ${status.className}`}
                               >
                                 {status.label}
                               </span>
                             </div>
 
-                            <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-bold text-[var(--ink)]">
-                              <span className="rounded-full bg-white/80 px-2.5 py-1">
+                            <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-bold text-[var(--ink)] sm:mt-3 sm:gap-1.5 sm:text-[11px]">
+                              <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
                                 {session.spots_left}/{session.capacity} cupos
                               </span>
-                              <span className="rounded-full bg-white/80 px-2.5 py-1">
+                              <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
                                 {session.requires_24h_cancel ? '24h' : '12h'}
                               </span>
                               {session.trainer_name ? (
-                                <span className="rounded-full bg-white/80 px-2.5 py-1">
+                                <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
                                   {session.trainer_name}
                                 </span>
                               ) : null}
                               {planUsageLabel ? (
-                                <span className="rounded-full bg-white/80 px-2.5 py-1">
+                                <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
                                   {planUsageLabel}
                                 </span>
                               ) : null}
@@ -310,7 +310,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
                             {mode === 'admin' ? (
                               <button
-                                className="mt-3 w-full rounded-xl bg-white/90 px-3 py-2 text-xs font-bold text-[var(--ink)] transition hover:bg-white"
+                                className="mt-2 w-full rounded-xl bg-white/90 px-3 py-2 text-xs font-bold text-[var(--ink)] transition hover:bg-white sm:mt-3"
                                 onClick={() => onSelectSession?.(session)}
                                 type="button"
                               >

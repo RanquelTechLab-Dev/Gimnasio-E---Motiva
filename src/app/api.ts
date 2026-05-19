@@ -5,6 +5,7 @@ import type {
   StudentAttendance,
   StudentFile,
   StudentPayment,
+  StudentPlanCatalogItem,
   StudentProfileDetails,
   StudentProfileSummary,
 } from './types'
@@ -136,4 +137,22 @@ export async function listMyFiles() {
   }
 
   return (data ?? []) as StudentFile[]
+}
+
+export async function listActivePlansCatalog() {
+  const client = getClient()
+  const { data, error } = await client
+    .from('plans')
+    .select(
+      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, plan_activities(activity_id, monthly_credits, weekly_class_limit, activities(id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity))',
+    )
+    .eq('active', true)
+    .order('price', { ascending: true })
+    .order('name', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as unknown as StudentPlanCatalogItem[]
 }

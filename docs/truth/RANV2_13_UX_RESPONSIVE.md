@@ -67,6 +67,9 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - La gestion completa de actividades/tipos de clase queda en `/admin/calendar`,
   donde se configuran estado, color, ventana de cancelacion, cupo por defecto y
   cupo maximo.
+- `/app/plans` agrega un catalogo informativo para alumnos con planes activos,
+  precios, periodo, tipo, actividades incluidas y clases por semana o paquete.
+  No permite comprar ni editar planes.
 
 ## Auditoria funcional
 
@@ -85,6 +88,8 @@ El schema actual permite:
 - representar paquetes personalizados de 1, 4, 8 y 12 clases con planes
   separados y clases finitas.
 - bloquear reservas cuando el alumno ya uso el limite semanal de esa actividad.
+- ver planes y precios activos desde el panel alumno como informacion de
+  consulta.
 
 Requieren subbloques especificos:
 

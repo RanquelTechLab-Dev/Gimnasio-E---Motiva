@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-05-19 - RANV2-13 catalogo alumno de planes
+
+- Se agrega `/app/plans` como seccion informativa de planes y precios para
+  alumnos autenticados.
+- La seccion muestra solo planes activos, precio, periodo, tipo, actividades
+  incluidas y clases por semana o clases de paquete.
+- No hay compra online ni edicion desde alumno; el copy orienta a consultar con
+  administracion.
+- No se crean migraciones ni se modifican RPCs.
+
 ## 2026-05-19 - RANV2-13 reordenamiento UX planes/calendario
 
 - `/admin/plans` queda enfocado en planes comerciales: precio, periodo, tipo,

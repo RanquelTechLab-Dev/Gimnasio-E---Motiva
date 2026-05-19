@@ -161,8 +161,7 @@ function buildRecurringDates(
 }
 
 function buildEmptyForm(activities: Activity[]): ClassFormState {
-  const firstActiveActivity =
-    activities.find((activity) => activity.active) ?? activities[0]
+  const firstActiveActivity = activities.find((activity) => activity.active)
   const start = new Date()
   start.setHours(start.getHours() + 2, 0, 0, 0)
   const end = new Date(start)
@@ -297,10 +296,18 @@ export function AdminCalendarPage() {
   const classActivities = useMemo(
     () =>
       activities.filter(
-        (activity) => activity.active || activity.id === form.activity_id,
+        (activity) =>
+          activity.active ||
+          (selectedSession ? activity.id === form.activity_id : false),
       ),
-    [activities, form.activity_id],
+    [activities, form.activity_id, selectedSession],
   )
+  const hasActiveActivities = useMemo(
+    () => activities.some((activity) => activity.active),
+    [activities],
+  )
+  const canSubmitClass =
+    Boolean(selectedSession) || (hasActiveActivities && Boolean(form.activity_id))
   const isPersonalizedOneOnOne =
     selectedActivity?.slug === 'personalizado_1_1'
   const startParts = getDateTimeParts(form.starts_at)
@@ -319,9 +326,25 @@ export function AdminCalendarPage() {
       ])
       setActivities(nextActivities)
       setSessions(nextSessions)
-      setForm((current) =>
-        current.activity_id ? current : buildEmptyForm(nextActivities),
-      )
+      setForm((current) => {
+        if (current.activity_id) {
+          const currentActivity = nextActivities.find(
+            (activity) => activity.id === current.activity_id,
+          )
+          if (
+            currentActivity?.active ||
+            nextSessions.some(
+              (session) =>
+                session.session_id === selectedSessionId &&
+                session.activity_id === current.activity_id,
+            )
+          ) {
+            return current
+          }
+        }
+
+        return buildEmptyForm(nextActivities)
+      })
       if (activityForm.id) {
         const nextSelected = nextActivities.find(
           (activity) => activity.id === activityForm.id,
@@ -444,6 +467,13 @@ export function AdminCalendarPage() {
       capacity: isPersonalizedOneOnOne ? '1' : form.capacity,
     }
     const capacity = Number(normalizedForm.capacity)
+
+    if (!selectedSession && !hasActiveActivities) {
+      setError(
+        'No hay actividades activas disponibles. Activa o crea una actividad antes de crear clases.',
+      )
+      return
+    }
 
     if (!form.activity_id || !form.title.trim()) {
       setError('Selecciona actividad y titulo para la clase.')
@@ -851,6 +881,7 @@ export function AdminCalendarPage() {
             <select
               aria-label="Actividad"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+              disabled={!selectedSession && !hasActiveActivities}
               onChange={(event) => {
                 const nextActivity = activities.find(
                   (activity) => activity.id === event.target.value,
@@ -874,6 +905,12 @@ export function AdminCalendarPage() {
                 </option>
               ))}
             </select>
+            {!selectedSession && !hasActiveActivities ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                No hay actividades activas disponibles. Activa o crea una
+                actividad antes de crear clases.
+              </p>
+            ) : null}
             <input
               aria-label="Titulo de la clase"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
@@ -1094,7 +1131,7 @@ export function AdminCalendarPage() {
             ) : null}
             <button
               className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
-              disabled={saving}
+              disabled={saving || !canSubmitClass}
               type="submit"
             >
               {saving

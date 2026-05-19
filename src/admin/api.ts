@@ -119,11 +119,18 @@ export async function deactivateStudent(studentId: string) {
 
 export async function deleteStudent(studentId: string) {
   const client = getClient()
-  const { data, error } = await client.rpc('admin_delete_student', {
-    p_student_id: studentId,
+  const { data, error } = await client.functions.invoke('delete-student', {
+    body: { student_id: studentId },
   })
 
   if (error) {
+    const response = 'context' in error ? error.context : null
+    if (response instanceof Response) {
+      const body = await response.json().catch(() => null)
+      if (body && typeof body.error === 'string') {
+        throw new Error(body.error)
+      }
+    }
     throw error
   }
 

@@ -1695,7 +1695,9 @@ export function AdminStudentsPage() {
                 </p>
                 <p className="text-xs text-[var(--muted)]">
                   Si el alumno tiene membresias, pagos, reservas, asistencia,
-                  archivos, notas o auditoria, no se elimina fisicamente.
+                  archivos o notas, no se elimina fisicamente.
+                  Eliminar tambien borra el usuario de acceso si es un alumno
+                  de prueba sin historial operativo.
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button

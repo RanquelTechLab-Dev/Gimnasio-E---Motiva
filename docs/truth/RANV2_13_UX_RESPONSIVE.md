@@ -48,10 +48,11 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - Las clases se colorean por actividad para acercar la lectura visual al plan
   semanal fuente.
 - Personalizado 1:1 fuerza cupo maximo 1 en UI y en base de datos.
-- Admin puede intentar bajas seguras: alumnos sin historial se eliminan,
-  alumnos con historial se desactivan; planes sin uso se eliminan, planes con
-  historial se archivan; clases sin reservas/asistencia se eliminan y clases
-  con historial deben cancelarse.
+- Admin puede intentar bajas seguras: alumnos sin historial operativo se
+  eliminan desde Edge Function tambien en Auth, alumnos con historial se
+  desactivan; planes sin uso se eliminan, planes con historial se archivan;
+  clases sin reservas/asistencia se eliminan y clases con historial deben
+  cancelarse.
 
 ## Auditoria funcional
 

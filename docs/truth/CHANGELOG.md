@@ -2,8 +2,10 @@
 
 ## 2026-05-18 - RANV2-13 bajas seguras admin
 
-- Se agregan RPCs admin-only para desactivar/eliminar alumnos, archivar/eliminar
-  planes y eliminar clases sin historial.
+- Se agregan RPCs admin-only para desactivar alumnos, archivar/eliminar planes
+  y eliminar clases sin historial.
+- El borrado fisico definitivo de alumnos queda en Edge Function admin-only
+  `delete-student`, con service role solo backend para eliminar tambien Auth.
 - El delete fisico queda bloqueado cuando hay historial operativo; en esos
   casos se conserva historial y se usa desactivacion, archivo o cancelacion.
 - Se agregan acciones visibles en `/admin/students`, `/admin/plans` y

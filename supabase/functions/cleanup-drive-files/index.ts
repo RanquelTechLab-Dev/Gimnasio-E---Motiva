@@ -13,6 +13,8 @@ type CleanupRequest = {
   force?: boolean
   maxFiles?: number
   studentId?: string | null
+  fileId?: string | null
+  fileIds?: string[] | null
 }
 
 type StudentCandidate = {
@@ -45,6 +47,7 @@ type CleanupFile = {
   size_bytes: number | null
   visible_to_student: boolean
   created_at: string
+  archived_at?: string | null
 }
 
 type CleanupFailure = {
@@ -91,6 +94,21 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+function uniqueStrings(values: unknown, limit: number) {
+  if (!Array.isArray(values)) {
+    return []
+  }
+
+  return [
+    ...new Set(
+      values
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, limit)
+}
+
 function normalizeRequest(body: unknown): Required<CleanupRequest> {
   const input = (body && typeof body === 'object' ? body : {}) as CleanupRequest
   const parsedMaxFiles = Number(input.maxFiles ?? defaultMaxFiles)
@@ -109,7 +127,24 @@ function normalizeRequest(body: unknown): Required<CleanupRequest> {
       typeof input.studentId === 'string' && input.studentId.trim()
         ? input.studentId.trim()
         : null,
+    fileId:
+      typeof input.fileId === 'string' && input.fileId.trim()
+        ? input.fileId.trim()
+        : null,
+    fileIds: uniqueStrings(input.fileIds, maxAllowedFiles),
   }
+}
+
+function getRequestMode(input: Required<CleanupRequest>) {
+  if (input.fileId) {
+    return 'file'
+  }
+
+  if (input.fileIds.length > 0) {
+    return 'files'
+  }
+
+  return 'candidate'
 }
 
 async function getGoogleAccessToken() {
@@ -252,6 +287,7 @@ Deno.serve(async (req) => {
     requestBody = {}
   }
   const input = normalizeRequest(requestBody)
+  const requestMode = getRequestMode(input)
 
   if (!input.dryRun && !input.force) {
     return jsonResponse(
@@ -285,25 +321,92 @@ Deno.serve(async (req) => {
     checked_at: new Date().toISOString(),
   })
 
-  let filesQuery = adminClient
-    .from('files')
-    .select(
-      'id, student_id, title, kind, drive_file_id, drive_url, size_bytes, visible_to_student, created_at',
-    )
-    .is('archived_at', null)
-    .not('drive_file_id', 'is', null)
-    .order('created_at', { ascending: true })
+  let files: CleanupFile[] = []
 
-  if (input.studentId) {
-    filesQuery = filesQuery.eq('student_id', input.studentId)
+  if (requestMode === 'file' || requestMode === 'files') {
+    let fileQuery = adminClient
+      .from('files')
+      .select(
+        'id, student_id, title, kind, drive_file_id, drive_url, size_bytes, visible_to_student, created_at, archived_at',
+      )
+
+    if (requestMode === 'file') {
+      fileQuery = fileQuery.eq('id', input.fileId)
+    } else {
+      fileQuery = fileQuery.in('id', input.fileIds)
+    }
+
+    const { data: requestedFiles, error: fileError } = await fileQuery
+
+    if (fileError) {
+      return jsonResponse({ error: 'No se pudieron listar los archivos indicados.' }, 500)
+    }
+
+    if (requestMode === 'file' && (requestedFiles ?? []).length !== 1) {
+      return jsonResponse({ error: 'No se encontro el archivo indicado.' }, 404)
+    }
+
+    if (requestMode === 'files') {
+      const foundIds = new Set((requestedFiles ?? []).map((file) => file.id))
+      const missingIds = input.fileIds.filter((fileId) => !foundIds.has(fileId))
+      if (missingIds.length > 0) {
+        return jsonResponse(
+          {
+            error:
+              'La vista previa ya no coincide con los archivos actuales. Actualiza la vista previa antes de limpiar.',
+            missing_file_ids: missingIds,
+          },
+          409,
+        )
+      }
+    }
+
+    const archivedFiles = (requestedFiles ?? []).filter((file) => file.archived_at)
+    if (archivedFiles.length > 0) {
+      return jsonResponse(
+        {
+          error:
+            'Uno o mas archivos indicados ya fueron archivados. Actualiza la vista previa antes de limpiar.',
+          archived_file_ids: archivedFiles.map((file) => file.id),
+        },
+        409,
+      )
+    }
+
+    const filesWithoutDrive = (requestedFiles ?? []).filter((file) => !file.drive_file_id)
+    if (filesWithoutDrive.length > 0) {
+      return jsonResponse(
+        {
+          error:
+            'Uno o mas documentos no tienen archivo real de Drive para eliminar definitivamente.',
+          file_ids: filesWithoutDrive.map((file) => file.id),
+        },
+        409,
+      )
+    }
+
+    files = (requestedFiles ?? []) as CleanupFile[]
+  } else {
+    let filesQuery = adminClient
+      .from('files')
+      .select(
+        'id, student_id, title, kind, drive_file_id, drive_url, size_bytes, visible_to_student, created_at',
+      )
+      .is('archived_at', null)
+      .not('drive_file_id', 'is', null)
+      .order('created_at', { ascending: true })
+
+    if (input.studentId) {
+      filesQuery = filesQuery.eq('student_id', input.studentId)
+    }
+
+    const { data: eligibleFiles, error: filesError } = await filesQuery
+    if (filesError) {
+      return jsonResponse({ error: 'No se pudieron listar archivos elegibles.' }, 500)
+    }
+
+    files = (eligibleFiles ?? []) as CleanupFile[]
   }
-
-  const { data: eligibleFiles, error: filesError } = await filesQuery
-  if (filesError) {
-    return jsonResponse({ error: 'No se pudieron listar archivos elegibles.' }, 500)
-  }
-
-  const files = (eligibleFiles ?? []) as CleanupFile[]
   const studentIds = [...new Set(files.map((file) => file.student_id))]
 
   if (studentIds.length === 0) {
@@ -314,6 +417,9 @@ Deno.serve(async (req) => {
       metadata: {
         dry_run: input.dryRun,
         force: input.force,
+        mode: requestMode,
+        requested_file_id: input.fileId,
+        requested_file_ids: input.fileIds,
         quota,
         threshold_reached: thresholdReached,
         student_id: input.studentId,
@@ -385,7 +491,9 @@ Deno.serve(async (req) => {
   )
 
   const candidates = (profiles ?? [])
-    .filter((student) => !activeMembershipStudentIds.has(student.id))
+    .filter(
+      (student) => requestMode === 'file' || !activeMembershipStudentIds.has(student.id),
+    )
     .map((student) => {
       const studentFiles = files.filter((file) => file.student_id === student.id)
       const studentPayments = (payments ?? []).filter(
@@ -435,12 +543,41 @@ Deno.serve(async (req) => {
     .filter((candidate) => candidate.eligible_file_count > 0)
     .sort((left, right) => candidateSortValue(left) - candidateSortValue(right))
 
-  const selectedStudent = candidates[0] ?? null
-  const selectedFiles = selectedStudent
-    ? files
-        .filter((file) => file.student_id === selectedStudent.student_id)
-        .slice(0, input.maxFiles)
-    : []
+  if (requestMode === 'files' && studentIds.length > 1) {
+    return jsonResponse(
+      {
+        error:
+          'La limpieza masiva confirmada debe pertenecer a un unico alumno. Actualiza la vista previa antes de limpiar.',
+      },
+      409,
+    )
+  }
+
+  const selectedStudent =
+    requestMode === 'file' || requestMode === 'files'
+      ? candidates.find((candidate) => candidate.student_id === files[0]?.student_id) ??
+        null
+      : candidates[0] ?? null
+  const selectedFiles =
+    requestMode === 'file' || requestMode === 'files'
+      ? files.slice(0, requestMode === 'file' ? 1 : files.length)
+      : selectedStudent
+        ? files
+            .filter((file) => file.student_id === selectedStudent.student_id)
+            .slice(0, input.maxFiles)
+        : []
+
+  if ((requestMode === 'file' || requestMode === 'files') && !selectedStudent) {
+    return jsonResponse(
+      {
+        error:
+          requestMode === 'files'
+            ? 'Los archivos ya no pertenecen a un candidato elegible. Actualiza la vista previa antes de limpiar.'
+            : 'El archivo indicado no esta asociado a un alumno valido.',
+      },
+      409,
+    )
+  }
   const reclaimableBytes = selectedFiles.reduce(
     (sum, file) => sum + Number(file.size_bytes ?? 0),
     0,
@@ -507,8 +644,11 @@ Deno.serve(async (req) => {
     metadata: {
       dry_run: input.dryRun,
       force: input.force,
+      mode: requestMode,
       max_files: input.maxFiles,
       requested_student_id: input.studentId,
+      requested_file_id: input.fileId,
+      requested_file_ids: input.fileIds,
       criteria: cleanupCriteria,
       quota,
       threshold_reached: thresholdReached,
@@ -525,6 +665,7 @@ Deno.serve(async (req) => {
         title: file.title,
         kind: file.kind,
         drive_file_id: file.drive_file_id,
+        drive_url: file.drive_url,
         size_bytes: file.size_bytes,
         visible_to_student: file.visible_to_student,
         created_at: file.created_at,
@@ -550,6 +691,9 @@ Deno.serve(async (req) => {
     threshold_reached: thresholdReached,
     criteria: cleanupCriteria,
     excluded_active_membership_student_ids_count: activeMembershipStudentIds.size,
+    mode: requestMode,
+    requested_file_id: input.fileId,
+    requested_file_ids: input.fileIds,
     selected_student: selectedStudent,
     selected_files: selectedFiles,
     selected_file_count: selectedFiles.length,
@@ -560,7 +704,11 @@ Deno.serve(async (req) => {
     message:
       activeMembershipMessage ??
       (input.dryRun
-        ? 'Vista previa generada. No se borro ningun archivo.'
+        ? requestMode === 'file'
+          ? 'Vista previa del archivo generada. No se borro ningun archivo.'
+          : requestMode === 'files'
+            ? 'Vista previa confirmada por archivos. No se borro ningun archivo.'
+          : 'Vista previa generada. No se borro ningun archivo.'
         : failedFiles.length > 0
           ? 'Limpieza ejecutada con incidencias auditadas.'
           : 'Limpieza ejecutada y auditada.'),

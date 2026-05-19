@@ -53,6 +53,9 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   desactivan; planes sin uso se eliminan, planes con historial se archivan;
   clases sin reservas/asistencia se eliminan y clases con historial deben
   cancelarse.
+- `/admin/storage` agrega limpieza segura de archivos: vista previa, limpieza
+  confirmada e individual de archivos reales de Drive, conservando historial
+  operativo en pagos, membresias, reservas y asistencia.
 
 ## Auditoria funcional
 
@@ -73,10 +76,11 @@ Requieren subbloques especificos:
 - CRUD completo de actividades;
 - aplicar y validar remotamente la migracion de limites semanales/paquetes;
 - aplicar y validar remotamente la migracion de fixes de calendario admin;
-- aplicar y validar remotamente la migracion de bajas seguras admin;
+- desplegar y validar remotamente la Edge Function actualizada de limpieza de
+  archivos;
 - editar/eliminar pagos y montos;
 - reset de contrasena de alumno desde admin;
-- eliminar archivos reales y/o metadata desde admin.
+- politicas futuras para purga tecnica de logs si alguna vez hiciera falta.
 
 ## Fuera de alcance de este slice
 

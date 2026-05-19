@@ -215,6 +215,13 @@ export type DriveCleanupFile = {
   size_bytes: number | null
   visible_to_student: boolean
   created_at: string
+  archived_at?: string | null
+}
+
+export type AdminStorageFile = DriveCleanupFile & {
+  student_name: string | null
+  student_email: string | null
+  archived_at: string | null
 }
 
 export type DriveCleanupResult = {
@@ -224,6 +231,9 @@ export type DriveCleanupResult = {
   threshold_reached: boolean
   criteria?: Record<string, unknown>
   excluded_active_membership_student_ids_count?: number
+  mode?: 'candidate' | 'file' | 'files'
+  requested_file_id?: string | null
+  requested_file_ids?: string[]
   selected_student: DriveCleanupCandidate | null
   selected_files: DriveCleanupFile[]
   selected_file_count?: number

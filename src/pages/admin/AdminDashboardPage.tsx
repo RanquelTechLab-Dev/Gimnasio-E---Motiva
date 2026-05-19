@@ -4,14 +4,14 @@ export function AdminDashboardPage() {
   return (
     <PlaceholderPanel
       bullets={[
-        'Acceso protegido para administracion.',
-        'Alumnos, pagos y membresias se incorporan en el panel operativo.',
-        'Sesion activa validada con Supabase Auth.',
-        'Perfil admin cargado desde Supabase.',
+        'Gestión de alumnos, clases, planes y pagos manuales.',
+        'Seguimiento de asistencia, documentos y comunicaciones.',
+        'Acceso exclusivo para administración del gimnasio.',
+        'Información organizada para la operación diaria.',
       ]}
-      description="Panel inicial de administracion para gestionar E-Motiva a medida que se incorporan las operaciones del gimnasio."
-      eyebrow="/admin"
-      title="Dashboard administracion"
+      description="Panel inicial para revisar y administrar la actividad diaria de E-Motiva."
+      eyebrow="Administración"
+      title="Panel administrativo"
     />
   )
 }

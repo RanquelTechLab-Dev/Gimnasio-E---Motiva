@@ -4,13 +4,13 @@ export function AdminSettingsPage() {
   return (
     <PlaceholderPanel
       bullets={[
-        'Sin configuraciones persistidas.',
-        'No hay secrets ni integraciones.',
-        'Espacio reservado para configuracion del panel admin.',
-        'La configuracion real se incorpora por bloque.',
+        'Preferencias generales del panel.',
+        'Accesos y reglas operativas se gestionan de forma segura.',
+        'La configuracion avanzada se habilita cuando sea necesaria.',
+        'Los cambios sensibles se incorporan con revision previa.',
       ]}
-      description="Espacio reservado para configuraciones futuras sin mezclar este bloque con integraciones externas."
-      eyebrow="/admin/settings"
+      description="Seccion preparada para futuras preferencias del gimnasio sin mezclar operaciones diarias."
+      eyebrow="Configuración"
       title="Configuracion"
     />
   )

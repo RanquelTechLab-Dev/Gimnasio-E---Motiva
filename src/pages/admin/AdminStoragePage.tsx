@@ -160,7 +160,7 @@ export function AdminStoragePage() {
     <section className="grid gap-5">
       <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-5">
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-          Storage
+          Archivos
         </p>
         <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -168,8 +168,8 @@ export function AdminStoragePage() {
               Limpieza de archivos
             </h3>
             <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
-              Revisa el espacio de Drive, previsualiza archivos elegibles y
-              elimina documentos reales solo con confirmacion. Archivar oculta
+              Revisá el espacio de documentos, previsualizá archivos elegibles y
+              eliminá documentos reales solo con confirmación. Archivar oculta
               el documento, pero conserva historial.
             </p>
           </div>

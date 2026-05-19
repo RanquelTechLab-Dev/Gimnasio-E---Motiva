@@ -124,7 +124,7 @@ export function StudentProfilePage() {
         onSubmit={(event) => void handleSubmit(event)}
       >
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
-          Autogestion
+          Datos de contacto
         </p>
         <h3 className="mt-2 text-2xl font-bold text-[var(--ink)]">
           Datos editables
@@ -148,8 +148,7 @@ export function StudentProfilePage() {
           Recibir novedades por email
         </label>
         <p className="mt-4 text-sm text-[var(--muted)]">
-          El email, el rol, el estado de cuenta y los marcadores operativos solo
-          los modifica administracion.
+          El email y el estado de la cuenta los actualiza administración.
         </p>
         <button
           className="mt-5 rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"

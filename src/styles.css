@@ -3,24 +3,24 @@
 
 :root {
   color-scheme: light;
-  --surface: #fffaf4;
-  --surface-strong: #fffdf8;
-  --ink: #1f2a21;
-  --muted: #5f6f61;
-  --line: #d9c6af;
-  --brand: #1f7a52;
-  --brand-soft: #dff1e7;
-  --accent: #d96c3b;
-  --accent-soft: #ffe5d8;
-  --shadow: 0 24px 60px rgba(74, 53, 36, 0.12);
+  --surface: #ffffff;
+  --surface-strong: #f7fcfb;
+  --ink: #173038;
+  --muted: #5d747a;
+  --line: #cde1df;
+  --brand: #0d9ca3;
+  --brand-soft: #dff6f4;
+  --accent: #d15f54;
+  --accent-soft: #ffe7e2;
+  --shadow: 0 24px 60px rgba(18, 88, 94, 0.12);
   font-family: 'Instrument Sans', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(217, 108, 59, 0.16), transparent 30%),
-    radial-gradient(circle at top right, rgba(31, 122, 82, 0.16), transparent 26%),
-    linear-gradient(180deg, #f8f1e7 0%, #f4ecdf 100%);
+    radial-gradient(circle at top left, rgba(12, 169, 188, 0.16), transparent 30%),
+    radial-gradient(circle at top right, rgba(81, 190, 169, 0.18), transparent 26%),
+    linear-gradient(180deg, #f3fbfa 0%, #eef8f6 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

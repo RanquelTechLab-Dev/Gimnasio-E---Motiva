@@ -134,7 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signIn = useCallback(
     async (email: string, password: string): Promise<SignInResult> => {
       if (!supabase) {
-        throw new Error(supabaseConfigError ?? 'Supabase no esta configurado.')
+        throw new Error(supabaseConfigError ?? 'La app no esta configurada.')
       }
 
       setError(null)

@@ -17,7 +17,7 @@ export function StudentLayout() {
       navItems={navItems}
       pendingLabel="Tus datos se actualizan desde administración. Si algo no coincide, contactanos para revisarlo."
       section="Panel alumno"
-      subtitle="Autogestion basica para perfil, reservas, pagos y asistencia."
+      subtitle="Clases, reservas, pagos y documentos en un solo lugar."
       title="Espacio del alumno"
     />
   )

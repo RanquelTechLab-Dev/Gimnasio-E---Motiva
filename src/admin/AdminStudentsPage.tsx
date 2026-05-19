@@ -873,8 +873,8 @@ export function AdminStudentsPage() {
           <p className="mt-5 text-sm text-[var(--muted)]">Cargando alumnos...</p>
         ) : students.length === 0 ? (
           <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
-            Todavia no hay alumnos creados. El alta real requiere desplegar la
-            Edge Function `create-student` en el bloque posterior.
+            Todavía no hay alumnos creados. Cuando cargues el primero, va a
+            aparecer en esta lista.
           </div>
         ) : (
           <div className="mt-5 grid gap-4">
@@ -1541,8 +1541,8 @@ export function AdminStudentsPage() {
             Crear alumno
           </h3>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Requiere deploy posterior de la Edge Function. No se guarda la
-            contrasena provisoria.
+            Creá la cuenta del alumno con una contraseña provisoria. La
+            contraseña no queda visible después del alta.
           </p>
           <div className="mt-5 grid gap-3">
             <input

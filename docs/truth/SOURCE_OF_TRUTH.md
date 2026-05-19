@@ -111,4 +111,5 @@ RAN-29 esta en ejecucion.
   CRUD admin de planes/actividades aplicado; la UX queda en ajuste para que
   planes administre la oferta comercial y calendario administre actividades,
   cupos, colores y reglas de tipos de clase. El panel alumno suma catalogo
-  informativo de planes y precios activos, sin compra online.
+  informativo de planes y precios activos, sin compra online. Se agrega pulido
+  visual/copy/branding final sin cambios de schema ni backend.

@@ -8,18 +8,18 @@ const navItems = [
   { label: 'Asistencia', to: '/admin/attendance' },
   { label: 'Planes', to: '/admin/plans' },
   { label: 'Emails', to: '/admin/emails' },
-  { label: 'Storage', to: '/admin/storage' },
-  { label: 'Settings', to: '/admin/settings' },
+  { label: 'Archivos', to: '/admin/storage' },
+  { label: 'Configuración', to: '/admin/settings' },
 ]
 
 export function AdminLayout() {
   return (
     <LayoutShell
       navItems={navItems}
-      pendingLabel="Acceso admin protegido. Alumnos, planes y pagos manuales operan desde este panel."
-      section="Panel administracion"
-      subtitle="Area reservada para perfiles con rol admin activo en Supabase."
-      title="Panel administracion"
+      pendingLabel="Gestión interna para alumnos, clases, planes, pagos y documentos."
+      section="Panel administrativo"
+      subtitle="Gestión del gimnasio y operación diaria de E-Motiva."
+      title="Panel administrativo"
     />
   )
 }

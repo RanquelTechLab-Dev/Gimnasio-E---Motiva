@@ -70,6 +70,9 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - `/app/plans` agrega un catalogo informativo para alumnos con planes activos,
   precios, periodo, tipo, actividades incluidas y clases por semana o paquete.
   No permite comprar ni editar planes.
+- Se aplica pulido visual final: copy menos tecnico, logo con mayor presencia,
+  paleta base alineada al logo y pequenos ajustes de legibilidad mobile sin
+  modificar backend ni reglas operativas.
 
 ## Auditoria funcional
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-18 - RANV2-13 CRUD planes y actividades
+
+- Se agrega migracion local para administrar planes y actividades desde
+  `/admin/plans` mediante RPCs admin-only.
+- Admin puede crear/editar planes con tipo semanal, paquete o manual,
+  actividades incluidas y limites semanales por actividad.
+- Los planes usados conservan historial; si se archivan quedan inactivos para
+  nuevas asignaciones y si nunca fueron usados pueden eliminarse.
+- Admin puede crear/editar/archivar actividades y eliminarlas solo si nunca
+  fueron usadas ni vinculadas a planes.
+- Se agregan metadatos de actividad para color, cupo por defecto y cupo maximo;
+  Personalizado 1:1 queda compatible con maximo 1 alumno.
+- No se ejecuta `db push` real.
+
 ## 2026-05-18 - RANV2-13 bajas seguras admin
 
 - Se agregan RPCs admin-only para desactivar alumnos, archivar/eliminar planes

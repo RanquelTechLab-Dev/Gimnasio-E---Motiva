@@ -18,12 +18,19 @@ export type Activity = {
   id: string
   name: string
   slug: string
+  description: string | null
+  requires_24h_cancel: boolean
+  flexible_schedule: boolean
   active: boolean
+  color_hex: string | null
+  default_capacity: number | null
+  max_capacity: number | null
 }
 
 export type PlanType = 'weekly' | 'package' | 'manual'
 
 export type PlanActivity = {
+  activity_id?: string
   monthly_credits: number | null
   weekly_class_limit: number | null
   activities: Activity | null
@@ -39,6 +46,7 @@ export type Plan = {
   plan_type: PlanType
   package_class_count: number | null
   active: boolean
+  memberships?: Array<{ id: string }>
   plan_activities?: PlanActivity[]
 }
 
@@ -126,17 +134,41 @@ export type UpdatePaymentInput = {
   notes: string
 }
 
-export type UpdatePlanInput = {
+export type PlanActivityInput = {
+  activity_id: string
+  monthly_credits: number | null
+  weekly_class_limit: number | null
+}
+
+export type PlanInput = {
+  name: string
   description: string
   price: number
+  billing_period_days: number
+  plan_type: PlanType
+  package_class_count: number | null
   active: boolean
+  activities: PlanActivityInput[]
+}
+
+export type ActivityInput = {
+  name: string
+  description: string
+  requires_24h_cancel: boolean
+  flexible_schedule: boolean
+  active: boolean
+  color_hex: string
+  default_capacity: number | null
+  max_capacity: number | null
 }
 
 export type AdminActionResult = {
-  action: 'archived' | 'deactivated' | 'deleted'
+  action: 'archived' | 'created' | 'deactivated' | 'deleted' | 'updated'
   student_id?: string
   plan_id?: string
+  activity_id?: string
   session_id?: string
+  has_history?: boolean
 }
 
 export type AdminTrainingNote = {

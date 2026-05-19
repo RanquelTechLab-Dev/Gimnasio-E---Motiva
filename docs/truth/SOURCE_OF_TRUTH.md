@@ -107,5 +107,6 @@ RAN-29 esta en ejecucion.
   calendario visual interactivo mergeado, catalogo real de precios/planes
   aplicado, limites semanales/paquetes aplicados, fixes de calendario admin
   aplicados, bajas seguras admin aplicadas y limpieza segura de archivos en
-  produccion. Pagos editables/anulables queda en preparacion con migracion
-  pendiente de aplicar.
+  produccion. Pagos editables/anulables aplicados y UX de anulacion ajustada.
+  CRUD admin de planes/actividades queda en preparacion con migracion pendiente
+  de aplicar.

@@ -40,10 +40,10 @@ export function LoginPage() {
   return (
     <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
       <div className="hidden lg:block">
-        <div className="inline-flex items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-4 py-3 shadow-[var(--shadow)]">
+        <div className="inline-flex items-center gap-4 rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] px-5 py-4 shadow-[var(--shadow)]">
           <img
             alt="E-Motiva"
-            className="h-12 w-12 rounded-2xl bg-white object-contain p-1 shadow-sm"
+            className="h-16 w-16 rounded-3xl bg-white object-contain p-1.5 shadow-sm"
             src="/brand/logo-small.png"
           />
           <div>
@@ -51,7 +51,7 @@ export function LoginPage() {
               E-Motiva
             </p>
             <p className="text-sm text-[var(--muted)]">
-              Gestion del gimnasio y autogestion de alumnos.
+              Gestión de clases, reservas y seguimiento.
             </p>
           </div>
         </div>
@@ -59,7 +59,7 @@ export function LoginPage() {
           Acceso E-Motiva
         </h1>
         <p className="mt-5 max-w-xl text-base text-[var(--muted)]">
-          Ingresa con tu cuenta para gestionar clases, alumnos y reservas.
+          Ingresá para consultar clases, reservas, pagos y documentos.
         </p>
       </div>
       <form
@@ -69,7 +69,7 @@ export function LoginPage() {
         <div className="flex items-center gap-3">
           <img
             alt="E-Motiva"
-            className="h-14 w-14 rounded-2xl bg-white object-contain p-1 shadow-sm sm:h-16 sm:w-16"
+            className="h-16 w-16 rounded-3xl bg-white object-contain p-1.5 shadow-sm sm:h-20 sm:w-20"
             src="/brand/logo-small.png"
           />
           <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
@@ -80,8 +80,8 @@ export function LoginPage() {
           Acceso E-Motiva
         </h1>
         <p className="mt-3 text-sm text-[var(--muted)]">
-          Ingresa con tu cuenta para continuar. Las cuentas son creadas por
-          administracion.
+          Ingresá con tu cuenta para continuar. Las cuentas son creadas por
+          administración.
         </p>
 
         {location.state ? (

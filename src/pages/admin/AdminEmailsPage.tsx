@@ -84,7 +84,7 @@ export function AdminEmailsPage() {
     }
 
     const confirmed = window.confirm(
-      `Vas a enviar este email a ${preview?.eligible_count ?? 0} destinatarios. Esta accion usa Mailjet y queda registrada. Continuar?`,
+      `Vas a enviar este email a ${preview?.eligible_count ?? 0} destinatarios. La accion queda registrada. Continuar?`,
     )
 
     if (!confirmed) {
@@ -177,7 +177,7 @@ export function AdminEmailsPage() {
               onClick={() => void handleSend()}
               type="button"
             >
-              {sending ? 'Enviando...' : 'Enviar con Mailjet'}
+              {sending ? 'Enviando...' : 'Enviar email'}
             </button>
           </div>
         </form>
@@ -237,7 +237,7 @@ export function AdminEmailsPage() {
                 {preview.eligible_count} destinatarios elegibles
               </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Opt-out excluido automaticamente.
+                Alumnos que no aceptan emails quedan excluidos automaticamente.
               </p>
             </div>
 

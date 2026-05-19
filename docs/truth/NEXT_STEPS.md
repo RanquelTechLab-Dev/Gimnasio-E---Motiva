@@ -6,8 +6,8 @@ RAN-29 / RANV2-13: PWA + responsive + UX final.
 
 ## Siguiente
 
-Revisar PR de catalogo alumno de planes y precios; la seccion es informativa y
-usa solo planes activos.
+Revisar PR de pulido visual final: copy profesional, presencia de marca,
+paleta E-Motiva y legibilidad mobile sin cambios funcionales.
 
 ## Pendiente
 

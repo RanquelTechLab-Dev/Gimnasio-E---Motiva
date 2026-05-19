@@ -35,7 +35,7 @@ import type {
 
 function getClient() {
   if (!supabase) {
-    throw new Error(supabaseConfigError ?? 'Supabase no esta configurado.')
+    throw new Error(supabaseConfigError ?? 'La app no esta configurada.')
   }
 
   return supabase
@@ -95,7 +95,7 @@ export async function createStudent(input: CreateStudentInput) {
 
   if (error) {
     throw new Error(
-      `${error.message}. Si la Edge Function aun no fue desplegada, este flujo queda pendiente para el bloque posterior.`,
+      `${error.message}. Si el alta no esta disponible, revisa la configuracion del sistema.`,
     )
   }
 

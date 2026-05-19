@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-19 - RANV2-13 pulido visual final
+
+- Se ajusta copy visible en login, layouts, dashboard admin, perfil alumno,
+  archivos y configuracion para usar lenguaje de gimnasio y evitar textos
+  tecnicos.
+- Se refuerza la presencia del logo E-Motiva en login y sidebar sin cambiar
+  flujos funcionales.
+- Se alinea la paleta base con tonos turquesa/celeste/verde agua del logo,
+  manteniendo contraste y estados de alerta.
+- No se crean migraciones, RPCs ni cambios de backend.
+
 ## 2026-05-19 - RANV2-13 catalogo alumno de planes
 
 - Se agrega `/app/plans` como seccion informativa de planes y precios para

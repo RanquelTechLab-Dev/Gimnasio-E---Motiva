@@ -12,7 +12,7 @@ import type {
 
 function getClient() {
   if (!supabase) {
-    throw new Error(supabaseConfigError ?? 'Supabase no esta configurado.')
+    throw new Error(supabaseConfigError ?? 'La app no esta configurada.')
   }
 
   return supabase

@@ -9,6 +9,7 @@ import { StudentDashboardPage } from './pages/student/StudentDashboardPage'
 import { StudentCalendarPage } from './pages/student/StudentCalendarPage'
 import { StudentBookingsPage } from './pages/student/StudentBookingsPage'
 import { StudentPlanPage } from './pages/student/StudentPlanPage'
+import { StudentPlansPricesPage } from './pages/student/StudentPlansPricesPage'
 import { StudentProfilePage } from './pages/student/StudentProfilePage'
 import { StudentPaymentsPage } from './pages/student/StudentPaymentsPage'
 import { StudentAttendancePage } from './pages/student/StudentAttendancePage'
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
           { path: 'bookings', element: <StudentBookingsPage /> },
           { path: 'my-bookings', element: <StudentBookingsPage /> },
           { path: 'my-plan', element: <StudentPlanPage /> },
+          { path: 'plans', element: <StudentPlansPricesPage /> },
           { path: 'payments', element: <StudentPaymentsPage /> },
           { path: 'attendance', element: <StudentAttendancePage /> },
           { path: 'files', element: <StudentFilesPage /> },

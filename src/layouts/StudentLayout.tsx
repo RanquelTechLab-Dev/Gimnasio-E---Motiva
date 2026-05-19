@@ -4,6 +4,7 @@ const navItems = [
   { label: 'Dashboard', to: '/app' },
   { label: 'Calendario', to: '/app/calendar' },
   { label: 'Mis reservas', to: '/app/bookings' },
+  { label: 'Planes y precios', to: '/app/plans' },
   { label: 'Mis pagos', to: '/app/payments' },
   { label: 'Mi asistencia', to: '/app/attendance' },
   { label: 'Perfil', to: '/app/profile' },

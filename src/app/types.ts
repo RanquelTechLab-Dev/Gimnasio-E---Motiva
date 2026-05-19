@@ -145,3 +145,34 @@ export type StudentFile = {
   visible_to_student: boolean
   created_at: string
 }
+
+export type StudentPlanCatalogActivity = {
+  activity_id: string
+  monthly_credits: number | null
+  weekly_class_limit: number | null
+  activities: {
+    id: string
+    name: string
+    slug: string
+    description: string | null
+    requires_24h_cancel: boolean
+    flexible_schedule: boolean
+    active: boolean
+    color_hex: string | null
+    default_capacity: number | null
+    max_capacity: number | null
+  } | null
+}
+
+export type StudentPlanCatalogItem = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  price: number
+  billing_period_days: number
+  plan_type: 'weekly' | 'package' | 'manual'
+  package_class_count: number | null
+  active: boolean
+  plan_activities: StudentPlanCatalogActivity[]
+}

@@ -736,327 +736,58 @@ export function AdminCalendarPage() {
 
   return (
     <section className="grid gap-5 pb-24">
-      <div className="contents">
-        <div className="order-1 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-                Calendario
-              </p>
-              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-                Clases y cupos
-              </h3>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <input
-                aria-label="Fecha desde"
-                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
-                onChange={(event) => setFromDate(event.target.value)}
-                type="date"
-                value={fromDate}
-              />
-              <input
-                aria-label="Fecha hasta"
-                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
-                onChange={(event) => setToDate(event.target.value)}
-                type="date"
-                value={toDate}
-              />
-              <button
-                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
-                onClick={() => void loadData()}
-                type="button"
-              >
-                Actualizar
-              </button>
-            </div>
+      <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+              Calendario
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Clases y cupos
+            </h3>
           </div>
-
-          <div className="mt-5">
-            {loading ? (
-              <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
-            ) : (
-              <WeeklyScheduleGrid
-                fromDate={fromDate}
-                mode="admin"
-                onSelectSession={selectSession}
-                selectedSessionId={selectedSessionId}
-                sessions={sessions}
-                toDate={toDate}
-              />
-            )}
+          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            <input
+              aria-label="Fecha desde"
+              className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+              onChange={(event) => setFromDate(event.target.value)}
+              type="date"
+              value={fromDate}
+            />
+            <input
+              aria-label="Fecha hasta"
+              className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+              onChange={(event) => setToDate(event.target.value)}
+              type="date"
+              value={toDate}
+            />
+            <button
+              className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+              onClick={() => void loadData()}
+              type="button"
+            >
+              Actualizar
+            </button>
           </div>
         </div>
 
-        <div className="order-3 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-                Tipos de clase
-              </p>
-              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-                Tipos de clase
-              </h3>
-              <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
-                Las actividades definen tipos de clase, colores, cupos y reglas
-                de cancelacion. Los planes solo indican que actividades incluye
-                el alumno.
-              </p>
-            </div>
-            <button
-              className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
-              onClick={() => {
-                setActivityForm(emptyActivityForm)
-                setShowActivityEditor(true)
-                setError(null)
-                setSuccess(null)
-              }}
-              type="button"
-            >
-              Nuevo tipo de clase
-            </button>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {activities.map((activity) => (
-              <div
-                className={`rounded-[20px] border p-4 text-left transition ${
-                  activityForm.id === activity.id
-                    ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
-                    : 'border-[var(--line)] bg-[var(--surface-strong)]'
-                }`}
-                key={activity.id}
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className="mt-1 h-4 w-4 rounded-full border border-[var(--line)]"
-                    style={{ backgroundColor: activity.color_hex ?? '#75cfc2' }}
-                  />
-                  <div>
-                    <p className="font-semibold text-[var(--ink)]">
-                      {activity.name}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      {activity.active ? 'Activa' : 'Archivada'} ·{' '}
-                      {activity.requires_24h_cancel
-                        ? 'Cancelacion 24h'
-                        : 'Cancelacion 12h'}
-                      {activity.default_capacity
-                        ? ` · cupo ${activity.default_capacity}`
-                        : ''}
-                      {activity.max_capacity
-                        ? ` · maximo ${activity.max_capacity}`
-                        : ''}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-white"
-                    onClick={() => selectManagedActivity(activity)}
-                    type="button"
-                  >
-                    Editar tipo
-                  </button>
-                  <button
-                    className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-white disabled:opacity-60"
-                    disabled={saving || !activity.active}
-                    onClick={() => {
-                      setActivityForm(activityToForm(activity))
-                      void handleArchiveActivity(activity)
-                    }}
-                    type="button"
-                  >
-                    Archivar tipo
-                  </button>
-                  <button
-                    className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
-                    disabled={saving}
-                    onClick={() => {
-                      setActivityForm(activityToForm(activity))
-                      void handleDeleteActivity(activity)
-                    }}
-                    type="button"
-                  >
-                    Eliminar tipo
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {showActivityEditor ? (
-            <form
-              className="mt-5 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
-              onSubmit={handleActivitySubmit}
-            >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
-                  Configuracion
-                </p>
-                <h4 className="mt-1 text-lg font-bold text-[var(--ink)]">
-                  {activityForm.id
-                    ? 'Configurar tipo de clase'
-                    : 'Nuevo tipo de clase'}
-                </h4>
-              </div>
-              <button
-                className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
-                onClick={() => {
-                  setActivityForm(emptyActivityForm)
-                  setShowActivityEditor(true)
-                }}
-                type="button"
-              >
-                Nuevo tipo
-              </button>
-            </div>
-            <p className="mt-3 text-xs text-[var(--muted)]">
-              Estos cambios afectan al tipo de clase seleccionado y a futuras
-              clases de este tipo. Archivar oculta para nuevas clases, pero
-              conserva historial.
-            </p>
-
-            <div className="mt-4 grid gap-4">
-              <div className="grid gap-3 lg:grid-cols-2">
-                <label className="text-sm font-semibold">
-                  Nombre
-                  <input
-                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        name: event.target.value,
-                      })
-                    }
-                    value={activityForm.name}
-                  />
-                </label>
-                <label className="text-sm font-semibold">
-                  Color
-                  <input
-                    className="mt-2 h-11 w-full rounded-2xl border border-[var(--line)] bg-white px-2 py-1"
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        color_hex: event.target.value,
-                      })
-                    }
-                    type="color"
-                    value={activityForm.color_hex || '#75cfc2'}
-                  />
-                </label>
-              </div>
-              <label className="text-sm font-semibold">
-                Descripcion
-                <textarea
-                  className="mt-2 min-h-20 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      description: event.target.value,
-                    })
-                  }
-                  value={activityForm.description}
-                />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-sm font-semibold">
-                  Cupo por defecto
-                  <input
-                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                    min="1"
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        default_capacity: event.target.value,
-                      })
-                    }
-                    type="number"
-                    value={activityForm.default_capacity}
-                  />
-                </label>
-                <label className="text-sm font-semibold">
-                  Cupo maximo
-                  <input
-                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                    min="1"
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        max_capacity: event.target.value,
-                      })
-                    }
-                    type="number"
-                    value={activityForm.max_capacity}
-                  />
-                </label>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <label className="flex items-center gap-3 text-sm font-semibold">
-                  <input
-                    checked={activityForm.requires_24h_cancel}
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        requires_24h_cancel: event.target.checked,
-                      })
-                    }
-                    type="checkbox"
-                  />
-                  Cancelacion 24h
-                </label>
-                <label className="flex items-center gap-3 text-sm font-semibold">
-                  <input
-                    checked={activityForm.flexible_schedule}
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        flexible_schedule: event.target.checked,
-                      })
-                    }
-                    type="checkbox"
-                  />
-                  Horario flexible
-                </label>
-                <label className="flex items-center gap-3 text-sm font-semibold">
-                  <input
-                    checked={activityForm.active}
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        active: event.target.checked,
-                      })
-                    }
-                    type="checkbox"
-                  />
-                  Tipo activo
-                </label>
-              </div>
-              {activityForm.max_capacity === '1' ? (
-                <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-xs font-semibold text-[var(--brand)]">
-                  Personalizado 1:1 permite maximo 1 alumno.
-                </p>
-              ) : null}
-              <button
-                className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
-                disabled={saving}
-                type="submit"
-              >
-                {saving
-                  ? 'Guardando...'
-                  : activityForm.id
-                    ? 'Guardar tipo'
-                    : 'Crear tipo'}
-              </button>
-            </div>
-            </form>
-          ) : null}
+        <div className="mt-5">
+          {loading ? (
+            <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
+          ) : (
+            <WeeklyScheduleGrid
+              fromDate={fromDate}
+              mode="admin"
+              onSelectSession={selectSession}
+              selectedSessionId={selectedSessionId}
+              sessions={sessions}
+              toDate={toDate}
+            />
+          )}
         </div>
       </div>
 
-      <div className="order-2 grid gap-5">
+      <div className="grid gap-5">
         <form
           className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5"
           onSubmit={handleSubmit}
@@ -1463,6 +1194,273 @@ export function AdminCalendarPage() {
           <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
             {success}
           </p>
+        ) : null}
+      </div>
+
+      <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+              Tipos de clase
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Tipos de clase
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
+              Las actividades definen tipos de clase, colores, cupos y reglas
+              de cancelacion. Los planes solo indican que actividades incluye
+              el alumno.
+            </p>
+          </div>
+          <button
+            className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+            onClick={() => {
+              setActivityForm(emptyActivityForm)
+              setShowActivityEditor(true)
+              setError(null)
+              setSuccess(null)
+            }}
+            type="button"
+          >
+            Nuevo tipo de clase
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {activities.map((activity) => (
+            <div
+              className={`rounded-[20px] border p-4 text-left transition ${
+                activityForm.id === activity.id
+                  ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
+                  : 'border-[var(--line)] bg-[var(--surface-strong)]'
+              }`}
+              key={activity.id}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="mt-1 h-4 w-4 rounded-full border border-[var(--line)]"
+                  style={{ backgroundColor: activity.color_hex ?? '#75cfc2' }}
+                />
+                <div>
+                  <p className="font-semibold text-[var(--ink)]">
+                    {activity.name}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    {activity.active ? 'Activa' : 'Archivada'} ·{' '}
+                    {activity.requires_24h_cancel
+                      ? 'Cancelacion 24h'
+                      : 'Cancelacion 12h'}
+                    {activity.default_capacity
+                      ? ` · cupo ${activity.default_capacity}`
+                      : ''}
+                    {activity.max_capacity
+                      ? ` · maximo ${activity.max_capacity}`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-white"
+                  onClick={() => selectManagedActivity(activity)}
+                  type="button"
+                >
+                  Editar tipo
+                </button>
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-white disabled:opacity-60"
+                  disabled={saving || !activity.active}
+                  onClick={() => {
+                    setActivityForm(activityToForm(activity))
+                    void handleArchiveActivity(activity)
+                  }}
+                  type="button"
+                >
+                  Archivar tipo
+                </button>
+                <button
+                  className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => {
+                    setActivityForm(activityToForm(activity))
+                    void handleDeleteActivity(activity)
+                  }}
+                  type="button"
+                >
+                  Eliminar tipo
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {showActivityEditor ? (
+          <form
+            className="mt-5 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
+            onSubmit={handleActivitySubmit}
+          >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
+                Configuracion
+              </p>
+              <h4 className="mt-1 text-lg font-bold text-[var(--ink)]">
+                {activityForm.id
+                  ? 'Configurar tipo de clase'
+                  : 'Nuevo tipo de clase'}
+              </h4>
+            </div>
+            <button
+              className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
+              onClick={() => {
+                setActivityForm(emptyActivityForm)
+                setShowActivityEditor(true)
+              }}
+              type="button"
+            >
+              Nuevo tipo
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-[var(--muted)]">
+            Estos cambios afectan al tipo de clase seleccionado y a futuras
+            clases de este tipo. Archivar oculta para nuevas clases, pero
+            conserva historial.
+          </p>
+
+          <div className="mt-4 grid gap-4">
+            <div className="grid gap-3 lg:grid-cols-2">
+              <label className="text-sm font-semibold">
+                Nombre
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      name: event.target.value,
+                    })
+                  }
+                  value={activityForm.name}
+                />
+              </label>
+              <label className="text-sm font-semibold">
+                Color
+                <input
+                  className="mt-2 h-11 w-full rounded-2xl border border-[var(--line)] bg-white px-2 py-1"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      color_hex: event.target.value,
+                    })
+                  }
+                  type="color"
+                  value={activityForm.color_hex || '#75cfc2'}
+                />
+              </label>
+            </div>
+            <label className="text-sm font-semibold">
+              Descripcion
+              <textarea
+                className="mt-2 min-h-20 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setActivityForm({
+                    ...activityForm,
+                    description: event.target.value,
+                  })
+                }
+                value={activityForm.description}
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold">
+                Cupo por defecto
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  min="1"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      default_capacity: event.target.value,
+                    })
+                  }
+                  type="number"
+                  value={activityForm.default_capacity}
+                />
+              </label>
+              <label className="text-sm font-semibold">
+                Cupo maximo
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  min="1"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      max_capacity: event.target.value,
+                    })
+                  }
+                  type="number"
+                  value={activityForm.max_capacity}
+                />
+              </label>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={activityForm.requires_24h_cancel}
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      requires_24h_cancel: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Cancelacion 24h
+              </label>
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={activityForm.flexible_schedule}
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      flexible_schedule: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Horario flexible
+              </label>
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={activityForm.active}
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      active: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Tipo activo
+              </label>
+            </div>
+            {activityForm.max_capacity === '1' ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-xs font-semibold text-[var(--brand)]">
+                Personalizado 1:1 permite maximo 1 alumno.
+              </p>
+            ) : null}
+            <button
+              className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+              disabled={saving}
+              type="submit"
+            >
+              {saving
+                ? 'Guardando...'
+                : activityForm.id
+                  ? 'Guardar tipo'
+                  : 'Crear tipo'}
+            </button>
+          </div>
+          </form>
         ) : null}
       </div>
     </section>

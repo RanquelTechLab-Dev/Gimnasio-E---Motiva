@@ -121,6 +121,13 @@ export type UpdatePlanInput = {
   active: boolean
 }
 
+export type AdminActionResult = {
+  action: 'archived' | 'deactivated' | 'deleted'
+  student_id?: string
+  plan_id?: string
+  session_id?: string
+}
+
 export type AdminTrainingNote = {
   note_id: string
   student_id: string

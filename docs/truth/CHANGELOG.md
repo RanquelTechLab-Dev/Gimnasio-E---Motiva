@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-19 - RANV2-13 reordenamiento UX planes/calendario
+
+- `/admin/plans` queda enfocado en planes comerciales: precio, periodo, tipo,
+  actividades incluidas, clases por semana o clases de paquete y estado.
+- La gestion completa de actividades/tipos de clase se mueve a
+  `/admin/calendar`, donde afecta creacion de clases, colores, cupos y reglas
+  de cancelacion.
+- Al configurar planes, las actividades se muestran como resumen informativo y
+  no como CRUD completo.
+- No se crean migraciones ni se modifican RPCs.
+
 ## 2026-05-18 - RANV2-13 CRUD planes y actividades
 
 - Se agrega migracion local para administrar planes y actividades desde

@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  archiveActivity,
   cancelClassSession,
+  createActivity,
   createClassSession,
+  deleteActivity,
   deleteClassSession,
   formatAdminError,
   listActivities,
   listCalendarSessions,
+  updateActivity,
   updateClassSession,
 } from './api'
 import type {
   Activity,
+  ActivityInput,
   CalendarSession,
   ClassSessionInput,
   UpdateClassSessionInput,
@@ -37,6 +42,18 @@ type RecurrenceFormState = {
   end_time: string
 }
 
+type ActivityFormState = {
+  id: string | null
+  name: string
+  description: string
+  requires_24h_cancel: boolean
+  flexible_schedule: boolean
+  active: boolean
+  color_hex: string
+  default_capacity: string
+  max_capacity: string
+}
+
 const weekdayLabels = [
   'Domingo',
   'Lunes',
@@ -46,6 +63,18 @@ const weekdayLabels = [
   'Viernes',
   'Sabado',
 ]
+
+const emptyActivityForm: ActivityFormState = {
+  id: null,
+  name: '',
+  description: '',
+  requires_24h_cancel: false,
+  flexible_schedule: false,
+  active: true,
+  color_hex: '',
+  default_capacity: '',
+  max_capacity: '',
+}
 
 function formatLocalDate(date: Date) {
   const year = date.getFullYear()
@@ -132,13 +161,14 @@ function buildRecurringDates(
 }
 
 function buildEmptyForm(activities: Activity[]): ClassFormState {
+  const firstActiveActivity = activities.find((activity) => activity.active)
   const start = new Date()
   start.setHours(start.getHours() + 2, 0, 0, 0)
   const end = new Date(start)
   end.setHours(end.getHours() + 1)
 
   return {
-    activity_id: activities[0]?.id ?? '',
+    activity_id: firstActiveActivity?.id ?? '',
     title: '',
     starts_at: formatDateTimeLocal(start),
     ends_at: formatDateTimeLocal(end),
@@ -146,6 +176,61 @@ function buildEmptyForm(activities: Activity[]): ClassFormState {
     coach_name: '',
     notes: '',
     active: true,
+  }
+}
+
+function activityToForm(activity: Activity): ActivityFormState {
+  return {
+    id: activity.id,
+    name: activity.name,
+    description: activity.description ?? '',
+    requires_24h_cancel: activity.requires_24h_cancel,
+    flexible_schedule: activity.flexible_schedule,
+    active: activity.active,
+    color_hex: activity.color_hex ?? '',
+    default_capacity: activity.default_capacity
+      ? String(activity.default_capacity)
+      : '',
+    max_capacity: activity.max_capacity ? String(activity.max_capacity) : '',
+  }
+}
+
+function parsePositiveInteger(value: string, label: string, required = false) {
+  if (!value.trim()) {
+    if (required) {
+      throw new Error(`${label} es obligatorio.`)
+    }
+    return null
+  }
+
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${label} debe ser un numero entero mayor a cero.`)
+  }
+
+  return parsed
+}
+
+function toActivityInput(form: ActivityFormState): ActivityInput {
+  const defaultCapacity = parsePositiveInteger(
+    form.default_capacity,
+    'El cupo por defecto',
+  )
+  const maxCapacity = parsePositiveInteger(form.max_capacity, 'El cupo maximo')
+
+  if (defaultCapacity && maxCapacity && defaultCapacity > maxCapacity) {
+    throw new Error('El cupo por defecto no puede superar el cupo maximo.')
+  }
+
+  return {
+    name: form.name,
+    description: form.description,
+    requires_24h_cancel: form.requires_24h_cancel,
+    flexible_schedule: form.flexible_schedule,
+    active: form.active,
+    color_hex: form.color_hex,
+    default_capacity: defaultCapacity,
+    max_capacity: maxCapacity,
   }
 }
 
@@ -185,6 +270,8 @@ export function AdminCalendarPage() {
   const [recurrence, setRecurrence] = useState<RecurrenceFormState>(
     buildRecurrenceForm(buildEmptyForm([])),
   )
+  const [activityForm, setActivityForm] =
+    useState<ActivityFormState>(emptyActivityForm)
   const [cancelReason, setCancelReason] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -201,6 +288,26 @@ export function AdminCalendarPage() {
     () => activities.find((activity) => activity.id === form.activity_id) ?? null,
     [activities, form.activity_id],
   )
+  const selectedManagedActivity = useMemo(
+    () =>
+      activities.find((activity) => activity.id === activityForm.id) ?? null,
+    [activities, activityForm.id],
+  )
+  const classActivities = useMemo(
+    () =>
+      activities.filter(
+        (activity) =>
+          activity.active ||
+          (selectedSession ? activity.id === form.activity_id : false),
+      ),
+    [activities, form.activity_id, selectedSession],
+  )
+  const hasActiveActivities = useMemo(
+    () => activities.some((activity) => activity.active),
+    [activities],
+  )
+  const canSubmitClass =
+    Boolean(selectedSession) || (hasActiveActivities && Boolean(form.activity_id))
   const isPersonalizedOneOnOne =
     selectedActivity?.slug === 'personalizado_1_1'
   const startParts = getDateTimeParts(form.starts_at)
@@ -211,7 +318,7 @@ export function AdminCalendarPage() {
     setError(null)
     try {
       const [nextActivities, nextSessions] = await Promise.all([
-        listActivities(),
+        listActivities(true),
         listCalendarSessions(
           dateInputToRangeStart(fromDate),
           dateInputToRangeEnd(toDate),
@@ -219,9 +326,33 @@ export function AdminCalendarPage() {
       ])
       setActivities(nextActivities)
       setSessions(nextSessions)
-      setForm((current) =>
-        current.activity_id ? current : buildEmptyForm(nextActivities),
-      )
+      setForm((current) => {
+        if (current.activity_id) {
+          const currentActivity = nextActivities.find(
+            (activity) => activity.id === current.activity_id,
+          )
+          if (
+            currentActivity?.active ||
+            nextSessions.some(
+              (session) =>
+                session.session_id === selectedSessionId &&
+                session.activity_id === current.activity_id,
+            )
+          ) {
+            return current
+          }
+        }
+
+        return buildEmptyForm(nextActivities)
+      })
+      if (activityForm.id) {
+        const nextSelected = nextActivities.find(
+          (activity) => activity.id === activityForm.id,
+        )
+        if (nextSelected) {
+          setActivityForm(activityToForm(nextSelected))
+        }
+      }
       if (
         selectedSessionId &&
         !nextSessions.some((session) => session.session_id === selectedSessionId)
@@ -256,6 +387,12 @@ export function AdminCalendarPage() {
     setForm(nextForm)
     setRecurrence(buildRecurrenceForm(nextForm))
     setCancelReason('')
+    setError(null)
+    setSuccess(null)
+  }
+
+  function selectManagedActivity(activity: Activity) {
+    setActivityForm(activityToForm(activity))
     setError(null)
     setSuccess(null)
   }
@@ -330,6 +467,13 @@ export function AdminCalendarPage() {
       capacity: isPersonalizedOneOnOne ? '1' : form.capacity,
     }
     const capacity = Number(normalizedForm.capacity)
+
+    if (!selectedSession && !hasActiveActivities) {
+      setError(
+        'No hay actividades activas disponibles. Activa o crea una actividad antes de crear clases.',
+      )
+      return
+    }
 
     if (!form.activity_id || !form.title.trim()) {
       setError('Selecciona actividad y titulo para la clase.')
@@ -507,56 +651,204 @@ export function AdminCalendarPage() {
     }
   }
 
+  async function handleActivitySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const input = toActivityInput(activityForm)
+      const result = activityForm.id
+        ? await updateActivity(activityForm.id, input)
+        : await createActivity(input)
+      setSuccess(
+        result.has_history
+          ? 'Actividad guardada. Tiene historial: los cambios aplican a nuevas clases.'
+          : activityForm.id
+            ? 'Actividad actualizada.'
+            : 'Actividad creada.',
+      )
+      await loadData()
+    } catch (saveError) {
+      setError(formatAdminError(saveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleArchiveActivity() {
+    if (!selectedManagedActivity) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Archivar oculta para nuevas clases, pero conserva historial. ¿Continuar?',
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await archiveActivity(selectedManagedActivity.id)
+      setSuccess('Actividad archivada. No aparecera para nuevas clases.')
+      await loadData()
+    } catch (archiveError) {
+      setError(formatAdminError(archiveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteActivity() {
+    if (!selectedManagedActivity) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Eliminar solo esta disponible si nunca fue usada. Esta accion es definitiva. ¿Continuar?',
+    )
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deleteActivity(selectedManagedActivity.id)
+      setSuccess('Actividad eliminada definitivamente.')
+      setActivityForm(emptyActivityForm)
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
-      <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-              Calendario
-            </p>
-            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-              Clases y cupos
-            </h3>
+      <div className="grid gap-5">
+        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+                Calendario
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                Clases y cupos
+              </h3>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <input
+                aria-label="Fecha desde"
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                onChange={(event) => setFromDate(event.target.value)}
+                type="date"
+                value={fromDate}
+              />
+              <input
+                aria-label="Fecha hasta"
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                onChange={(event) => setToDate(event.target.value)}
+                type="date"
+                value={toDate}
+              />
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+                onClick={() => void loadData()}
+                type="button"
+              >
+                Actualizar
+              </button>
+            </div>
           </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <input
-              aria-label="Fecha desde"
-              className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
-              onChange={(event) => setFromDate(event.target.value)}
-              type="date"
-              value={fromDate}
-            />
-            <input
-              aria-label="Fecha hasta"
-              className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
-              onChange={(event) => setToDate(event.target.value)}
-              type="date"
-              value={toDate}
-            />
-            <button
-              className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
-              onClick={() => void loadData()}
-              type="button"
-            >
-              Actualizar
-            </button>
+
+          <div className="mt-5">
+            {loading ? (
+              <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
+            ) : (
+              <WeeklyScheduleGrid
+                fromDate={fromDate}
+                mode="admin"
+                onSelectSession={selectSession}
+                selectedSessionId={selectedSessionId}
+                sessions={sessions}
+                toDate={toDate}
+              />
+            )}
           </div>
         </div>
 
-        <div className="mt-5">
-          {loading ? (
-            <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
-          ) : (
-            <WeeklyScheduleGrid
-              fromDate={fromDate}
-              mode="admin"
-              onSelectSession={selectSession}
-              selectedSessionId={selectedSessionId}
-              sessions={sessions}
-              toDate={toDate}
-            />
-          )}
+        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+                Actividades
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                Actividades / tipos de clase
+              </h3>
+              <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
+                Las actividades definen tipos de clase, colores, cupos y reglas
+                de cancelacion. Los planes solo indican que actividades incluye
+                el alumno.
+              </p>
+            </div>
+            <button
+              className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+              onClick={() => {
+                setActivityForm(emptyActivityForm)
+                setError(null)
+                setSuccess(null)
+              }}
+              type="button"
+            >
+              Nueva actividad
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {activities.map((activity) => (
+              <button
+                className={`rounded-[20px] border p-4 text-left transition ${
+                  activityForm.id === activity.id
+                    ? 'border-[var(--brand)] bg-[var(--brand-soft)]'
+                    : 'border-[var(--line)] bg-[var(--surface-strong)] hover:border-[var(--brand)]'
+                }`}
+                key={activity.id}
+                onClick={() => selectManagedActivity(activity)}
+                type="button"
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className="mt-1 h-4 w-4 rounded-full border border-[var(--line)]"
+                    style={{ backgroundColor: activity.color_hex ?? '#75cfc2' }}
+                  />
+                  <div>
+                    <p className="font-semibold text-[var(--ink)]">
+                      {activity.name}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {activity.active ? 'Activa' : 'Archivada'} ·{' '}
+                      {activity.requires_24h_cancel
+                        ? 'Cancelacion 24h'
+                        : 'Cancelacion 12h'}
+                      {activity.default_capacity
+                        ? ` · cupo ${activity.default_capacity}`
+                        : ''}
+                      {activity.max_capacity
+                        ? ` · maximo ${activity.max_capacity}`
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -589,6 +881,7 @@ export function AdminCalendarPage() {
             <select
               aria-label="Actividad"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+              disabled={!selectedSession && !hasActiveActivities}
               onChange={(event) => {
                 const nextActivity = activities.find(
                   (activity) => activity.id === event.target.value,
@@ -605,12 +898,19 @@ export function AdminCalendarPage() {
               value={form.activity_id}
             >
               <option value="">Seleccionar actividad</option>
-              {activities.map((activity) => (
+              {classActivities.map((activity) => (
                 <option key={activity.id} value={activity.id}>
                   {activity.name}
+                  {activity.active ? '' : ' (archivada)'}
                 </option>
               ))}
             </select>
+            {!selectedSession && !hasActiveActivities ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                No hay actividades activas disponibles. Activa o crea una
+                actividad antes de crear clases.
+              </p>
+            ) : null}
             <input
               aria-label="Titulo de la clase"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
@@ -831,7 +1131,7 @@ export function AdminCalendarPage() {
             ) : null}
             <button
               className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
-              disabled={saving}
+              disabled={saving || !canSubmitClass}
               type="submit"
             >
               {saving
@@ -887,6 +1187,188 @@ export function AdminCalendarPage() {
             </div>
           </div>
         ) : null}
+
+        <form
+          className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
+          onSubmit={handleActivitySubmit}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+                Tipos de clase
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                {activityForm.id ? 'Editar actividad' : 'Nueva actividad'}
+              </h3>
+            </div>
+            <button
+              className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
+              onClick={() => setActivityForm(emptyActivityForm)}
+              type="button"
+            >
+              Nueva
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-[var(--muted)]">
+            Archivar oculta para nuevas clases, pero conserva historial.
+            Eliminar solo esta disponible si nunca fue usada.
+          </p>
+
+          <div className="mt-5 grid gap-4">
+            <label className="text-sm font-semibold">
+              Nombre
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setActivityForm({ ...activityForm, name: event.target.value })
+                }
+                value={activityForm.name}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Descripcion
+              <textarea
+                className="mt-2 min-h-20 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setActivityForm({
+                    ...activityForm,
+                    description: event.target.value,
+                  })
+                }
+                value={activityForm.description}
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="text-sm font-semibold">
+                Color
+                <input
+                  className="mt-2 h-11 w-full rounded-2xl border border-[var(--line)] bg-white px-2 py-1"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      color_hex: event.target.value,
+                    })
+                  }
+                  type="color"
+                  value={activityForm.color_hex || '#75cfc2'}
+                />
+              </label>
+              <label className="text-sm font-semibold">
+                Cupo por defecto
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  min="1"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      default_capacity: event.target.value,
+                    })
+                  }
+                  type="number"
+                  value={activityForm.default_capacity}
+                />
+              </label>
+              <label className="text-sm font-semibold">
+                Cupo maximo
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  min="1"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      max_capacity: event.target.value,
+                    })
+                  }
+                  type="number"
+                  value={activityForm.max_capacity}
+                />
+              </label>
+            </div>
+            <div className="grid gap-2">
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={activityForm.requires_24h_cancel}
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      requires_24h_cancel: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Requiere cancelacion con 24h
+              </label>
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={activityForm.flexible_schedule}
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      flexible_schedule: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Horario flexible
+              </label>
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={activityForm.active}
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      active: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Actividad activa
+              </label>
+            </div>
+            {activityForm.max_capacity === '1' ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-xs font-semibold text-[var(--brand)]">
+                Personalizado 1:1 permite maximo 1 alumno.
+              </p>
+            ) : null}
+            <button
+              className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+              disabled={saving}
+              type="submit"
+            >
+              {saving
+                ? 'Guardando...'
+                : activityForm.id
+                  ? 'Guardar actividad'
+                  : 'Crear actividad'}
+            </button>
+            {selectedManagedActivity ? (
+              <div className="grid gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+                <p className="text-xs text-[var(--muted)]">
+                  La actividad usada por clases o planes no se elimina: se
+                  archiva para conservar historial.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-white disabled:opacity-60"
+                    disabled={saving || !selectedManagedActivity.active}
+                    onClick={() => void handleArchiveActivity()}
+                    type="button"
+                  >
+                    Archivar actividad
+                  </button>
+                  <button
+                    className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                    disabled={saving}
+                    onClick={() => void handleDeleteActivity()}
+                    type="button"
+                  >
+                    Eliminar actividad
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </form>
 
         {error ? (
           <p className="rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">

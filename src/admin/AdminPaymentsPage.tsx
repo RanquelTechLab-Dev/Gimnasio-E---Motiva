@@ -53,6 +53,11 @@ type EditPaymentState = {
   notes: string
 }
 
+type PaymentFeedback = {
+  type: 'error' | 'success'
+  message: string
+}
+
 function todayDate() {
   const date = new Date()
   const year = date.getFullYear()
@@ -104,6 +109,11 @@ export function AdminPaymentsPage() {
   })
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({})
   const [voidReason, setVoidReason] = useState<Record<string, string>>({})
+  const [voidFeedback, setVoidFeedback] = useState<
+    Record<string, PaymentFeedback>
+  >({})
+  const [paymentsMessage, setPaymentsMessage] =
+    useState<PaymentFeedback | null>(null)
   const [editingPayment, setEditingPayment] = useState<EditPaymentState | null>(
     null,
   )
@@ -300,7 +310,13 @@ export function AdminPaymentsPage() {
   async function handleVoidPayment(payment: Payment) {
     const reason = voidReason[payment.id]?.trim() ?? ''
     if (!reason) {
-      setError('El motivo de anulacion es obligatorio.')
+      setVoidFeedback({
+        ...voidFeedback,
+        [payment.id]: {
+          type: 'error',
+          message: 'Escribi un motivo para poder anular el pago.',
+        },
+      })
       return
     }
 
@@ -317,17 +333,35 @@ export function AdminPaymentsPage() {
     setSaving(true)
     setError(null)
     setSuccess(null)
+    setPaymentsMessage(null)
+    setVoidFeedback({
+      ...voidFeedback,
+      [payment.id]: {
+        type: 'success',
+        message: 'Anulando pago...',
+      },
+    })
     try {
       await voidPayment(payment.id, reason)
-      setSuccess(
-        payment.membership_id
-          ? 'Pago anulado. Revisa la membresia asociada si corresponde.'
-          : 'Pago anulado con auditoria.',
-      )
+      setPaymentsMessage({
+        type: 'success',
+        message: 'Pago anulado. Podes verlo en la pestana Anulado.',
+      })
       setVoidReason({ ...voidReason, [payment.id]: '' })
+      setVoidFeedback((current) => {
+        const next = { ...current }
+        delete next[payment.id]
+        return next
+      })
       await loadData(filter)
     } catch (voidError) {
-      setError(formatAdminError(voidError))
+      setVoidFeedback({
+        ...voidFeedback,
+        [payment.id]: {
+          type: 'error',
+          message: formatAdminError(voidError),
+        },
+      })
     } finally {
       setSaving(false)
     }
@@ -365,6 +399,18 @@ export function AdminPaymentsPage() {
           </div>
         </div>
 
+        {paymentsMessage ? (
+          <p
+            className={`mt-5 rounded-2xl p-3 text-sm font-semibold ${
+              paymentsMessage.type === 'error'
+                ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                : 'bg-[var(--brand-soft)] text-[var(--brand)]'
+            }`}
+          >
+            {paymentsMessage.message}
+          </p>
+        ) : null}
+
         {loading ? (
           <p className="mt-5 text-sm text-[var(--muted)]">Cargando pagos...</p>
         ) : payments.length === 0 ? (
@@ -379,6 +425,9 @@ export function AdminPaymentsPage() {
                 ? membershipsById.get(payment.membership_id)
                 : null
               const plan = membership ? plansById.get(membership.plan_id) : null
+              const voidReasonValue = voidReason[payment.id] ?? ''
+              const canVoidPayment = voidReasonValue.trim().length > 0
+              const currentVoidFeedback = voidFeedback[payment.id]
               return (
                 <article
                   className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4"
@@ -550,34 +599,61 @@ export function AdminPaymentsPage() {
                   ) : null}
 
                   {payment.status !== 'voided' ? (
-                    <div className="mt-4 grid gap-2 lg:grid-cols-[1fr_auto_auto]">
-                      <input
-                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
-                        onChange={(event) =>
-                          setVoidReason({
-                            ...voidReason,
-                            [payment.id]: event.target.value,
-                          })
-                        }
-                        placeholder="Motivo obligatorio para anular"
-                        value={voidReason[payment.id] ?? ''}
-                      />
-                      <button
-                        className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold text-[var(--ink)] disabled:opacity-60"
-                        disabled={saving}
-                        onClick={() => startEditPayment(payment)}
-                        type="button"
-                      >
-                        Editar pago
-                      </button>
-                      <button
-                        className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] disabled:opacity-60"
-                        disabled={saving}
-                        onClick={() => void handleVoidPayment(payment)}
-                        type="button"
-                      >
-                        Anular pago
-                      </button>
+                    <div className="mt-4 grid gap-2">
+                      <div className="grid gap-2 lg:grid-cols-[1fr_auto_auto]">
+                        <input
+                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                          onChange={(event) => {
+                            setVoidReason({
+                              ...voidReason,
+                              [payment.id]: event.target.value,
+                            })
+                            setVoidFeedback((current) => {
+                              const next = { ...current }
+                              delete next[payment.id]
+                              return next
+                            })
+                          }}
+                          placeholder="Motivo obligatorio para anular"
+                          value={voidReasonValue}
+                        />
+                        <button
+                          className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold text-[var(--ink)] disabled:opacity-60"
+                          disabled={saving}
+                          onClick={() => startEditPayment(payment)}
+                          type="button"
+                        >
+                          Editar pago
+                        </button>
+                        <button
+                          className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] disabled:opacity-60"
+                          disabled={saving || !canVoidPayment}
+                          onClick={() => void handleVoidPayment(payment)}
+                          type="button"
+                        >
+                          Anular pago
+                        </button>
+                      </div>
+                      <p className="text-xs text-[var(--muted)]">
+                        No borra el pago. Lo marca como anulado y conserva
+                        historial.
+                      </p>
+                      {!canVoidPayment ? (
+                        <p className="text-xs font-semibold text-[var(--accent)]">
+                          Escribi un motivo para poder anular el pago.
+                        </p>
+                      ) : null}
+                      {currentVoidFeedback ? (
+                        <p
+                          className={`rounded-2xl p-3 text-sm font-semibold ${
+                            currentVoidFeedback.type === 'error'
+                              ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                              : 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                          }`}
+                        >
+                          {currentVoidFeedback.message}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </article>

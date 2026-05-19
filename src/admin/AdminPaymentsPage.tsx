@@ -9,6 +9,8 @@ import {
   listStudents,
   registerManualPayment,
   rejectManualPayment,
+  updatePayment,
+  voidPayment,
 } from './api'
 import type {
   Membership,
@@ -29,6 +31,7 @@ const statusLabels: Record<PaymentStatus, string> = {
   pending: 'Pendiente',
   approved: 'Aprobado',
   rejected: 'Rechazado',
+  voided: 'Anulado',
 }
 
 type PaymentFilter = PaymentStatus | 'all'
@@ -42,12 +45,24 @@ type PaymentFormState = {
   notes: string
 }
 
+type EditPaymentState = {
+  payment_id: string
+  amount: string
+  method: PaymentMethod
+  payment_date: string
+  notes: string
+}
+
 function todayDate() {
   const date = new Date()
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function dateInputValue(value: string) {
+  return value.slice(0, 10)
 }
 
 function describeMembership(membership: Membership, plan?: Plan | null) {
@@ -88,6 +103,10 @@ export function AdminPaymentsPage() {
     notes: '',
   })
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({})
+  const [voidReason, setVoidReason] = useState<Record<string, string>>({})
+  const [editingPayment, setEditingPayment] = useState<EditPaymentState | null>(
+    null,
+  )
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -230,6 +249,90 @@ export function AdminPaymentsPage() {
     }
   }
 
+  function startEditPayment(payment: Payment) {
+    setEditingPayment({
+      payment_id: payment.id,
+      amount: String(payment.amount),
+      method: payment.method,
+      payment_date: dateInputValue(payment.paid_at),
+      notes: payment.notes ?? '',
+    })
+  }
+
+  async function handleUpdatePayment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingPayment) {
+      return
+    }
+
+    const amount = Number(editingPayment.amount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('El monto debe ser mayor a cero.')
+      return
+    }
+
+    if (!editingPayment.payment_date) {
+      setError('La fecha de pago es obligatoria.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await updatePayment({
+        payment_id: editingPayment.payment_id,
+        amount,
+        method: editingPayment.method,
+        payment_date: editingPayment.payment_date,
+        notes: editingPayment.notes,
+      })
+      setSuccess('Pago actualizado con auditoria.')
+      setEditingPayment(null)
+      await loadData(filter)
+    } catch (updateError) {
+      setError(formatAdminError(updateError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleVoidPayment(payment: Payment) {
+    const reason = voidReason[payment.id]?.trim() ?? ''
+    if (!reason) {
+      setError('El motivo de anulacion es obligatorio.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      payment.membership_id
+        ? 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. Este pago esta vinculado a una membresia: la anulacion no elimina automaticamente la membresia. ¿Continuar?'
+        : 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. ¿Continuar?',
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await voidPayment(payment.id, reason)
+      setSuccess(
+        payment.membership_id
+          ? 'Pago anulado. Revisa la membresia asociada si corresponde.'
+          : 'Pago anulado con auditoria.',
+      )
+      setVoidReason({ ...voidReason, [payment.id]: '' })
+      await loadData(filter)
+    } catch (voidError) {
+      setError(formatAdminError(voidError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -243,8 +346,9 @@ export function AdminPaymentsPage() {
             </h3>
           </div>
           <div className="flex flex-wrap gap-2">
-            {(['pending', 'approved', 'rejected', 'all'] as PaymentFilter[]).map(
-              (item) => (
+            {(
+              ['pending', 'approved', 'rejected', 'voided', 'all'] as PaymentFilter[]
+            ).map((item) => (
                 <button
                   className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                     filter === item
@@ -257,8 +361,7 @@ export function AdminPaymentsPage() {
                 >
                   {item === 'all' ? 'Todos' : statusLabels[item]}
                 </button>
-              ),
-            )}
+              ))}
           </div>
         </div>
 
@@ -303,6 +406,16 @@ export function AdminPaymentsPage() {
                         Nota/comprobante:{' '}
                         {payment.notes?.trim() || 'Sin nota cargada'}
                       </p>
+                      {payment.status === 'voided' ? (
+                        <p className="mt-2 rounded-2xl bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent)]">
+                          Anulado: {payment.void_reason ?? 'sin motivo cargado'}
+                        </p>
+                      ) : payment.status === 'approved' && payment.membership_id ? (
+                        <p className="mt-2 text-xs text-[var(--muted)]">
+                          Si este pago se anula, la membresia vinculada no se
+                          elimina automaticamente.
+                        </p>
+                      ) : null}
                     </div>
                     <div className="text-left lg:text-right">
                       <p className="font-display text-xl font-bold text-[var(--ink)]">
@@ -313,6 +426,96 @@ export function AdminPaymentsPage() {
                       </p>
                     </div>
                   </div>
+
+                  {editingPayment?.payment_id === payment.id ? (
+                    <form
+                      className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4"
+                      onSubmit={handleUpdatePayment}
+                    >
+                      <p className="text-sm font-bold text-[var(--ink)]">
+                        Editar corrige los datos administrativos del pago y deja
+                        auditoria.
+                      </p>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <label className="text-sm font-semibold">
+                          Monto
+                          <input
+                            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                            min="0.01"
+                            onChange={(event) =>
+                              setEditingPayment({
+                                ...editingPayment,
+                                amount: event.target.value,
+                              })
+                            }
+                            step="0.01"
+                            type="number"
+                            value={editingPayment.amount}
+                          />
+                        </label>
+                        <label className="text-sm font-semibold">
+                          Fecha de pago
+                          <input
+                            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                            onChange={(event) =>
+                              setEditingPayment({
+                                ...editingPayment,
+                                payment_date: event.target.value,
+                              })
+                            }
+                            type="date"
+                            value={editingPayment.payment_date}
+                          />
+                        </label>
+                        <label className="text-sm font-semibold">
+                          Metodo
+                          <select
+                            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                            onChange={(event) =>
+                              setEditingPayment({
+                                ...editingPayment,
+                                method: event.target.value as PaymentMethod,
+                              })
+                            }
+                            value={editingPayment.method}
+                          >
+                            <option value="cash">Efectivo</option>
+                            <option value="transfer">Transferencia</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label className="text-sm font-semibold">
+                        Nota / comprobante
+                        <textarea
+                          className="mt-2 min-h-20 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                          onChange={(event) =>
+                            setEditingPayment({
+                              ...editingPayment,
+                              notes: event.target.value,
+                            })
+                          }
+                          value={editingPayment.notes}
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          className="rounded-2xl bg-[var(--brand)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                          disabled={saving}
+                          type="submit"
+                        >
+                          Guardar cambios
+                        </button>
+                        <button
+                          className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold"
+                          disabled={saving}
+                          onClick={() => setEditingPayment(null)}
+                          type="button"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
 
                   {payment.status === 'pending' ? (
                     <div className="mt-4 grid gap-2 lg:grid-cols-[1fr_auto_auto]">
@@ -342,6 +545,38 @@ export function AdminPaymentsPage() {
                         type="button"
                       >
                         Rechazar
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {payment.status !== 'voided' ? (
+                    <div className="mt-4 grid gap-2 lg:grid-cols-[1fr_auto_auto]">
+                      <input
+                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                        onChange={(event) =>
+                          setVoidReason({
+                            ...voidReason,
+                            [payment.id]: event.target.value,
+                          })
+                        }
+                        placeholder="Motivo obligatorio para anular"
+                        value={voidReason[payment.id] ?? ''}
+                      />
+                      <button
+                        className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold text-[var(--ink)] disabled:opacity-60"
+                        disabled={saving}
+                        onClick={() => startEditPayment(payment)}
+                        type="button"
+                      >
+                        Editar pago
+                      </button>
+                      <button
+                        className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] disabled:opacity-60"
+                        disabled={saving}
+                        onClick={() => void handleVoidPayment(payment)}
+                        type="button"
+                      >
+                        Anular pago
                       </button>
                     </div>
                   ) : null}

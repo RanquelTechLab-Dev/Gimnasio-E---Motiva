@@ -22,6 +22,7 @@ import type {
   StudentFileMetadataInput,
   StudentProfile,
   UpdateClassSessionInput,
+  UpdatePaymentInput,
   UpdatePlanInput,
   UpdateStudentInput,
   UploadStudentFileInput,
@@ -272,7 +273,7 @@ export async function listPayments(status?: PaymentStatus | 'all') {
   let query = client
     .from('payments')
     .select(
-      'id, student_id, membership_id, amount, method, status, paid_at, approved_at, rejected_at, notes, created_at, updated_at',
+      'id, student_id, membership_id, amount, method, status, paid_at, approved_at, rejected_at, voided_at, voided_by, void_reason, notes, created_at, updated_at',
     )
     .order('created_at', { ascending: false })
 
@@ -325,6 +326,37 @@ export async function rejectManualPayment(paymentId: string, reason: string) {
   const { data, error } = await client.rpc('reject_manual_payment', {
     payment_id: paymentId,
     reason: reason.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function updatePayment(input: UpdatePaymentInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_update_payment', {
+    p_payment_id: input.payment_id,
+    p_amount: input.amount,
+    p_method: input.method,
+    p_paid_at: input.payment_date,
+    p_notes: input.notes.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function voidPayment(paymentId: string, reason: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_void_payment', {
+    p_payment_id: paymentId,
+    p_reason: reason.trim(),
   })
 
   if (error) {

@@ -85,7 +85,7 @@ export type StudentLastPaymentSummary = {
   payment_id: string
   amount: number
   method: 'cash' | 'transfer'
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'voided'
   paid_at: string
   notes: string | null
 }
@@ -111,10 +111,12 @@ export type StudentPayment = {
   membership_id: string | null
   amount: number
   method: 'cash' | 'transfer'
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'voided'
   paid_at: string
   approved_at: string | null
   rejected_at: string | null
+  voided_at?: string | null
+  void_reason?: string | null
   notes: string | null
   plan_name: string | null
 }

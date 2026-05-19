@@ -7,6 +7,7 @@ const statusLabels: Record<StudentPayment['status'], string> = {
   approved: 'Aprobado',
   pending: 'Pendiente',
   rejected: 'Rechazado',
+  voided: 'Anulado',
 }
 
 const methodLabels: Record<StudentPayment['method'], string> = {

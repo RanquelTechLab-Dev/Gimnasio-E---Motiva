@@ -73,6 +73,11 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - Se aplica pulido visual final: copy menos tecnico, logo con mayor presencia,
   paleta base alineada al logo y pequenos ajustes de legibilidad mobile sin
   modificar backend ni reglas operativas.
+- Se prepara una migracion de datos iniciales reales desde `Precios.jpeg` y
+  `Plan Actividades.jpeg`: planes/precios activos, tipos de clase reales y un
+  calendario base acotado de 8 semanas desde el lunes 2026-05-25, sin duplicar
+  clases exactas ni tocar historial. El combo semipersonalizado y funcional
+  queda respaldado por clases Funcional reservables en el calendario base.
 
 ## Auditoria funcional
 
@@ -93,6 +98,8 @@ El schema actual permite:
 - bloquear reservas cuando el alumno ya uso el limite semanal de esa actividad.
 - ver planes y precios activos desde el panel alumno como informacion de
   consulta.
+- iniciar el sistema con catalogo real de planes, actividades reales y
+  cronograma base fuente, pendiente de `db push` autorizado.
 
 Requieren subbloques especificos:
 

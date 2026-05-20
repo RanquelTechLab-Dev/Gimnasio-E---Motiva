@@ -112,4 +112,6 @@ RAN-29 esta en ejecucion.
   planes administre la oferta comercial y calendario administre actividades,
   cupos, colores y reglas de tipos de clase. El panel alumno suma catalogo
   informativo de planes y precios activos, sin compra online. Se agrega pulido
-  visual/copy/branding final sin cambios de schema ni backend.
+  visual/copy/branding final sin cambios de schema ni backend. Queda preparada
+  una migracion local para alinear el catalogo inicial y el calendario base con
+  `Precios.jpeg` y `Plan Actividades.jpeg`, sin tocar historial operativo.

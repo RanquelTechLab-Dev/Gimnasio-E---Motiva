@@ -208,6 +208,9 @@ declare
   v_actor uuid := auth.uid();
   v_activity public.activities%rowtype;
   v_rule public.class_recurring_rules%rowtype;
+  v_existing_rule public.class_recurring_rules%rowtype;
+  v_valid_from date := coalesce(p_valid_from, current_date);
+  v_valid_until date := p_valid_until;
 begin
   if v_actor is null or not private.is_admin() then
     raise exception 'Solo un admin activo puede crear horarios recurrentes.';
@@ -234,12 +237,34 @@ begin
     raise exception 'La hora de fin debe ser posterior a la hora de inicio.';
   end if;
 
+  if v_valid_until is not null and v_valid_until < v_valid_from then
+    raise exception 'La fecha final debe ser posterior o igual a la fecha inicial.';
+  end if;
+
   if p_capacity is null or p_capacity <= 0 then
     raise exception 'El cupo debe ser mayor a cero.';
   end if;
 
   if v_activity.max_capacity is not null and p_capacity > v_activity.max_capacity then
     raise exception 'El tipo de clase permite maximo % alumno(s).', v_activity.max_capacity;
+  end if;
+
+  select * into v_existing_rule
+  from public.class_recurring_rules r
+  where r.active = true
+    and r.activity_id = p_activity_id
+    and r.weekday = p_weekday
+    and r.start_time = p_start_time
+    and r.end_time = p_end_time
+    and r.valid_from <= coalesce(v_valid_until, date '9999-12-31')
+    and v_valid_from <= coalesce(r.valid_until, date '9999-12-31')
+  limit 1;
+
+  if found and (
+    v_existing_rule.valid_from is distinct from v_valid_from
+    or v_existing_rule.valid_until is distinct from v_valid_until
+  ) then
+    raise exception 'Ya existe un horario recurrente activo para ese tipo, dia y horario. Pausa el anterior antes de crear otro.';
   end if;
 
   insert into public.class_recurring_rules (
@@ -266,8 +291,8 @@ begin
     nullif(btrim(coalesce(p_trainer_name, '')), ''),
     nullif(btrim(coalesce(p_notes, '')), ''),
     true,
-    coalesce(p_valid_from, current_date),
-    p_valid_until,
+    v_valid_from,
+    v_valid_until,
     v_actor
   )
   on conflict (
@@ -456,6 +481,23 @@ expanded_rules as (
     sr.notes
   from source_rules sr
   join public.activities a on a.slug = sr.activity_slug
+),
+updated_rules as (
+  update public.class_recurring_rules r
+  set
+    title = er.title,
+    capacity = er.capacity,
+    notes = er.notes,
+    updated_at = now()
+  from expanded_rules er
+  where r.active = true
+    and r.activity_id = er.activity_id
+    and r.weekday = er.weekday
+    and r.start_time = er.start_time
+    and r.end_time = er.end_time
+    and r.valid_from = date '2026-05-25'
+    and r.valid_until is null
+  returning r.id
 )
 insert into public.class_recurring_rules (
   activity_id,
@@ -479,20 +521,17 @@ select
   true,
   date '2026-05-25'
 from expanded_rules er
-on conflict (
-  activity_id,
-  weekday,
-  start_time,
-  end_time,
-  valid_from,
-  (coalesce(valid_until, date '9999-12-31'))
-)
-where active = true
-do update set
-  title = excluded.title,
-  capacity = excluded.capacity,
-  notes = excluded.notes,
-  updated_at = now();
+where not exists (
+  select 1
+  from public.class_recurring_rules existing
+  where existing.active = true
+    and existing.activity_id = er.activity_id
+    and existing.weekday = er.weekday
+    and existing.start_time = er.start_time
+    and existing.end_time = er.end_time
+    and existing.valid_from <= date '9999-12-31'
+    and date '2026-05-25' <= coalesce(existing.valid_until, date '9999-12-31')
+);
 
 revoke all on table public.class_recurring_rules from anon;
 revoke all on function private.materialize_recurring_class_sessions(timestamptz, timestamptz) from public, anon, authenticated;

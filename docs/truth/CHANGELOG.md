@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-20 - RANV2-13 horarios recurrentes perpetuos
+
+- Se agrega migracion local para configurar reglas semanales perpetuas en
+  `class_recurring_rules`.
+- El calendario materializa sesiones concretas solo para el rango consultado y
+  evita duplicados exactos con sesiones ya existentes.
+- Crear clase recurrente desde admin ahora crea un horario fijo semanal sin
+  fecha de fin, pausable desde `/admin/calendar`.
+- Las reservas siguen usando `class_sessions` reales y la logica semanal 3x/5x
+  se mantiene intacta.
+- No se borran sesiones existentes, reservas, asistencia ni historial.
+- No se ejecuta `db push` real.
+
 ## 2026-05-20 - RANV2-13 micro UX final
 
 - La grilla semanal mantiene encabezados de dia visibles al hacer scroll

@@ -115,3 +115,5 @@ RAN-29 esta en ejecucion.
   visual/copy/branding final sin cambios de schema ni backend. Queda preparada
   una migracion local para alinear el catalogo inicial y el calendario base con
   `Precios.jpeg` y `Plan Actividades.jpeg`, sin tocar historial operativo.
+  Se agrega modelo de horarios recurrentes perpetuos para que el calendario no
+  dependa de tandas finitas de 8, 12 o 52 semanas.

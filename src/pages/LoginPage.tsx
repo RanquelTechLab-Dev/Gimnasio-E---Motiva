@@ -40,17 +40,17 @@ export function LoginPage() {
   return (
     <section className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
       <div className="hidden lg:block">
-        <div className="inline-flex items-center gap-4 rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] px-5 py-4 shadow-[var(--shadow)]">
+        <div className="inline-flex items-center gap-5 rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] px-6 py-5 shadow-[var(--shadow)]">
           <img
             alt="E-Motiva"
-            className="h-24 w-24 rounded-[32px] bg-white object-contain p-2 shadow-sm"
+            className="h-44 w-32 object-contain"
             src="/brand/logo-small.png"
           />
           <div>
-            <p className="font-display text-sm font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-              E-Motiva
+            <p className="font-display text-lg font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+              E-MOTIVA
             </p>
-            <p className="text-sm text-[var(--muted)]">
+            <p className="mt-2 max-w-xs text-sm text-[var(--muted)]">
               Gestión de clases, reservas y seguimiento.
             </p>
           </div>
@@ -66,22 +66,26 @@ export function LoginPage() {
         className="w-full rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] p-6 shadow-[var(--shadow)] sm:p-8"
         onSubmit={handleSubmit}
       >
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:text-left">
           <img
             alt="E-Motiva"
-            className="h-24 w-24 rounded-[32px] bg-white object-contain p-2 shadow-sm sm:h-28 sm:w-28"
+            className="h-36 w-28 object-contain sm:h-40 sm:w-32"
             src="/brand/logo-small.png"
           />
-          <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
-            E-Motiva
-          </p>
+          <div>
+            <p className="font-display text-sm font-bold uppercase tracking-[0.28em] text-[var(--brand)]">
+              E-MOTIVA
+            </p>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              Gestión de clases, reservas y seguimiento.
+            </p>
+          </div>
         </div>
         <h1 className="mt-4 font-display text-4xl font-bold text-[var(--ink)]">
           Acceso E-Motiva
         </h1>
         <p className="mt-3 text-sm text-[var(--muted)]">
-          Ingresá con tu cuenta para continuar. Las cuentas son creadas por
-          administración.
+          Ingresá para consultar clases, reservas, pagos y documentos.
         </p>
 
         {location.state ? (

@@ -162,12 +162,42 @@ export type ActivityInput = {
   max_capacity: number | null
 }
 
+export type ClassRecurringRule = {
+  rule_id: string
+  activity_id: string
+  activity_name: string
+  activity_slug: string
+  title: string
+  weekday: number
+  start_time: string
+  end_time: string
+  capacity: number
+  trainer_name: string | null
+  notes: string | null
+  active: boolean
+  valid_from: string
+  valid_until: string | null
+}
+
+export type ClassRecurringRuleInput = {
+  activity_id: string
+  title: string
+  weekday: number
+  start_time: string
+  end_time: string
+  capacity: number
+  trainer_name: string
+  notes: string
+  valid_from: string
+}
+
 export type AdminActionResult = {
   action: 'archived' | 'created' | 'deactivated' | 'deleted' | 'updated'
   student_id?: string
   plan_id?: string
   activity_id?: string
   session_id?: string
+  rule_id?: string
   has_history?: boolean
 }
 

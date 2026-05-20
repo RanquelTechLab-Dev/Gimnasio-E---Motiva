@@ -2,14 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   archiveActivity,
+  archiveClassRecurringRule,
   cancelClassSession,
   createActivity,
   createClassSession,
+  createClassRecurringRule,
   deleteActivity,
   deleteClassSession,
   formatAdminError,
   listActivities,
   listCalendarSessions,
+  listClassRecurringRules,
   updateActivity,
   updateClassSession,
 } from './api'
@@ -17,6 +20,7 @@ import type {
   Activity,
   ActivityInput,
   CalendarSession,
+  ClassRecurringRule,
   ClassSessionInput,
   UpdateClassSessionInput,
 } from './types'
@@ -37,7 +41,6 @@ type RecurrenceFormState = {
   enabled: boolean
   weekday: string
   date_from: string
-  date_to: string
   start_time: string
   end_time: string
 }
@@ -113,10 +116,6 @@ function dateTimeLocalToIso(value: string) {
   return new Date(value).toISOString()
 }
 
-function localDateTimeToIso(dateValue: string, timeValue: string) {
-  return dateTimeLocalToIso(`${dateValue}T${timeValue}`)
-}
-
 function getDateTimeParts(value: string) {
   const [date = '', time = ''] = value.split('T')
   return {
@@ -132,32 +131,9 @@ function buildRecurrenceForm(form: ClassFormState): RecurrenceFormState {
     enabled: false,
     weekday: String(start.getDay()),
     date_from: formatLocalDate(start),
-    date_to: formatLocalDate(addDays(start, 28)),
     start_time: formatLocalTime(start),
     end_time: formatLocalTime(end),
   }
-}
-
-function buildRecurringDates(
-  dateFrom: string,
-  dateTo: string,
-  weekday: number,
-) {
-  const start = new Date(`${dateFrom}T00:00:00`)
-  const end = new Date(`${dateTo}T00:00:00`)
-  const dates: string[] = []
-
-  for (
-    let cursor = start;
-    cursor <= end && dates.length <= 80;
-    cursor = addDays(cursor, 1)
-  ) {
-    if (cursor.getDay() === weekday) {
-      dates.push(formatLocalDate(cursor))
-    }
-  }
-
-  return dates
 }
 
 function buildEmptyForm(activities: Activity[]): ClassFormState {
@@ -263,6 +239,7 @@ export function AdminCalendarPage() {
   const today = useMemo(() => new Date(), [])
   const [activities, setActivities] = useState<Activity[]>([])
   const [sessions, setSessions] = useState<CalendarSession[]>([])
+  const [recurringRules, setRecurringRules] = useState<ClassRecurringRule[]>([])
   const [fromDate, setFromDate] = useState(formatLocalDate(today))
   const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 6)))
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
@@ -318,15 +295,17 @@ export function AdminCalendarPage() {
     setLoading(true)
     setError(null)
     try {
-      const [nextActivities, nextSessions] = await Promise.all([
+      const [nextActivities, nextSessions, nextRules] = await Promise.all([
         listActivities(true),
         listCalendarSessions(
           dateInputToRangeStart(fromDate),
           dateInputToRangeEnd(toDate),
         ),
+        listClassRecurringRules(),
       ])
       setActivities(nextActivities)
       setSessions(nextSessions)
+      setRecurringRules(nextRules)
       setForm((current) => {
         if (current.activity_id) {
           const currentActivity = nextActivities.find(
@@ -413,28 +392,11 @@ export function AdminCalendarPage() {
     const nextStartsAt = `${dateValue}T${timeValue}`
     const previousStart = new Date(form.starts_at)
     const previousEnd = new Date(form.ends_at)
-    const previousRecurrenceStart = new Date(`${recurrence.date_from}T00:00:00`)
-    const previousRecurrenceEnd = new Date(`${recurrence.date_to}T00:00:00`)
-    const dayMs = 24 * 60 * 60 * 1000
-    const previousSpanDays =
-      Number.isFinite(previousRecurrenceStart.getTime()) &&
-      Number.isFinite(previousRecurrenceEnd.getTime()) &&
-      previousRecurrenceEnd >= previousRecurrenceStart
-        ? Math.round(
-            (previousRecurrenceEnd.getTime() -
-              previousRecurrenceStart.getTime()) /
-              dayMs,
-          )
-        : 28
     const durationMs = Math.max(
       previousEnd.getTime() - previousStart.getTime(),
       30 * 60 * 1000,
     )
     const nextEnd = new Date(new Date(nextStartsAt).getTime() + durationMs)
-    const nextRecurrenceEnd = addDays(
-      new Date(`${dateValue}T00:00:00`),
-      previousSpanDays,
-    )
 
     setForm({
       ...form,
@@ -444,7 +406,6 @@ export function AdminCalendarPage() {
     setRecurrence({
       ...recurrence,
       date_from: dateValue,
-      date_to: formatLocalDate(nextRecurrenceEnd),
       start_time: timeValue,
       end_time: formatLocalTime(nextEnd),
       weekday: String(new Date(`${dateValue}T00:00:00`).getDay()),
@@ -494,29 +455,14 @@ export function AdminCalendarPage() {
 
     if (recurrence.enabled && !selectedSession) {
       const weekday = Number(recurrence.weekday)
-      const recurringDates = buildRecurringDates(
-        recurrence.date_from,
-        recurrence.date_to,
-        weekday,
-      )
 
       if (
         !Number.isInteger(weekday) ||
-        !recurrence.date_from ||
-        !recurrence.date_to ||
-        recurrence.date_to < recurrence.date_from
+        weekday < 0 ||
+        weekday > 6 ||
+        !recurrence.date_from
       ) {
-        setError('Completa un rango valido para repetir la clase.')
-        return
-      }
-
-      if (recurringDates.length === 0) {
-        setError('No hay fechas para crear con ese dia de semana y rango.')
-        return
-      }
-
-      if (recurringDates.length > 52) {
-        setError('La recurrencia no puede crear mas de 52 clases por vez.')
+        setError('Completa un dia y fecha de inicio validos para repetir la clase.')
         return
       }
 
@@ -542,58 +488,18 @@ export function AdminCalendarPage() {
         } satisfies UpdateClassSessionInput)
         setSuccess('Clase actualizada.')
       } else if (recurrence.enabled) {
-        const recurringDates = buildRecurringDates(
-          recurrence.date_from,
-          recurrence.date_to,
-          Number(recurrence.weekday),
-        )
-        const existingSessions = await listCalendarSessions(
-          dateInputToRangeStart(recurrence.date_from),
-          dateInputToRangeEnd(recurrence.date_to),
-        )
-        const existingKeys = new Set(
-          existingSessions.map((session) => {
-            return [
-              session.activity_id,
-              formatDateTimeLocal(new Date(session.starts_at)),
-              formatDateTimeLocal(new Date(session.ends_at)),
-            ].join('|')
-          }),
-        )
-        const createdDates: string[] = []
-        const skippedDates: string[] = []
-
-        for (const dateValue of recurringDates) {
-          const startsAt = localDateTimeToIso(dateValue, recurrence.start_time)
-          const endsAt = localDateTimeToIso(dateValue, recurrence.end_time)
-          const duplicateKey = [
-            form.activity_id,
-            `${dateValue}T${recurrence.start_time}`,
-            `${dateValue}T${recurrence.end_time}`,
-          ].join('|')
-
-          if (existingKeys.has(duplicateKey)) {
-            skippedDates.push(dateValue)
-            continue
-          }
-
-          await createClassSession({
-            ...input,
-            starts_at: startsAt,
-            ends_at: endsAt,
-          })
-          createdDates.push(dateValue)
-        }
-
-        if (createdDates.length === 0) {
-          setError('No se crearon clases nuevas porque ya existian en ese rango.')
-        } else {
-          setSuccess(
-            skippedDates.length > 0
-              ? `Se crearon ${createdDates.length} clases. Se omitieron ${skippedDates.length} duplicadas.`
-              : `Se crearon ${createdDates.length} clases recurrentes.`,
-          )
-        }
+        await createClassRecurringRule({
+          activity_id: normalizedForm.activity_id,
+          title: normalizedForm.title,
+          weekday: Number(recurrence.weekday),
+          start_time: recurrence.start_time,
+          end_time: recurrence.end_time,
+          capacity,
+          trainer_name: normalizedForm.coach_name,
+          notes: normalizedForm.notes,
+          valid_from: recurrence.date_from,
+        })
+        setSuccess('Horario recurrente creado. Se repetira todas las semanas hasta que lo pauses o modifiques.')
       } else {
         await createClassSession(input)
         setSuccess('Clase creada.')
@@ -648,6 +554,29 @@ export function AdminCalendarPage() {
       await loadData()
     } catch (deleteError) {
       setError(formatAdminError(deleteError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleArchiveRecurringRule(rule: ClassRecurringRule) {
+    const confirmed = window.confirm(
+      `Pausar el horario recurrente "${rule.title}"? Las clases ya creadas se conservan.`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await archiveClassRecurringRule(rule.rule_id)
+      setSuccess('Horario recurrente pausado. Las clases ya creadas se conservan.')
+      await loadData()
+    } catch (archiveError) {
+      setError(formatAdminError(archiveError))
     } finally {
       setSaving(false)
     }
@@ -985,8 +914,9 @@ export function AdminCalendarPage() {
                   <span>
                     Crear clase recurrente
                     <span className="block text-xs font-normal text-[var(--muted)]">
-                      Repite la clase en el dia elegido, evita duplicados exactos
-                      y crea hasta 52 clases por vez.
+                      Se repetira todas las semanas hasta que la pauses o
+                      modifiques. El calendario crea las fechas necesarias al
+                      consultarlas.
                     </span>
                   </span>
                 </label>
@@ -1026,20 +956,9 @@ export function AdminCalendarPage() {
                           value={recurrence.date_from}
                         />
                       </label>
-                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
-                        Fecha hasta
-                        <input
-                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
-                          onChange={(event) =>
-                            setRecurrence({
-                              ...recurrence,
-                              date_to: event.target.value,
-                            })
-                          }
-                          type="date"
-                          value={recurrence.date_to}
-                        />
-                      </label>
+                      <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                        Sin fecha de fin. Pausala cuando deje de estar vigente.
+                      </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
@@ -1136,7 +1055,7 @@ export function AdminCalendarPage() {
                 : selectedSession
                   ? 'Guardar clase'
                   : recurrence.enabled
-                    ? 'Crear clases recurrentes'
+                    ? 'Crear horario recurrente'
                     : 'Crear clase'}
             </button>
           </div>
@@ -1184,6 +1103,60 @@ export function AdminCalendarPage() {
             </div>
           </div>
         ) : null}
+
+        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+            Horarios fijos
+          </p>
+          <h3 className="mt-2 font-display text-xl font-bold text-[var(--ink)]">
+            Horarios recurrentes
+          </h3>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Se repiten todas las semanas hasta que los pauses. Las clases ya
+            creadas se conservan para reservas y asistencia.
+          </p>
+          <div className="mt-4 grid gap-2">
+            {recurringRules.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-[var(--line)] p-3 text-sm text-[var(--muted)]">
+                No hay horarios recurrentes configurados.
+              </p>
+            ) : (
+              recurringRules.map((rule) => (
+                <div
+                  className="rounded-2xl border border-[var(--line)] bg-white p-3"
+                  key={rule.rule_id}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-[var(--ink)]">
+                        {rule.title}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--muted)]">
+                        {weekdayLabels[rule.weekday]} · {rule.start_time.slice(0, 5)}
+                        {' - '}
+                        {rule.end_time.slice(0, 5)} · {rule.activity_name} · cupo{' '}
+                        {rule.capacity}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-[var(--brand)]">
+                        {rule.active ? 'Activo' : 'Pausado'}
+                      </p>
+                    </div>
+                    {rule.active ? (
+                      <button
+                        className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                        disabled={saving}
+                        onClick={() => void handleArchiveRecurringRule(rule)}
+                        type="button"
+                      >
+                        Pausar
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
         {error ? (
           <p className="rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">

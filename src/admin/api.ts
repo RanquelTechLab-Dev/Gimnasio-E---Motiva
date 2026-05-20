@@ -11,6 +11,8 @@ import type {
   AutoFinalizeAttendanceResult,
   CalendarSession,
   ClassSessionInput,
+  ClassRecurringRule,
+  ClassRecurringRuleInput,
   CreateStudentInput,
   MassEmailInput,
   MassEmailResult,
@@ -466,6 +468,18 @@ export async function voidPayment(paymentId: string, reason: string) {
 
 export async function listCalendarSessions(fromDate: string, toDate: string) {
   const client = getClient()
+  const { error: materializeError } = await client.rpc(
+    'materialize_recurring_class_sessions',
+    {
+      from_date: fromDate,
+      to_date: toDate,
+    },
+  )
+
+  if (materializeError) {
+    throw materializeError
+  }
+
   const { data, error } = await client.rpc('list_calendar_sessions', {
     from_date: fromDate,
     to_date: toDate,
@@ -476,6 +490,54 @@ export async function listCalendarSessions(fromDate: string, toDate: string) {
   }
 
   return (data ?? []) as CalendarSession[]
+}
+
+export async function listClassRecurringRules() {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_list_class_recurring_rules')
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as ClassRecurringRule[]
+}
+
+export async function createClassRecurringRule(
+  input: ClassRecurringRuleInput,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_create_class_recurring_rule', {
+    p_activity_id: input.activity_id,
+    p_title: input.title,
+    p_weekday: input.weekday,
+    p_start_time: input.start_time,
+    p_end_time: input.end_time,
+    p_capacity: input.capacity,
+    p_trainer_name: input.trainer_name.trim() || null,
+    p_notes: input.notes.trim() || null,
+    p_valid_from: input.valid_from,
+    p_valid_until: null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function archiveClassRecurringRule(ruleId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_archive_class_recurring_rule', {
+    p_rule_id: ruleId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
 }
 
 export async function createClassSession(input: ClassSessionInput) {

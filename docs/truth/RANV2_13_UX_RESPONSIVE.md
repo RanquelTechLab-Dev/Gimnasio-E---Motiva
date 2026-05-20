@@ -83,6 +83,9 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - El inicio admin queda como pagina de accesos rapidos y Configuracion deja de
   competir en la navegacion diaria.
 - El login refuerza presencia de marca con logo mas visible y responsive.
+- Se prepara modelo de horarios recurrentes perpetuos: admin crea una regla
+  semanal sin fecha de fin, el calendario materializa sesiones reales por rango
+  consultado y las reservas siguen operando sobre `class_sessions`.
 
 ## Auditoria funcional
 
@@ -105,6 +108,8 @@ El schema actual permite:
   consulta.
 - iniciar el sistema con catalogo real de planes, actividades reales y
   cronograma base fuente, pendiente de `db push` autorizado.
+- mantener horarios fijos semanales sin recrear tandas finitas; las reglas se
+  pueden pausar y no eliminan sesiones ya creadas.
 
 Requieren subbloques especificos:
 

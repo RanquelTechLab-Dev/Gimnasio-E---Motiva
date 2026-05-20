@@ -116,4 +116,6 @@ RAN-29 esta en ejecucion.
   una migracion local para alinear el catalogo inicial y el calendario base con
   `Precios.jpeg` y `Plan Actividades.jpeg`, sin tocar historial operativo.
   Se agrega modelo de horarios recurrentes perpetuos para que el calendario no
-  dependa de tandas finitas de 8, 12 o 52 semanas.
+  dependa de tandas finitas de 8, 12 o 52 semanas. Walter confirma base virgen
+  y autoriza reset controlado de datos de prueba para reconstruir catalogo y
+  cronograma desde las fuentes reales, conservando Auth y perfiles.

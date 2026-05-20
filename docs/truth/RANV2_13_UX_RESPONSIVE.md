@@ -86,6 +86,16 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - Se prepara modelo de horarios recurrentes perpetuos: admin crea una regla
   semanal sin fecha de fin, el calendario materializa sesiones reales por rango
   consultado y las reservas siguen operando sobre `class_sessions`.
+- Se prepara reset virgen autorizado para limpiar datos operativos de prueba y
+  reconstruir catalogo/calendario desde cero:
+  - 11 planes activos con precios de `Precios.jpeg`;
+  - tipos definitivos de clase/bloque, incluyendo bloques compuestos;
+  - reglas recurrentes perpetuas exactas de `Plan Actividades.jpeg`;
+  - una sola tarjeta por bloque horario, sin receso ni fines de semana.
+- `Funcional` queda disponible para el combo, pero sin horario fijo inicial
+  porque no aparece como bloque explicito en la tabla fuente.
+- La grilla semanal usa contenedor de scroll propio para que encabezados de dia,
+  columna de horarios y esquina Horario queden sticky en scroll profundo.
 
 ## Auditoria funcional
 

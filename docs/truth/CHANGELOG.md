@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-05-20 - RANV2-13 reset virgen catalogo/calendario real
+
+- Se agrega migracion local de reset controlado para base virgen, autorizada
+  por Walter, conservando Auth y perfiles.
+- Se limpian datos operativos de prueba: pagos, membresias, reservas,
+  asistencia, archivos metadata, sesiones, reglas recurrentes, planes,
+  actividades y vinculos de planes.
+- Se reconstruye el catalogo activo desde `Precios.jpeg` con 11 planes reales
+  y precios confirmados.
+- Se reconstruye el cronograma desde `Plan Actividades.jpeg` con una sola
+  tarjeta por bloque horario, sin clases en receso ni fines de semana.
+- Se usan tipos compuestos para reflejar las celdas reales:
+  `Plan / Semipersonalizado` y `Plan / Personalizado / Semipersonalizado`.
+- `Funcional` queda como tipo disponible para el combo, pero sin horario fijo
+  inicial porque no aparece como bloque explicito en la fuente.
+- La grilla semanal pasa a tener contenedor de scroll propio para que dias,
+  horarios y esquina Horario queden sticky de forma estable.
+- No se ejecuta `db push` real.
+
 ## 2026-05-20 - RANV2-13 horarios recurrentes perpetuos
 
 - Se agrega migracion local para configurar reglas semanales perpetuas en

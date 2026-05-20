@@ -43,7 +43,7 @@ export function LoginPage() {
         <div className="inline-flex items-center gap-4 rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] px-5 py-4 shadow-[var(--shadow)]">
           <img
             alt="E-Motiva"
-            className="h-16 w-16 rounded-3xl bg-white object-contain p-1.5 shadow-sm"
+            className="h-24 w-24 rounded-[32px] bg-white object-contain p-2 shadow-sm"
             src="/brand/logo-small.png"
           />
           <div>
@@ -66,10 +66,10 @@ export function LoginPage() {
         className="w-full rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)] p-6 shadow-[var(--shadow)] sm:p-8"
         onSubmit={handleSubmit}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
           <img
             alt="E-Motiva"
-            className="h-16 w-16 rounded-3xl bg-white object-contain p-1.5 shadow-sm sm:h-20 sm:w-20"
+            className="h-24 w-24 rounded-[32px] bg-white object-contain p-2 shadow-sm sm:h-28 sm:w-28"
             src="/brand/logo-small.png"
           />
           <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">

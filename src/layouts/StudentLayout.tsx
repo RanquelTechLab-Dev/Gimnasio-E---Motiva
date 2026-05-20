@@ -1,7 +1,7 @@
 import { LayoutShell } from '../components/LayoutShell'
 
 const navItems = [
-  { label: 'Dashboard', to: '/app' },
+  { label: 'Inicio', to: '/app' },
   { label: 'Calendario', to: '/app/calendar' },
   { label: 'Mis reservas', to: '/app/bookings' },
   { label: 'Planes y precios', to: '/app/plans' },

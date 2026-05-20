@@ -78,6 +78,11 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   calendario base acotado de 8 semanas desde el lunes 2026-05-25, sin duplicar
   clases exactas ni tocar historial. El combo semipersonalizado y funcional
   queda respaldado por clases Funcional reservables en el calendario base.
+- La grilla semanal mejora navegacion con encabezados de dia sticky y columna
+  de horarios sticky, util para desktop y mobile con scroll.
+- El inicio admin queda como pagina de accesos rapidos y Configuracion deja de
+  competir en la navegacion diaria.
+- El login refuerza presencia de marca con logo mas visible y responsive.
 
 ## Auditoria funcional
 

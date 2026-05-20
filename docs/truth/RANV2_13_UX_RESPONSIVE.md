@@ -76,7 +76,8 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
 - Se prepara una migracion de datos iniciales reales desde `Precios.jpeg` y
   `Plan Actividades.jpeg`: planes/precios activos, tipos de clase reales y un
   calendario base acotado de 8 semanas desde el lunes 2026-05-25, sin duplicar
-  clases exactas ni tocar historial.
+  clases exactas ni tocar historial. El combo semipersonalizado y funcional
+  queda respaldado por clases Funcional reservables en el calendario base.
 
 ## Auditoria funcional
 

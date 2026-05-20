@@ -12,6 +12,8 @@
   Personalizado 1:1.
 - Se carga un calendario base inicial acotado, desde el lunes 2026-05-25 por
   8 semanas, sin duplicar clases exactas existentes.
+- El calendario base incluye clases Funcional para que el plan Combo
+  semipersonalizado y funcional tenga oferta reservable real.
 - Cognitivo y Personalizado 1:1 quedan como tipos activos/flexibles; no se
   fuerzan horarios fijos iniciales.
 - No se tocan pagos, membresias, reservas, asistencia, archivos ni historial.

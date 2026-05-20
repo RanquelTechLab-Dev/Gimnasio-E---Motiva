@@ -348,6 +348,7 @@ week_starts as (
 ),
 source_slots(day_group, start_time, end_time, activity_slug, title, capacity, notes) as (
   values
+    ('lmv', time '07:00', time '08:00', 'funcional', 'Funcional', 10, 'Horario funcional inicial para el combo Semipersonalizado y Funcional.'),
     ('lmv', time '07:00', time '08:00', 'neurofuncional', 'Neurofuncional', 10, 'Cronograma semanal fuente: lunes, miercoles y viernes.'),
     ('lmv', time '08:00', time '09:00', 'plan_entrenamiento', 'Plan de entrenamiento', 10, 'Horario compartido Plan / Semipersonalizado segun fuente.'),
     ('lmv', time '08:00', time '09:00', 'semi_personalizado', 'Semipersonalizado', 10, 'Horario compartido Plan / Semipersonalizado segun fuente.'),
@@ -362,6 +363,7 @@ source_slots(day_group, start_time, end_time, activity_slug, title, capacity, no
     ('lmv', time '17:00', time '18:00', 'ninos', 'Programa Kids', 10, 'Cronograma semanal fuente: lunes, miercoles y viernes.'),
     ('lmv', time '18:00', time '19:00', 'plan_entrenamiento', 'Plan de entrenamiento', 10, 'Horario compartido Plan y Semipersonalizado segun fuente.'),
     ('lmv', time '18:00', time '19:00', 'semi_personalizado', 'Semipersonalizado', 10, 'Horario compartido Plan y Semipersonalizado segun fuente.'),
+    ('lmv', time '19:00', time '20:00', 'funcional', 'Funcional', 10, 'Horario funcional inicial para el combo Semipersonalizado y Funcional.'),
     ('lmv', time '19:00', time '20:00', 'neurofuncional', 'Neurofuncional', 10, 'Cronograma semanal fuente: lunes, miercoles y viernes.'),
     ('mj', time '07:00', time '08:00', 'plan_entrenamiento', 'Plan de entrenamiento', 10, 'Horario compartido Plan y Semipersonalizado segun fuente.'),
     ('mj', time '07:00', time '08:00', 'semi_personalizado', 'Semipersonalizado', 10, 'Horario compartido Plan y Semipersonalizado segun fuente.'),

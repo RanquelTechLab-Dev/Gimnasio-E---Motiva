@@ -214,12 +214,12 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
           gridTemplateColumns: `76px repeat(${days.length}, minmax(132px, 1fr))`,
         }}
       >
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted)] sm:px-3 sm:py-3 sm:text-xs sm:tracking-[0.18em]">
+        <div className="sticky left-0 top-0 z-30 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted)] shadow-sm sm:px-3 sm:py-3 sm:text-xs sm:tracking-[0.18em]">
           Horario
         </div>
         {days.map((day) => (
           <div
-            className="rounded-2xl border border-[var(--line)] bg-[var(--brand)] px-2 py-2 text-center font-display text-xs font-bold capitalize text-white sm:px-3 sm:py-3 sm:text-sm"
+            className="sticky top-0 z-20 rounded-2xl border border-[var(--line)] bg-[var(--brand)] px-2 py-2 text-center font-display text-xs font-bold capitalize text-white shadow-sm sm:px-3 sm:py-3 sm:text-sm"
             key={day}
           >
             {formatDayTitle(day)}
@@ -228,7 +228,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
         {timeSlots.map((timeSlot) => (
           <div className="contents" key={timeSlot}>
-            <div className="flex min-h-[96px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] sm:min-h-[118px] sm:px-3 sm:py-4 sm:text-sm">
+            <div className="sticky left-0 z-10 flex min-h-[96px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-sm sm:min-h-[118px] sm:px-3 sm:py-4 sm:text-sm">
               {timeSlot}
             </div>
             {days.map((day) => {

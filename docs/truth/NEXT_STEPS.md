@@ -6,8 +6,9 @@ RAN-29 / RANV2-13: PWA + responsive + UX final.
 
 ## Siguiente
 
-Revisar PR de catalogo/calendario inicial real y, si pasa, autorizar `db push`
-de la migracion `20260520120000_ranv2_13_real_initial_catalog_calendar.sql`.
+Revisar PR de micro UX final: encabezados sticky del calendario, inicio admin
+con accesos rapidos, Configuracion fuera del menu principal y logo de login con
+mayor presencia.
 
 ## Pendiente
 

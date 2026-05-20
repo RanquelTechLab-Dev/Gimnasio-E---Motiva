@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-05-20 - RANV2-13 micro UX final
+
+- La grilla semanal mantiene encabezados de dia visibles al hacer scroll
+  vertical y la columna de horarios visible al hacer scroll horizontal.
+- El inicio admin se convierte en accesos rapidos reales para la operacion
+  diaria.
+- La opcion Configuracion se oculta de la navegacion principal; la ruta directa
+  queda con mensaje breve y vuelta al panel.
+- El login aumenta la presencia visual del logo E-Motiva sin cambiar auth.
+- No se crean migraciones ni se modifican RPCs/backend.
+
 ## 2026-05-20 - RANV2-13 catalogo y calendario inicial real
 
 - Se agrega migracion local para alinear el arranque del sistema con

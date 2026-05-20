@@ -1,7 +1,7 @@
 import { LayoutShell } from '../components/LayoutShell'
 
 const navItems = [
-  { label: 'Dashboard', to: '/admin' },
+  { label: 'Inicio', to: '/admin' },
   { label: 'Alumnos', to: '/admin/students' },
   { label: 'Pagos', to: '/admin/payments' },
   { label: 'Calendario', to: '/admin/calendar' },
@@ -9,7 +9,6 @@ const navItems = [
   { label: 'Planes', to: '/admin/plans' },
   { label: 'Emails', to: '/admin/emails' },
   { label: 'Archivos', to: '/admin/storage' },
-  { label: 'Configuración', to: '/admin/settings' },
 ]
 
 export function AdminLayout() {

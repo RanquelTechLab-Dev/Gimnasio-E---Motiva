@@ -609,6 +609,18 @@ export async function deleteClassSession(sessionId: string) {
 
 export async function listAttendanceSessions(fromDate: string, toDate: string) {
   const client = getClient()
+  const { error: materializeError } = await client.rpc(
+    'materialize_recurring_class_sessions',
+    {
+      from_date: fromDate,
+      to_date: toDate,
+    },
+  )
+
+  if (materializeError) {
+    throw materializeError
+  }
+
   const { data, error } = await client.rpc('list_attendance_sessions', {
     from_date: fromDate,
     to_date: toDate,

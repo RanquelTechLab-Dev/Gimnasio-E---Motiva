@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-20 - RANV2-13 catalogo y calendario inicial real
+
+- Se agrega migracion local para alinear el arranque del sistema con
+  `Precios.jpeg` y `Plan Actividades.jpeg`.
+- El catalogo inicial deja activos los planes reales con precios confirmados:
+  planes semanales 3x/5x, combo semipersonalizado/funcional y paquetes
+  personalizados de 1, 4, 8 y 12 clases.
+- Se refuerzan los tipos de clase reales: Funcional, Neurofuncional,
+  Semipersonalizado, Programa Kids, Plan de entrenamiento, Cognitivo y
+  Personalizado 1:1.
+- Se carga un calendario base inicial acotado, desde el lunes 2026-05-25 por
+  8 semanas, sin duplicar clases exactas existentes.
+- Cognitivo y Personalizado 1:1 quedan como tipos activos/flexibles; no se
+  fuerzan horarios fijos iniciales.
+- No se tocan pagos, membresias, reservas, asistencia, archivos ni historial.
+- No se ejecuta `db push` real.
+
 ## 2026-05-19 - RANV2-13 pulido visual final
 
 - Se ajusta copy visible en login, layouts, dashboard admin, perfil alumno,

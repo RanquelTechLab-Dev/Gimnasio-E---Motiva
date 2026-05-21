@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   archiveActivity,
-  archiveClassRecurringRule,
   cancelClassSession,
   createActivity,
   createClassSession,
@@ -12,7 +11,6 @@ import {
   formatAdminError,
   listActivities,
   listCalendarSessions,
-  listClassRecurringRules,
   updateActivity,
   updateClassSession,
 } from './api'
@@ -20,7 +18,6 @@ import type {
   Activity,
   ActivityInput,
   CalendarSession,
-  ClassRecurringRule,
   ClassSessionInput,
   UpdateClassSessionInput,
 } from './types'
@@ -239,7 +236,6 @@ export function AdminCalendarPage() {
   const today = useMemo(() => new Date(), [])
   const [activities, setActivities] = useState<Activity[]>([])
   const [sessions, setSessions] = useState<CalendarSession[]>([])
-  const [recurringRules, setRecurringRules] = useState<ClassRecurringRule[]>([])
   const [fromDate, setFromDate] = useState(formatLocalDate(today))
   const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 6)))
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
@@ -295,17 +291,15 @@ export function AdminCalendarPage() {
     setLoading(true)
     setError(null)
     try {
-      const [nextActivities, nextSessions, nextRules] = await Promise.all([
+      const [nextActivities, nextSessions] = await Promise.all([
         listActivities(true),
         listCalendarSessions(
           dateInputToRangeStart(fromDate),
           dateInputToRangeEnd(toDate),
         ),
-        listClassRecurringRules(),
       ])
       setActivities(nextActivities)
       setSessions(nextSessions)
-      setRecurringRules(nextRules)
       setForm((current) => {
         if (current.activity_id) {
           const currentActivity = nextActivities.find(
@@ -554,29 +548,6 @@ export function AdminCalendarPage() {
       await loadData()
     } catch (deleteError) {
       setError(formatAdminError(deleteError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleArchiveRecurringRule(rule: ClassRecurringRule) {
-    const confirmed = window.confirm(
-      `Pausar el horario recurrente "${rule.title}"? Las clases ya creadas se conservan.`,
-    )
-
-    if (!confirmed) {
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      await archiveClassRecurringRule(rule.rule_id)
-      setSuccess('Horario recurrente pausado. Las clases ya creadas se conservan.')
-      await loadData()
-    } catch (archiveError) {
-      setError(formatAdminError(archiveError))
     } finally {
       setSaving(false)
     }
@@ -1103,60 +1074,6 @@ export function AdminCalendarPage() {
             </div>
           </div>
         ) : null}
-
-        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-            Horarios fijos
-          </p>
-          <h3 className="mt-2 font-display text-xl font-bold text-[var(--ink)]">
-            Horarios recurrentes
-          </h3>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            Se repiten todas las semanas hasta que los pauses. Las clases ya
-            creadas se conservan para reservas y asistencia.
-          </p>
-          <div className="mt-4 grid gap-2">
-            {recurringRules.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-[var(--line)] p-3 text-sm text-[var(--muted)]">
-                No hay horarios recurrentes configurados.
-              </p>
-            ) : (
-              recurringRules.map((rule) => (
-                <div
-                  className="rounded-2xl border border-[var(--line)] bg-white p-3"
-                  key={rule.rule_id}
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-[var(--ink)]">
-                        {rule.title}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">
-                        {weekdayLabels[rule.weekday]} · {rule.start_time.slice(0, 5)}
-                        {' - '}
-                        {rule.end_time.slice(0, 5)} · {rule.activity_name} · cupo{' '}
-                        {rule.capacity}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-[var(--brand)]">
-                        {rule.active ? 'Activo' : 'Pausado'}
-                      </p>
-                    </div>
-                    {rule.active ? (
-                      <button
-                        className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
-                        disabled={saving}
-                        onClick={() => void handleArchiveRecurringRule(rule)}
-                        type="button"
-                      >
-                        Pausar
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
 
         {error ? (
           <p className="rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">

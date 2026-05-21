@@ -5,7 +5,7 @@
 do $$
 declare
   v_admin_id uuid;
-  v_profile_count int;
+  v_unauthorized_profiles text[];
   v_deleted_profiles int := 0;
 begin
   select id into v_admin_id
@@ -18,11 +18,13 @@ begin
     raise exception 'Demo cleanup abortado: no existe admin activo e.motiva.gym@gmail.com.';
   end if;
 
-  select count(*) into v_profile_count
-  from public.profiles;
+  select coalesce(array_agg(email order by email), array[]::text[])
+  into v_unauthorized_profiles
+  from public.profiles
+  where email not in ('e.motiva.gym@gmail.com', 'ranqueltechlab@gmail.com');
 
-  if v_profile_count > 2 then
-    raise exception 'Demo cleanup abortado: hay % perfiles. Solo esta autorizado para admin y alumno de prueba.', v_profile_count;
+  if array_length(v_unauthorized_profiles, 1) is not null then
+    raise exception 'Reset demo abortado: existen perfiles no autorizados para limpieza. Perfiles: %', v_unauthorized_profiles;
   end if;
 
   delete from public.attendance;
@@ -35,12 +37,12 @@ begin
   delete from auth.users au
   using public.profiles p
   where au.id = p.id
-    and p.email <> 'e.motiva.gym@gmail.com';
+    and p.email = 'ranqueltechlab@gmail.com';
 
   get diagnostics v_deleted_profiles = row_count;
 
   delete from public.profiles
-  where email <> 'e.motiva.gym@gmail.com';
+  where email = 'ranqueltechlab@gmail.com';
 
   update public.profiles
   set

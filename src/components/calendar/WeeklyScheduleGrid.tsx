@@ -73,6 +73,11 @@ const canonicalTimeSlots = [
   { key: '19:00', label: '19:00' },
 ]
 
+function minutesFromTimeKey(value: string) {
+  const [hours, minutes] = value.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
 function formatLocalDate(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -218,6 +223,20 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 }: WeeklyScheduleGridProps<TSession>) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const days = buildDays(fromDate, toDate)
+  const timeSlots = useMemo(() => {
+    const slotMap = new Map(canonicalTimeSlots.map((slot) => [slot.key, slot]))
+
+    sessions.forEach((session) => {
+      const timeKey = getTimeKey(session.starts_at)
+      if (!slotMap.has(timeKey)) {
+        slotMap.set(timeKey, { key: timeKey, label: timeKey })
+      }
+    })
+
+    return Array.from(slotMap.values()).sort(
+      (a, b) => minutesFromTimeKey(a.key) - minutesFromTimeKey(b.key),
+    )
+  }, [sessions])
   const sessionsByCell = useMemo(() => {
     const map = new Map<string, TSession[]>()
 
@@ -283,7 +302,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
           Deslizá horizontalmente para ver todos los días
         </div>
 
-        {canonicalTimeSlots.map((timeSlot) => (
+        {timeSlots.map((timeSlot) => (
           <div className="contents" key={timeSlot.key}>
             <div className="sticky left-0 z-20 flex min-h-[96px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-md sm:min-h-[118px] sm:px-3 sm:py-4 sm:text-sm">
               {timeSlot.label}

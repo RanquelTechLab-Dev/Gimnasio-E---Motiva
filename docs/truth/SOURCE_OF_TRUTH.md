@@ -118,4 +118,6 @@ RAN-29 esta en ejecucion.
   Se agrega modelo de horarios recurrentes perpetuos para que el calendario no
   dependa de tandas finitas de 8, 12 o 52 semanas. Walter confirma base virgen
   y autoriza reset controlado de datos de prueba para reconstruir catalogo y
-  cronograma desde las fuentes reales, conservando Auth y perfiles.
+  cronograma desde las fuentes reales, conservando Auth y perfiles. Para la demo
+  con Carolina se prepara una limpieza final que conserva solo el admin real y
+  elimina el alumno/Auth de prueba restante.

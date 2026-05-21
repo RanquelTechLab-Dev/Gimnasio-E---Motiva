@@ -96,6 +96,11 @@ admin/alumno. `public/brand/2.png` queda preservado como fuente/original.
   porque no aparece como bloque explicito en la tabla fuente.
 - La grilla semanal usa contenedor de scroll propio para que encabezados de dia,
   columna de horarios y esquina Horario queden sticky en scroll profundo.
+- La grilla semanal queda ajustada para demo: usa solo dias habiles, slots
+  canonicos 07:00-20:00 de `Plan Actividades.jpeg`, indicador de desplazamiento
+  horizontal y reset de scroll al cambiar rango.
+- Se prepara limpieza final de datos de prueba para conservar solo el admin real
+  antes de la demo con Carolina.
 
 ## Auditoria funcional
 

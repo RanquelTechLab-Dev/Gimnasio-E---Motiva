@@ -6,9 +6,9 @@ RAN-29 / RANV2-13: PWA + responsive + UX final.
 
 ## Siguiente
 
-Revisar PR de reset virgen de catalogo/calendario real y, si pasa, autorizar
-`db push` de la migracion
-`20260520140000_ranv2_13_virgin_reset_real_schedule.sql`.
+Revisar PR de limpieza demo final y fix visual de calendario. Si pasa,
+autorizar `db push` de la migracion
+`20260521100000_ranv2_13_demo_clean_only_admin.sql`.
 
 ## Pendiente
 
@@ -18,4 +18,6 @@ Revisar PR de reset virgen de catalogo/calendario real y, si pasa, autorizar
 - Validacion manual del cronograma real reconstruido desde
   `Plan Actividades.jpeg`, sin duplicados ni horarios de receso.
 - Validar sticky real de dias/horarios en desktop y mobile.
+- Validar que solo quede el admin `e.motiva.gym@gmail.com` antes de mostrar la
+  app a Carolina.
 - RAN-31 QA final recien despues de cerrar los subbloques UX.

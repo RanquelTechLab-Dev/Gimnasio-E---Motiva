@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-21 - RANV2-13 limpieza demo y calendario tabla real
+
+- Se agrega migracion local para dejar la demo con un unico perfil admin:
+  `e.motiva.gym@gmail.com`.
+- La migracion limpia restos operativos de prueba y elimina el Auth/profile del
+  alumno de prueba, conservando planes, actividades, reglas recurrentes y
+  sesiones del cronograma real.
+- La grilla semanal usa dias habiles y slots canonicos de `Plan Actividades.jpeg`
+  en orden 07:00 a 20:00, sin ordenar por texto formateado.
+- El calendario agrega indicador horizontal visible y resetea scroll interno al
+  cambiar rango para abrir desde 07:00.
+- No se ejecuta `db push` real.
+
 ## 2026-05-20 - RANV2-13 reset virgen catalogo/calendario real
 
 - Se agrega migracion local de reset controlado para base virgen, autorizada

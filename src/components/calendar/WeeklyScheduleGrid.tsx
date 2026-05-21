@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useRef } from 'react'
+
 export type ScheduleSession = {
   session_id: string
   activity_id: string
@@ -58,6 +60,24 @@ const activityToneBySlug: Record<string, string> = {
   semi_personalizado: 'border-sky-300 bg-sky-50',
 }
 
+const canonicalTimeSlots = [
+  { key: '07:00', label: '07:00' },
+  { key: '08:00', label: '08:00' },
+  { key: '09:00', label: '09:00' },
+  { key: '10:00', label: '10:00' },
+  { key: '14:00', label: '14:00' },
+  { key: '15:00', label: '15:00' },
+  { key: '16:00', label: '16:00' },
+  { key: '17:00', label: '17:00' },
+  { key: '18:00', label: '18:00' },
+  { key: '19:00', label: '19:00' },
+]
+
+function minutesFromTimeKey(value: string) {
+  const [hours, minutes] = value.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
 function formatLocalDate(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -100,14 +120,20 @@ function buildDays(fromDate: string, toDate: string) {
     cursor <= end && days.length < 21;
     cursor = addDays(cursor, 1)
   ) {
-    days.push(formatLocalDate(cursor))
+    const weekday = cursor.getDay()
+    if (weekday >= 1 && weekday <= 5) {
+      days.push(formatLocalDate(cursor))
+    }
   }
 
   return days
 }
 
 function getTimeKey(value: string) {
-  return formatTime(value)
+  const date = new Date(value)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 function toneForSession(session: ScheduleSession) {
@@ -195,12 +221,48 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
   onBookSession,
   onCancelBooking,
 }: WeeklyScheduleGridProps<TSession>) {
+  const scrollRef = useRef<HTMLDivElement | null>(null)
   const days = buildDays(fromDate, toDate)
-  const timeSlots = Array.from(
-    new Set(sessions.map((session) => getTimeKey(session.starts_at))),
-  ).sort()
+  const timeSlots = useMemo(() => {
+    const slotMap = new Map(canonicalTimeSlots.map((slot) => [slot.key, slot]))
 
-  if (timeSlots.length === 0) {
+    sessions.forEach((session) => {
+      const timeKey = getTimeKey(session.starts_at)
+      if (!slotMap.has(timeKey)) {
+        slotMap.set(timeKey, { key: timeKey, label: timeKey })
+      }
+    })
+
+    return Array.from(slotMap.values()).sort(
+      (a, b) => minutesFromTimeKey(a.key) - minutesFromTimeKey(b.key),
+    )
+  }, [sessions])
+  const sessionsByCell = useMemo(() => {
+    const map = new Map<string, TSession[]>()
+
+    sessions.forEach((session) => {
+      const dayKey = getDayKey(session.starts_at)
+      const timeKey = getTimeKey(session.starts_at)
+      const cellKey = `${dayKey}|${timeKey}`
+      const nextSessions = map.get(cellKey) ?? []
+      nextSessions.push(session)
+      nextSessions.sort(
+        (a, b) =>
+          new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
+      )
+      map.set(cellKey, nextSessions)
+    })
+
+    return map
+  }, [sessions])
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ left: 0, top: 0 })
+    }
+  }, [fromDate, toDate])
+
+  if (days.length === 0 || sessions.length === 0) {
     return (
       <div className="rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
         No hay clases cargadas para este rango.
@@ -209,7 +271,10 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
   }
 
   return (
-    <div className="max-h-[72vh] overflow-auto overscroll-contain rounded-[22px] border border-[var(--line)] bg-[var(--surface)] p-1 pb-2 shadow-inner sm:max-h-[760px]">
+    <div
+      className="max-h-[72vh] overflow-auto overscroll-contain rounded-[22px] border border-[var(--line)] bg-[var(--surface)] p-1 pb-2 shadow-inner sm:max-h-[760px]"
+      ref={scrollRef}
+    >
       <div
         className="grid min-w-[720px] gap-1.5 sm:min-w-[920px] sm:gap-2"
         style={{
@@ -227,28 +292,39 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
             {formatDayTitle(day)}
           </div>
         ))}
+        <div className="sticky left-0 top-[38px] z-30 rounded-xl border border-[var(--line)] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted)] shadow-sm sm:top-[48px]">
+          Desplazá
+        </div>
+        <div
+          className="sticky top-[38px] z-20 col-span-5 rounded-xl border border-[var(--line)] bg-white px-3 py-1 text-center text-[11px] font-semibold text-[var(--muted)] shadow-sm sm:top-[48px] sm:text-xs"
+          style={{ gridColumn: `span ${days.length}` }}
+        >
+          Deslizá horizontalmente para ver todos los días
+        </div>
 
         {timeSlots.map((timeSlot) => (
-          <div className="contents" key={timeSlot}>
+          <div className="contents" key={timeSlot.key}>
             <div className="sticky left-0 z-20 flex min-h-[96px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-md sm:min-h-[118px] sm:px-3 sm:py-4 sm:text-sm">
-              {timeSlot}
+              {timeSlot.label}
             </div>
             {days.map((day) => {
-              const daySessions = sessions.filter(
-                (session) =>
-                  getDayKey(session.starts_at) === day &&
-                  getTimeKey(session.starts_at) === timeSlot,
-              )
+              const daySessions =
+                sessionsByCell.get(`${day}|${timeSlot.key}`) ?? []
 
               return (
                 <div
-                  className="min-h-[96px] rounded-2xl border border-[var(--line)] bg-white/70 p-1.5 sm:min-h-[118px] sm:p-2"
-                  key={`${day}-${timeSlot}`}
+                  className="min-h-[96px] overflow-hidden rounded-2xl border border-[var(--line)] bg-white/70 p-1.5 sm:min-h-[118px] sm:p-2"
+                  key={`${day}-${timeSlot.key}`}
                 >
                   {daySessions.length === 0 ? (
                     <div className="h-full rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface)]" />
                   ) : (
                     <div className="grid gap-2">
+                      {daySessions.length > 1 ? (
+                        <p className="rounded-lg bg-[var(--accent-soft)] px-2 py-1 text-[10px] font-bold text-[var(--accent)]">
+                          Revisar duplicado
+                        </p>
+                      ) : null}
                       {daySessions.map((session) => {
                         const status = getStatus(session, mode)
                         const selected = selectedSessionId === session.session_id
@@ -271,10 +347,10 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                                   {formatTime(session.starts_at)} -{' '}
                                   {formatTime(session.ends_at)}
                                 </p>
-                                <h4 className="mt-1 text-xs font-bold leading-tight text-[var(--ink)] sm:text-sm">
+                                <h4 className="mt-1 break-words text-xs font-bold leading-tight text-[var(--ink)] sm:text-sm">
                                   {session.title}
                                 </h4>
-                                <p className="mt-1 text-[11px] font-semibold text-[var(--ink)]/75 sm:text-xs">
+                                <p className="mt-1 break-words text-[11px] font-semibold text-[var(--ink)]/75 sm:text-xs">
                                   {session.activity_name}
                                 </p>
                               </div>

@@ -46,6 +46,8 @@ export type Plan = {
   plan_type: PlanType
   package_class_count: number | null
   active: boolean
+  visible_to_students: boolean
+  max_active_memberships: number | null
   memberships?: Array<{ id: string }>
   plan_activities?: PlanActivity[]
 }
@@ -148,6 +150,8 @@ export type PlanInput = {
   plan_type: PlanType
   package_class_count: number | null
   active: boolean
+  visible_to_students: boolean
+  max_active_memberships: number | null
   activities: PlanActivityInput[]
 }
 

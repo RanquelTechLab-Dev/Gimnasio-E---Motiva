@@ -317,6 +317,8 @@ export function AdminStudentsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
 
   const filteredStudents = useMemo(
     () =>
@@ -529,13 +531,6 @@ export function AdminStudentsPage() {
       return
     }
 
-    const confirmed = window.confirm(
-      'Este alumno quedara inactivo y no podra operar en la app. El historial se conserva. ¿Continuar?',
-    )
-    if (!confirmed) {
-      return
-    }
-
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -550,15 +545,28 @@ export function AdminStudentsPage() {
     }
   }
 
-  async function handleDeleteStudent() {
+  function openDeleteStudentModal() {
     if (!selectedStudent) {
       return
     }
 
-    const confirmed = window.confirm(
-      'Esta accion elimina el alumno de prueba definitivamente solo si no tiene historial. ¿Continuar?',
-    )
-    if (!confirmed) {
+    setDeleteConfirmation('')
+    setError(null)
+    setSuccess(null)
+    setDeleteModalOpen(true)
+  }
+
+  function closeDeleteStudentModal() {
+    if (saving) {
+      return
+    }
+
+    setDeleteConfirmation('')
+    setDeleteModalOpen(false)
+  }
+
+  async function handleDeleteStudent() {
+    if (!selectedStudent || deleteConfirmation !== 'ELIMINAR') {
       return
     }
 
@@ -570,6 +578,8 @@ export function AdminStudentsPage() {
       setSuccess('Alumno eliminado definitivamente.')
       setSelectedStudentId(null)
       setEditForm(null)
+      setDeleteConfirmation('')
+      setDeleteModalOpen(false)
       await loadData()
     } catch (deleteError) {
       setError(formatAdminError(deleteError))
@@ -1694,10 +1704,9 @@ export function AdminStudentsPage() {
                   Baja segura
                 </p>
                 <p className="text-xs text-[var(--muted)]">
-                  Si el alumno tiene membresias, pagos, reservas, asistencia,
-                  archivos o notas, no se elimina fisicamente.
-                  Eliminar tambien borra el usuario de acceso si es un alumno
-                  de prueba sin historial operativo.
+                  Desactivar conserva el historial y bloquea el acceso. Eliminar
+                  borra definitivamente al alumno, su usuario de acceso y datos
+                  asociados; usalo solo para pruebas o cargas por error.
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
@@ -1711,7 +1720,7 @@ export function AdminStudentsPage() {
                   <button
                     className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
                     disabled={saving}
-                    onClick={() => void handleDeleteStudent()}
+                    onClick={openDeleteStudentModal}
                     type="button"
                   >
                     Eliminar alumno
@@ -1720,6 +1729,78 @@ export function AdminStudentsPage() {
               </div>
             </div>
           </form>
+        ) : null}
+
+        {deleteModalOpen && selectedStudent ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+            <div
+              aria-modal="true"
+              className="w-full max-w-xl rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow)]"
+              role="dialog"
+            >
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
+                Baja definitiva
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                Eliminar alumno definitivamente
+              </h3>
+              <p className="mt-3 text-sm text-[var(--muted)]">
+                Esta acción elimina el alumno y sus datos asociados. Usala solo
+                para alumnos de prueba o cargados por error. Para alumnos reales
+                con historial, recomendamos desactivarlo.
+              </p>
+              <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+                <p className="text-sm font-bold text-[var(--ink)]">
+                  Se eliminará:
+                </p>
+                <ul className="mt-2 grid gap-1 text-sm text-[var(--muted)]">
+                  <li>Pagos</li>
+                  <li>Membresías</li>
+                  <li>Reservas</li>
+                  <li>Asistencia</li>
+                  <li>Archivos</li>
+                  <li>Notas / planes</li>
+                  <li>Usuario de acceso</li>
+                </ul>
+              </div>
+              <p className="mt-4 text-sm text-[var(--ink)]">
+                Para confirmar la eliminación de{' '}
+                <strong>
+                  {selectedStudent.first_name} {selectedStudent.last_name}
+                </strong>
+                , escribí <strong>ELIMINAR</strong>.
+              </p>
+              <input
+                aria-label="Confirmar eliminacion definitiva"
+                className="mt-3 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold tracking-[0.12em]"
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                value={deleteConfirmation}
+              />
+              {error ? (
+                <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+                  {error}
+                </p>
+              ) : null}
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={closeDeleteStudentModal}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                  disabled={saving || deleteConfirmation !== 'ELIMINAR'}
+                  onClick={() => void handleDeleteStudent()}
+                  type="button"
+                >
+                  {saving ? 'Eliminando...' : 'Eliminar definitivamente'}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {selectedStudent ? (

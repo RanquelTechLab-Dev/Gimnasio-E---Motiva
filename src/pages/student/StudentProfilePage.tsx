@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import {
   formatAppError,
   getMyProfileSummary,
+  updateMyPassword,
   updateMyProfilePreferences,
 } from '../../app/api'
 import { formatDateTime } from '../../app/format'
@@ -14,10 +15,15 @@ export function StudentProfilePage() {
   const [profile, setProfile] = useState<StudentProfileDetails | null>(null)
   const [phone, setPhone] = useState('')
   const [receivesEmails, setReceivesEmails] = useState(true)
+  const [newPassword, setNewPassword] = useState('')
+  const [repeatPassword, setRepeatPassword] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -78,6 +84,36 @@ export function StudentProfilePage() {
     }
   }
 
+  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSavingPassword(true)
+    setPasswordError(null)
+    setPasswordSuccess(null)
+
+    try {
+      if (!newPassword || !repeatPassword) {
+        throw new Error('Completá la nueva contraseña y repetila.')
+      }
+
+      if (newPassword.length < 6) {
+        throw new Error('La nueva contraseña debe tener al menos 6 caracteres.')
+      }
+
+      if (newPassword !== repeatPassword) {
+        throw new Error('Las contraseñas no coinciden.')
+      }
+
+      await updateMyPassword(newPassword)
+      setNewPassword('')
+      setRepeatPassword('')
+      setPasswordSuccess('Contraseña actualizada correctamente.')
+    } catch (saveError) {
+      setPasswordError(formatAppError(saveError))
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
   if (loading) {
     return <p className="text-sm text-[var(--muted)]">Cargando perfil...</p>
   }
@@ -119,55 +155,112 @@ export function StudentProfilePage() {
         </dl>
       </article>
 
-      <form
-        className="rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-5"
-        onSubmit={(event) => void handleSubmit(event)}
-      >
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
-          Datos de contacto
-        </p>
-        <h3 className="mt-2 text-2xl font-bold text-[var(--ink)]">
-          Datos editables
-        </h3>
-        <label className="mt-5 block text-sm font-semibold text-[var(--ink)]">
-          Telefono
-          <input
-            className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-            onChange={(event) => setPhone(event.target.value)}
-            placeholder="Telefono de contacto"
-            type="tel"
-            value={phone}
-          />
-        </label>
-        <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4 text-sm font-semibold">
-          <input
-            checked={receivesEmails}
-            onChange={(event) => setReceivesEmails(event.target.checked)}
-            type="checkbox"
-          />
-          Recibir novedades por email
-        </label>
-        <p className="mt-4 text-sm text-[var(--muted)]">
-          El email y el estado de la cuenta los actualiza administración.
-        </p>
-        <button
-          className="mt-5 rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
-          disabled={saving}
-          type="submit"
+      <div className="grid gap-5">
+        <form
+          className="rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-5"
+          onSubmit={(event) => void handleSubmit(event)}
         >
-          Guardar cambios
-        </button>
-        {error ? (
-          <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
-            {error}
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
+            Datos de contacto
           </p>
-        ) : null}
-        {success ? (
-          <p className="mt-4 rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
-            {success}
+          <h3 className="mt-2 text-2xl font-bold text-[var(--ink)]">
+            Datos editables
+          </h3>
+          <label className="mt-5 block text-sm font-semibold text-[var(--ink)]">
+            Telefono
+            <input
+              className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+              onChange={(event) => setPhone(event.target.value)}
+              placeholder="Telefono de contacto"
+              type="tel"
+              value={phone}
+            />
+          </label>
+          <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4 text-sm font-semibold">
+            <input
+              checked={receivesEmails}
+              onChange={(event) => setReceivesEmails(event.target.checked)}
+              type="checkbox"
+            />
+            Recibir novedades por email
+          </label>
+          <p className="mt-4 text-sm text-[var(--muted)]">
+            El email y el estado de la cuenta los actualiza administración.
           </p>
-        ) : null}
-      </form>
+          <button
+            className="mt-5 rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+            disabled={saving}
+            type="submit"
+          >
+            Guardar cambios
+          </button>
+          {error ? (
+            <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+              {error}
+            </p>
+          ) : null}
+          {success ? (
+            <p className="mt-4 rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
+              {success}
+            </p>
+          ) : null}
+        </form>
+
+        <form
+          className="rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-5"
+          onSubmit={(event) => void handlePasswordSubmit(event)}
+        >
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+            Seguridad
+          </p>
+          <h3 className="mt-2 text-2xl font-bold text-[var(--ink)]">
+            Cambiar contraseña
+          </h3>
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            Usá esta opción si querés reemplazar la contraseña provisoria que te
+            dio administración.
+          </p>
+          <label className="mt-5 block text-sm font-semibold text-[var(--ink)]">
+            Nueva contraseña
+            <input
+              autoComplete="new-password"
+              className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+              minLength={6}
+              onChange={(event) => setNewPassword(event.target.value)}
+              type="password"
+              value={newPassword}
+            />
+          </label>
+          <label className="mt-4 block text-sm font-semibold text-[var(--ink)]">
+            Repetir nueva contraseña
+            <input
+              autoComplete="new-password"
+              className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+              minLength={6}
+              onChange={(event) => setRepeatPassword(event.target.value)}
+              type="password"
+              value={repeatPassword}
+            />
+          </label>
+          <button
+            className="mt-5 rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+            disabled={savingPassword}
+            type="submit"
+          >
+            {savingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+          </button>
+          {passwordError ? (
+            <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+              {passwordError}
+            </p>
+          ) : null}
+          {passwordSuccess ? (
+            <p className="mt-4 rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
+              {passwordSuccess}
+            </p>
+          ) : null}
+        </form>
+      </div>
     </section>
   )
 }

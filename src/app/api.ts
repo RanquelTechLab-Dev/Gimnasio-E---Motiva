@@ -118,6 +118,17 @@ export async function updateMyProfilePreferences(input: {
   return data as StudentProfileDetails
 }
 
+export async function updateMyPassword(newPassword: string) {
+  const client = getClient()
+  const { error } = await client.auth.updateUser({
+    password: newPassword,
+  })
+
+  if (error) {
+    throw error
+  }
+}
+
 export async function listMyPayments() {
   const client = getClient()
   const { data, error } = await client.rpc('list_my_payments')

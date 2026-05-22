@@ -174,5 +174,6 @@ export type StudentPlanCatalogItem = {
   plan_type: 'weekly' | 'package' | 'manual'
   package_class_count: number | null
   active: boolean
+  visible_to_students: boolean
   plan_activities: StudentPlanCatalogActivity[]
 }

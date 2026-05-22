@@ -223,6 +223,8 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 }: WeeklyScheduleGridProps<TSession>) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const days = buildDays(fromDate, toDate)
+  const todayKey = formatLocalDate(new Date())
+  const rangeStartKey = fromDate
   const timeSlots = useMemo(() => {
     const slotMap = new Map(canonicalTimeSlots.map((slot) => [slot.key, slot]))
 
@@ -284,14 +286,29 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
         <div className="sticky left-0 top-0 z-40 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted)] shadow-md sm:px-3 sm:py-3 sm:text-xs sm:tracking-[0.18em]">
           Horario
         </div>
-        {days.map((day) => (
-          <div
-            className="sticky top-0 z-30 rounded-2xl border border-[var(--line)] bg-[var(--brand)] px-2 py-2 text-center font-display text-xs font-bold capitalize text-white shadow-md sm:px-3 sm:py-3 sm:text-sm"
-            key={day}
-          >
-            {formatDayTitle(day)}
-          </div>
-        ))}
+        {days.map((day) => {
+          const isToday = day === todayKey
+          const isRangeStart = day === rangeStartKey
+          const headerTone = isToday
+            ? 'border-[var(--ink)] bg-[var(--ink)] text-white'
+            : isRangeStart
+              ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
+              : 'border-[var(--line)] bg-[var(--brand)] text-white'
+
+          return (
+            <div
+              className={`sticky top-0 z-30 rounded-2xl border px-2 py-2 text-center font-display text-xs font-bold capitalize shadow-md sm:px-3 sm:py-3 sm:text-sm ${headerTone}`}
+              key={day}
+            >
+              {formatDayTitle(day)}
+              {isToday ? (
+                <span className="mt-1 block text-[10px] uppercase tracking-[0.14em]">
+                  Hoy
+                </span>
+              ) : null}
+            </div>
+          )
+        })}
         <div className="sticky left-0 top-[38px] z-30 rounded-xl border border-[var(--line)] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted)] shadow-sm sm:top-[48px]">
           Desplazá
         </div>
@@ -310,10 +327,17 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
             {days.map((day) => {
               const daySessions =
                 sessionsByCell.get(`${day}|${timeSlot.key}`) ?? []
+              const isToday = day === todayKey
+              const isRangeStart = day === rangeStartKey
+              const cellTone = isToday
+                ? 'border-[var(--brand)] bg-[var(--brand-soft)]/70'
+                : isRangeStart
+                  ? 'border-[var(--brand)]/50 bg-[var(--surface-strong)]'
+                  : 'border-[var(--line)] bg-white/70'
 
               return (
                 <div
-                  className="min-h-[96px] overflow-hidden rounded-2xl border border-[var(--line)] bg-white/70 p-1.5 sm:min-h-[118px] sm:p-2"
+                  className={`min-h-[96px] overflow-hidden rounded-2xl border p-1.5 sm:min-h-[118px] sm:p-2 ${cellTone}`}
                   key={`${day}-${timeSlot.key}`}
                 >
                   {daySessions.length === 0 ? (

@@ -486,7 +486,7 @@ export function AdminStudentsPage() {
     try {
       await createStudent(studentForm)
       setSuccess(
-        'Alumno creado. Entrega la contrasena provisoria de forma manual y no la guardes.',
+        'Alumno creado. Entrega la contraseña provisoria de forma manual y no la guardes.',
       )
       setStudentForm({
         first_name: '',
@@ -1583,12 +1583,12 @@ export function AdminStudentsPage() {
               value={studentForm.phone}
             />
             <input
-              aria-label="Contrasena provisoria del alumno"
+              aria-label="Contraseña provisoria del alumno"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
               onChange={(event) =>
                 setStudentForm({ ...studentForm, password: event.target.value })
               }
-              placeholder="Contrasena provisoria"
+              placeholder="Contraseña provisoria"
               type="password"
               value={studentForm.password}
             />

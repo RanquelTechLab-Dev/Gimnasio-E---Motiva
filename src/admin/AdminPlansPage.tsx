@@ -32,6 +32,8 @@ type PlanFormState = {
   plan_type: PlanType
   package_class_count: string
   active: boolean
+  visible_to_students: boolean
+  max_active_memberships: string
   activities: Array<{
     activity_id: string
     weekly_class_limit: string
@@ -48,6 +50,8 @@ const emptyPlanForm: PlanFormState = {
   plan_type: 'weekly',
   package_class_count: '',
   active: true,
+  visible_to_students: true,
+  max_active_memberships: '',
   activities: [],
 }
 
@@ -63,6 +67,10 @@ function planToForm(plan: Plan): PlanFormState {
       ? String(plan.package_class_count)
       : '',
     active: plan.active,
+    visible_to_students: plan.visible_to_students,
+    max_active_memberships: plan.max_active_memberships
+      ? String(plan.max_active_memberships)
+      : '',
     activities: (plan.plan_activities ?? [])
       .filter((item) => item.activities)
       .map((item) => ({
@@ -179,6 +187,11 @@ function toPlanInput(form: PlanFormState): PlanInput {
           true,
         )
       : null
+  const maxActiveMemberships = parsePositiveInteger(
+    form.max_active_memberships,
+    'El limite de inscriptos',
+    false,
+  )
 
   const activities: PlanActivityInput[] = form.activities
     .filter((item) => item.activity_id)
@@ -210,6 +223,8 @@ function toPlanInput(form: PlanFormState): PlanInput {
     plan_type: form.plan_type,
     package_class_count: packageClassCount,
     active: form.active,
+    visible_to_students: form.visible_to_students,
+    max_active_memberships: maxActiveMemberships,
     activities,
   }
 }
@@ -470,7 +485,13 @@ export function AdminPlansPage() {
                   </div>
                   <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
                     {plan.active ? 'Activo' : 'Archivado'} ·{' '}
-                    {plan.billing_period_days} dias · {plan.plan_type}
+                    {plan.visible_to_students
+                      ? 'Visible para alumnos'
+                      : 'Oculto para alumnos'}{' '}
+                    · {plan.max_active_memberships
+                      ? `${plan.max_active_memberships} inscriptos max.`
+                      : 'Sin limite de inscriptos'}{' '}
+                    · {plan.billing_period_days} dias · {plan.plan_type}
                   </p>
                 </button>
               ))}
@@ -723,6 +744,44 @@ export function AdminPlansPage() {
                 type="checkbox"
               />
               Plan activo
+            </label>
+            <label className="grid gap-1 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3 text-sm font-semibold">
+              <span className="flex items-center gap-3">
+                <input
+                  checked={planForm.visible_to_students}
+                  onChange={(event) =>
+                    setPlanForm({
+                      ...planForm,
+                      visible_to_students: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Visible para alumnos
+              </span>
+              <span className="pl-6 text-xs font-normal text-[var(--muted)]">
+                Si está desactivado, el plan puede usarse internamente pero no
+                aparece en Planes y precios del alumno.
+              </span>
+            </label>
+            <label className="text-sm font-semibold">
+              Límite de inscriptos
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                min="1"
+                onChange={(event) =>
+                  setPlanForm({
+                    ...planForm,
+                    max_active_memberships: event.target.value,
+                  })
+                }
+                placeholder="Sin límite"
+                type="number"
+                value={planForm.max_active_memberships}
+              />
+              <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
+                Dejalo vacío para sin límite.
+              </span>
             </label>
             <button
               className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"

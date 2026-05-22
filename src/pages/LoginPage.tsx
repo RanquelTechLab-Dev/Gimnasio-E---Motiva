@@ -107,7 +107,7 @@ export function LoginPage() {
 
         <label className="mt-4 block">
           <span className="text-sm font-medium text-[var(--muted)]">
-            Contrasena
+            Contraseña
           </span>
           <input
             className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--ink)] outline-none transition focus:border-[var(--brand)]"

@@ -43,6 +43,27 @@ async function countRows(
   return count ?? 0
 }
 
+async function deleteRows(
+  adminClient: ReturnType<typeof createClient>,
+  table: string,
+  column: string,
+  value: string,
+) {
+  const count = await countRows(adminClient, table, column, value)
+
+  if (count === 0) {
+    return 0
+  }
+
+  const { error } = await adminClient.from(table).delete().eq(column, value)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return count
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -114,78 +135,99 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Solo un admin activo puede eliminar alumnos.' }, 403)
   }
 
+  if (studentId === requester.id) {
+    return jsonResponse(
+      { error: 'No podes eliminar tu propio usuario desde esta accion.' },
+      403,
+    )
+  }
+
   const { data: studentProfile, error: studentProfileError } = await adminClient
     .from('profiles')
     .select('id, role, email')
     .eq('id', studentId)
     .single()
 
-  if (studentProfileError || !studentProfile || studentProfile.role !== 'student') {
+  if (studentProfileError || !studentProfile) {
     return jsonResponse({ error: 'No se encontro el alumno.' }, 404)
   }
 
-  try {
-    const [
-      memberships,
-      payments,
-      bookings,
-      attendance,
-      files,
-      trainingNotes,
-    ] = await Promise.all([
-      countRows(adminClient, 'memberships', 'student_id', studentId),
-      countRows(adminClient, 'payments', 'student_id', studentId),
-      countRows(adminClient, 'bookings', 'student_id', studentId),
-      countRows(adminClient, 'attendance', 'student_id', studentId),
-      countRows(adminClient, 'files', 'student_id', studentId),
-      countRows(adminClient, 'training_notes', 'student_id', studentId),
-    ])
-
-    const operationalHistory =
-      memberships + payments + bookings + attendance + files + trainingNotes
-
-    if (operationalHistory > 0) {
-      return jsonResponse(
-        {
-          error:
-            'Este alumno tiene historial. No se puede eliminar definitivamente. Podes desactivarlo.',
-          history: {
-            memberships,
-            payments,
-            bookings,
-            attendance,
-            files,
-            training_notes: trainingNotes,
-          },
-        },
-        409,
-      )
-    }
-  } catch (historyError) {
-    const message =
-      historyError instanceof Error
-        ? historyError.message
-        : 'No se pudo verificar historial del alumno.'
-    return jsonResponse({ error: message }, 500)
+  if (studentProfile.role === 'admin') {
+    return jsonResponse(
+      { error: 'No se puede eliminar un usuario admin desde esta accion.' },
+      403,
+    )
   }
 
-  const { error: auditError } = await adminClient.from('audit_logs').insert({
-    actor_id: requester.id,
-    entity_type: 'student',
-    entity_id: studentId,
-    action: 'student.delete_requested',
-    metadata: {
-      email: studentProfile.email,
-      reason: 'admin_delete_without_operational_history',
-    },
-  })
+  if (studentProfile.role !== 'student') {
+    return jsonResponse({ error: 'Solo se pueden eliminar perfiles de alumno.' }, 403)
+  }
 
-  if (auditError) {
+  const deletedCounts: Record<string, number> = {}
+
+  try {
+    deletedCounts.attendance = await deleteRows(
+      adminClient,
+      'attendance',
+      'student_id',
+      studentId,
+    )
+    deletedCounts.bookings = await deleteRows(
+      adminClient,
+      'bookings',
+      'student_id',
+      studentId,
+    )
+    deletedCounts.payments = await deleteRows(
+      adminClient,
+      'payments',
+      'student_id',
+      studentId,
+    )
+    deletedCounts.memberships = await deleteRows(
+      adminClient,
+      'memberships',
+      'student_id',
+      studentId,
+    )
+    deletedCounts.files = await deleteRows(
+      adminClient,
+      'files',
+      'student_id',
+      studentId,
+    )
+    deletedCounts.training_notes = await deleteRows(
+      adminClient,
+      'training_notes',
+      'student_id',
+      studentId,
+    )
+
+    const { error: auditError } = await adminClient.from('audit_logs').insert({
+      actor_id: requester.id,
+      entity_type: 'student',
+      entity_id: studentId,
+      action: 'student.delete_final',
+      metadata: {
+        email: studentProfile.email,
+        deleted_counts: deletedCounts,
+        note:
+          'Eliminacion definitiva solicitada por admin para alumno de prueba o carga por error. Metadata de archivos eliminada; archivos Drive no se borran masivamente desde esta funcion.',
+      },
+    })
+
+    if (auditError) {
+      deletedCounts.audit_log_error = 1
+    }
+  } catch (deleteError) {
+    const message =
+      deleteError instanceof Error
+        ? deleteError.message
+        : 'No se pudieron eliminar los datos asociados del alumno.'
     return jsonResponse(
       {
-        error:
-          'No se pudo auditar el borrado. No se elimino el alumno.',
-        detail: auditError.message,
+        error: message,
+        deleted_counts: deletedCounts,
       },
       500,
     )
@@ -255,5 +297,6 @@ Deno.serve(async (req) => {
   return jsonResponse({
     action: 'deleted',
     student_id: studentId,
+    deleted_counts: deletedCounts,
   })
 })

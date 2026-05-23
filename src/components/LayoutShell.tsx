@@ -74,7 +74,7 @@ export function LayoutShell({
           </div>
         </aside>
 
-        <main className="flex min-h-[80vh] min-w-0 flex-col gap-4 rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] sm:p-5 xl:p-6">
+        <main className="flex min-h-[80vh] min-w-0 max-w-full flex-col gap-4 overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] sm:p-5 xl:p-6">
           <header className="grid gap-3 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,520px)] lg:items-end">
             <div>
               <p className="font-display text-xs font-bold uppercase tracking-[0.28em] text-[var(--brand)]">

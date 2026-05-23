@@ -635,8 +635,8 @@ export function AdminCalendarPage() {
   }
 
   return (
-    <section className="grid gap-5 pb-24">
-      <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
+    <section className="grid w-full min-w-0 max-w-full gap-5 overflow-hidden pb-24">
+      <div className="min-w-0 max-w-full overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -671,7 +671,7 @@ export function AdminCalendarPage() {
           </div>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-5 min-w-0 max-w-full overflow-hidden">
           {loading ? (
             <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
           ) : (

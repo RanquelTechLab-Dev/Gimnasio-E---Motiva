@@ -273,17 +273,18 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
   }
 
   return (
-    <div
-      className="max-h-[72vh] overflow-auto overscroll-contain rounded-[22px] border border-[var(--line)] bg-[var(--surface)] p-1 pb-2 shadow-inner sm:max-h-[760px]"
-      ref={scrollRef}
-    >
+    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border border-[var(--line)] bg-[var(--surface)] shadow-inner">
       <div
-        className="grid min-w-[720px] gap-1.5 sm:min-w-[920px] sm:gap-2"
+        className="w-full max-w-full overflow-x-auto overflow-y-visible overscroll-x-contain p-1 pb-2 md:max-h-[760px] md:overflow-auto md:overscroll-contain"
+        ref={scrollRef}
+      >
+      <div
+        className="grid w-max min-w-[760px] gap-2 md:min-w-[920px]"
         style={{
-          gridTemplateColumns: `76px repeat(${days.length}, minmax(132px, 1fr))`,
+          gridTemplateColumns: `72px repeat(${days.length}, minmax(128px, 1fr))`,
         }}
       >
-        <div className="sticky left-0 top-0 z-40 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted)] shadow-md sm:px-3 sm:py-3 sm:text-xs sm:tracking-[0.18em]">
+        <div className="z-10 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted)] shadow-sm md:sticky md:left-0 md:top-0 md:z-40 md:shadow-md md:px-3 md:py-3 md:text-xs md:tracking-[0.18em]">
           Horario
         </div>
         {days.map((day) => {
@@ -297,7 +298,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
           return (
             <div
-              className={`sticky top-0 z-30 rounded-2xl border px-2 py-2 text-center font-display text-xs font-bold capitalize shadow-md sm:px-3 sm:py-3 sm:text-sm ${headerTone}`}
+              className={`z-10 rounded-2xl border px-2 py-2 text-center font-display text-xs font-bold capitalize shadow-sm md:sticky md:top-0 md:z-30 md:shadow-md md:px-3 md:py-3 md:text-sm ${headerTone}`}
               key={day}
             >
               {formatDayTitle(day)}
@@ -309,11 +310,11 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
             </div>
           )
         })}
-        <div className="sticky left-0 top-[38px] z-30 rounded-xl border border-[var(--line)] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted)] shadow-sm sm:top-[48px]">
+        <div className="z-10 rounded-xl border border-[var(--line)] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--muted)] shadow-sm md:sticky md:left-0 md:top-[48px] md:z-30">
           Desplazá
         </div>
         <div
-          className="sticky top-[38px] z-20 col-span-5 rounded-xl border border-[var(--line)] bg-white px-3 py-1 text-center text-[11px] font-semibold text-[var(--muted)] shadow-sm sm:top-[48px] sm:text-xs"
+          className="z-10 rounded-xl border border-[var(--line)] bg-white px-3 py-1 text-center text-[11px] font-semibold text-[var(--muted)] shadow-sm md:sticky md:top-[48px] md:z-20 md:text-xs"
           style={{ gridColumn: `span ${days.length}` }}
         >
           Deslizá horizontalmente para ver todos los días
@@ -321,7 +322,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
         {timeSlots.map((timeSlot) => (
           <div className="contents" key={timeSlot.key}>
-            <div className="sticky left-0 z-20 flex min-h-[96px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-md sm:min-h-[118px] sm:px-3 sm:py-4 sm:text-sm">
+            <div className="z-10 flex min-h-[112px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-sm md:sticky md:left-0 md:z-20 md:min-h-[128px] md:px-3 md:py-4 md:text-sm md:shadow-md">
               {timeSlot.label}
             </div>
             {days.map((day) => {
@@ -337,7 +338,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
               return (
                 <div
-                  className={`min-h-[96px] overflow-hidden rounded-2xl border p-1.5 sm:min-h-[118px] sm:p-2 ${cellTone}`}
+                  className={`min-h-[112px] min-w-0 overflow-hidden rounded-2xl border p-2 md:min-h-[128px] ${cellTone}`}
                   key={`${day}-${timeSlot.key}`}
                 >
                   {daySessions.length === 0 ? (
@@ -358,14 +359,14 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                           mode === 'student' ? getPlanUsageLabel(session) : null
                         return (
                           <article
-                            className={`rounded-2xl border p-2 text-left shadow-sm transition sm:p-3 ${toneForSession(session)} ${
+                            className={`min-w-0 overflow-hidden rounded-2xl border p-2 text-left shadow-sm transition md:p-3 ${toneForSession(session)} ${
                               selected
                                 ? 'ring-2 ring-[var(--brand)]'
                                 : 'ring-0'
                             }`}
                             key={session.session_id}
                           >
-                            <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
                                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink)]/70 sm:text-[11px] sm:tracking-[0.12em]">
                                   {formatTime(session.starts_at)} -{' '}
@@ -379,7 +380,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                                 </p>
                               </div>
                               <span
-                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:px-2.5 sm:py-1 sm:text-[11px] ${status.className}`}
+                                className={`w-fit max-w-full shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:px-2.5 sm:py-1 sm:text-[11px] ${status.className}`}
                               >
                                 {status.label}
                               </span>
@@ -412,7 +413,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
                             {mode === 'admin' ? (
                               <button
-                                className="mt-2 w-full rounded-xl bg-white/90 px-3 py-2 text-xs font-bold text-[var(--ink)] transition hover:bg-white sm:mt-3"
+                                className="mt-3 w-full rounded-xl bg-white/90 px-3 py-2 text-center text-xs font-bold text-[var(--ink)] transition hover:bg-white"
                                 onClick={() => onSelectSession?.(session)}
                                 type="button"
                               >
@@ -423,7 +424,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                                 {session.own_booking_id ? (
                                   <>
                                     <button
-                                      className="rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+                                      className="w-full rounded-xl bg-[var(--accent)] px-3 py-2 text-center text-xs font-bold text-white disabled:opacity-60"
                                       disabled={busy || Boolean(cancelBlockReason)}
                                       onClick={() => onCancelBooking?.(session)}
                                       type="button"
@@ -438,7 +439,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                                   </>
                                 ) : (
                                   <button
-                                    className="rounded-xl bg-[var(--brand)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+                                    className="w-full rounded-xl bg-[var(--brand)] px-3 py-2 text-center text-xs font-bold text-white disabled:opacity-60"
                                     disabled={busy || !session.can_book}
                                     onClick={() => onBookSession?.(session)}
                                     type="button"
@@ -458,6 +459,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
             })}
           </div>
         ))}
+      </div>
       </div>
     </div>
   )

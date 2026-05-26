@@ -98,7 +98,7 @@ export function AppCalendarPage() {
   }
 
   return (
-    <section className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+    <section className="w-full min-w-0 max-w-full overflow-hidden rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 sm:p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -137,7 +137,7 @@ export function AppCalendarPage() {
         </div>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5 min-w-0 max-w-full overflow-hidden">
         {loading ? (
           <p className="text-sm text-[var(--muted)]">Cargando clases...</p>
         ) : (

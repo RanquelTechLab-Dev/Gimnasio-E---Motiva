@@ -210,6 +210,23 @@ function getPlanUsageLabel(session: ScheduleSession) {
   return null
 }
 
+function getSessionDetail(session: ScheduleSession) {
+  const title = session.title.trim()
+  return title && title !== session.activity_name ? title : null
+}
+
+function hasDuplicateActivity(sessions: ScheduleSession[]) {
+  const activityCounts = new Map<string, number>()
+  sessions.forEach((session) => {
+    activityCounts.set(
+      session.activity_id,
+      (activityCounts.get(session.activity_id) ?? 0) + 1,
+    )
+  })
+
+  return Array.from(activityCounts.values()).some((count) => count > 1)
+}
+
 export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
   sessions,
   fromDate,
@@ -345,9 +362,9 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                     <div className="h-full rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface)]" />
                   ) : (
                     <div className="grid gap-2">
-                      {daySessions.length > 1 ? (
+                      {hasDuplicateActivity(daySessions) ? (
                         <p className="rounded-lg bg-[var(--accent-soft)] px-2 py-1 text-[10px] font-bold text-[var(--accent)]">
-                          Revisar duplicado
+                          Hay otra clase igual en este horario
                         </p>
                       ) : null}
                       {daySessions.map((session) => {
@@ -355,6 +372,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                         const selected = selectedSessionId === session.session_id
                         const busy = savingSessionId === session.session_id
                         const cancelBlockReason = getCancelBlockReason(session)
+                        const sessionDetail = getSessionDetail(session)
                         const planUsageLabel =
                           mode === 'student' ? getPlanUsageLabel(session) : null
                         return (
@@ -373,11 +391,13 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                                   {formatTime(session.ends_at)}
                                 </p>
                                 <h4 className="mt-1 break-words text-xs font-bold leading-tight text-[var(--ink)] sm:text-sm">
-                                  {session.title}
-                                </h4>
-                                <p className="mt-1 break-words text-[11px] font-semibold text-[var(--ink)]/75 sm:text-xs">
                                   {session.activity_name}
-                                </p>
+                                </h4>
+                                {sessionDetail ? (
+                                  <p className="mt-1 break-words text-[11px] font-semibold text-[var(--ink)]/75 sm:text-xs">
+                                    {sessionDetail}
+                                  </p>
+                                ) : null}
                               </div>
                               <span
                                 className={`w-fit max-w-full shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:px-2.5 sm:py-1 sm:text-[11px] ${status.className}`}

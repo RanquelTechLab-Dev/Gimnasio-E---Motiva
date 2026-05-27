@@ -207,10 +207,15 @@ function toActivityInput(form: ActivityFormState): ActivityInput {
   }
 }
 
+function getSessionDetail(session: CalendarSession) {
+  const title = session.title.trim()
+  return title && title !== session.activity_name ? title : ''
+}
+
 function sessionToForm(session: CalendarSession): ClassFormState {
   return {
     activity_id: session.activity_id,
-    title: session.title,
+    title: getSessionDetail(session),
     starts_at: formatDateTimeLocal(new Date(session.starts_at)),
     ends_at: formatDateTimeLocal(new Date(session.ends_at)),
     capacity: String(session.capacity),
@@ -223,7 +228,7 @@ function sessionToForm(session: CalendarSession): ClassFormState {
 function formToInput(form: ClassFormState): ClassSessionInput {
   return {
     activity_id: form.activity_id,
-    title: form.title,
+    title: form.title.trim(),
     starts_at: dateTimeLocalToIso(form.starts_at),
     ends_at: dateTimeLocalToIso(form.ends_at),
     capacity: Number(form.capacity),
@@ -432,8 +437,8 @@ export function AdminCalendarPage() {
       return
     }
 
-    if (!form.activity_id || !form.title.trim()) {
-      setError('Selecciona actividad y titulo para la clase.')
+    if (!form.activity_id) {
+      setError('Selecciona un tipo de clase para la clase.')
       return
     }
 
@@ -474,17 +479,23 @@ export function AdminCalendarPage() {
     setSuccess(null)
     try {
       const input = formToInput(normalizedForm)
+      const selectedActivityName = selectedActivity?.name ?? ''
+      const inputWithTitle = {
+        ...input,
+        title: input.title || selectedActivityName,
+      }
       if (selectedSession) {
         await updateClassSession({
-          ...input,
+          ...inputWithTitle,
           session_id: selectedSession.session_id,
           active: form.active,
         } satisfies UpdateClassSessionInput)
-        setSuccess('Clase actualizada.')
+        setSuccess('Clase actualizada correctamente.')
+        resetForm()
       } else if (recurrence.enabled) {
         await createClassRecurringRule({
           activity_id: normalizedForm.activity_id,
-          title: normalizedForm.title,
+          title: normalizedForm.title.trim() || selectedActivityName,
           weekday: Number(recurrence.weekday),
           start_time: recurrence.start_time,
           end_time: recurrence.end_time,
@@ -495,7 +506,7 @@ export function AdminCalendarPage() {
         })
         setSuccess('Horario recurrente creado. Se repetira todas las semanas hasta que lo pauses o modifiques.')
       } else {
-        await createClassSession(input)
+        await createClassSession(inputWithTitle)
         setSuccess('Clase creada.')
       }
       await loadData()
@@ -809,10 +820,10 @@ export function AdminCalendarPage() {
               </p>
             </div>
             <input
-              aria-label="Titulo de la clase"
+              aria-label="Detalle opcional"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
               onChange={(event) => setForm({ ...form, title: event.target.value })}
-              placeholder="Titulo"
+              placeholder="Detalle opcional: grupo avanzado, reemplazo, observacion interna"
               value={form.title}
             />
             <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3">

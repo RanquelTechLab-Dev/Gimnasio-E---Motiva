@@ -101,6 +101,18 @@ const moneyFormatter = new Intl.NumberFormat('es-AR', {
   maximumFractionDigits: 0,
 })
 
+const paymentStatusLabels: Record<Payment['status'], string> = {
+  approved: 'Aprobado',
+  pending: 'Pendiente',
+  rejected: 'Rechazado',
+  voided: 'Anulado',
+}
+
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+  cash: 'Efectivo',
+  transfer: 'Transferencia',
+}
+
 const noteTypeLabels: Record<TrainingNoteType, string> = {
   admin_note: 'Nota administrativa',
   follow_up: 'Seguimiento',
@@ -129,6 +141,14 @@ function formatLocalDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function formatDisplayDate(value: string) {
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value))
 }
 
 function studentDisplayName(student: StudentProfile) {
@@ -1518,12 +1538,13 @@ export function AdminStudentsPage() {
                       className="flex flex-col gap-1 rounded-2xl border border-[var(--line)] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
                       key={payment.id}
                     >
-                      <span>{moneyFormatter.format(payment.amount)}</span>
+                      <span className="font-semibold text-[var(--ink)]">
+                        {formatDisplayDate(payment.paid_at)} ·{' '}
+                        {moneyFormatter.format(payment.amount)}
+                      </span>
                       <span className="text-[var(--muted)]">
-                        {payment.method === 'cash'
-                          ? 'Efectivo'
-                          : 'Transferencia'}{' '}
-                        · {payment.status}
+                        {paymentStatusLabels[payment.status]} ·{' '}
+                        {paymentMethodLabels[payment.method]}
                       </span>
                     </div>
                   ))

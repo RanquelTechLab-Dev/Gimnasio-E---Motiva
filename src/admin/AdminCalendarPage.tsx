@@ -237,6 +237,45 @@ function formToInput(form: ClassFormState): ClassSessionInput {
   }
 }
 
+function normalizeCapacityForActivity(
+  activity: Activity | null | undefined,
+  currentCapacity: string,
+) {
+  if (!activity) {
+    return { capacity: currentCapacity, adjusted: false }
+  }
+
+  if (activity.slug === 'personalizado_1_1') {
+    return { capacity: '1', adjusted: currentCapacity !== '1' }
+  }
+
+  const current = Number(currentCapacity)
+
+  if (!currentCapacity.trim() && activity.default_capacity) {
+    return { capacity: String(activity.default_capacity), adjusted: true }
+  }
+
+  if (
+    activity.max_capacity &&
+    Number.isFinite(current) &&
+    current > activity.max_capacity
+  ) {
+    return { capacity: String(activity.max_capacity), adjusted: true }
+  }
+
+  return { capacity: currentCapacity, adjusted: false }
+}
+
+function getActivityMaxCapacityMessage(activity: Activity) {
+  if (!activity.max_capacity) {
+    return null
+  }
+
+  return `${activity.name} permite maximo ${activity.max_capacity} alumno${
+    activity.max_capacity === 1 ? '' : 's'
+  }.`
+}
+
 export function AdminCalendarPage() {
   const today = useMemo(() => new Date(), [])
   const [activities, setActivities] = useState<Activity[]>([])
@@ -256,6 +295,7 @@ export function AdminCalendarPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [capacityNotice, setCapacityNotice] = useState<string | null>(null)
 
   const selectedSession = useMemo(
     () =>
@@ -366,6 +406,7 @@ export function AdminCalendarPage() {
     setForm(nextForm)
     setRecurrence(buildRecurrenceForm(nextForm))
     setCancelReason('')
+    setCapacityNotice(null)
     setError(null)
     setSuccess(null)
   }
@@ -383,8 +424,29 @@ export function AdminCalendarPage() {
     setForm(nextForm)
     setRecurrence(buildRecurrenceForm(nextForm))
     setCancelReason('')
+    setCapacityNotice(null)
     setError(null)
     setSuccess(null)
+  }
+
+  function handleActivityChange(activityId: string) {
+    const nextActivity =
+      activities.find((activity) => activity.id === activityId) ?? null
+    const normalized = normalizeCapacityForActivity(nextActivity, form.capacity)
+
+    setForm({
+      ...form,
+      activity_id: activityId,
+      capacity: normalized.capacity,
+    })
+    setCapacityNotice(
+      normalized.adjusted &&
+        nextActivity?.max_capacity &&
+        nextActivity.slug !== 'personalizado_1_1'
+        ? `Cupo ajustado al maximo permitido para ${nextActivity.name}.`
+        : null,
+    )
+    setError(null)
   }
 
   function updateStartDateTime(dateValue: string, timeValue: string) {
@@ -444,6 +506,15 @@ export function AdminCalendarPage() {
 
     if (!Number.isFinite(capacity) || capacity <= 0) {
       setError('El cupo debe ser mayor a cero.')
+      return
+    }
+
+    if (selectedActivity?.max_capacity && capacity > selectedActivity.max_capacity) {
+      setError(
+        `${selectedActivity.name} permite maximo ${selectedActivity.max_capacity} alumno${
+          selectedActivity.max_capacity === 1 ? '' : 's'
+        }.`,
+      )
       return
     }
 
@@ -728,19 +799,7 @@ export function AdminCalendarPage() {
               aria-label="Actividad"
               className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
               disabled={!selectedSession && !hasActiveActivities}
-              onChange={(event) => {
-                const nextActivity = activities.find(
-                  (activity) => activity.id === event.target.value,
-                )
-                setForm({
-                  ...form,
-                  activity_id: event.target.value,
-                  capacity:
-                    nextActivity?.slug === 'personalizado_1_1'
-                      ? '1'
-                      : form.capacity,
-                })
-              }}
+              onChange={(event) => handleActivityChange(event.target.value)}
               value={form.activity_id}
             >
               <option value="">Seleccionar actividad</option>
@@ -977,22 +1036,29 @@ export function AdminCalendarPage() {
               </div>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                aria-label="Cupo"
-                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                disabled={isPersonalizedOneOnOne}
-                max={isPersonalizedOneOnOne ? '1' : undefined}
-                min="1"
-                onChange={(event) => {
-                  const nextCapacity = isPersonalizedOneOnOne
-                    ? '1'
-                    : event.target.value
-                  setForm({ ...form, capacity: nextCapacity })
-                }}
-                placeholder="Cupo"
-                type="number"
-                value={isPersonalizedOneOnOne ? '1' : form.capacity}
-              />
+              <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                Cupo
+                <input
+                  aria-label="Cupo"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                  disabled={isPersonalizedOneOnOne}
+                  max={
+                    selectedActivity?.max_capacity ??
+                    (isPersonalizedOneOnOne ? 1 : undefined)
+                  }
+                  min="1"
+                  onChange={(event) => {
+                    const nextCapacity = isPersonalizedOneOnOne
+                      ? '1'
+                      : event.target.value
+                    setForm({ ...form, capacity: nextCapacity })
+                    setCapacityNotice(null)
+                  }}
+                  placeholder="Cupo"
+                  type="number"
+                  value={isPersonalizedOneOnOne ? '1' : form.capacity}
+                />
+              </label>
               <input
                 aria-label="Entrenador"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
@@ -1003,6 +1069,16 @@ export function AdminCalendarPage() {
                 value={form.coach_name}
               />
             </div>
+            {selectedActivity?.max_capacity && !isPersonalizedOneOnOne ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                {getActivityMaxCapacityMessage(selectedActivity)}
+              </p>
+            ) : null}
+            {capacityNotice ? (
+              <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                {capacityNotice}
+              </p>
+            ) : null}
             {isPersonalizedOneOnOne ? (
               <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
                 Personalizado 1:1 permite maximo 1 alumno.

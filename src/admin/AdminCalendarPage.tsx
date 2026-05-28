@@ -191,10 +191,6 @@ function toActivityInput(form: ActivityFormState): ActivityInput {
   )
   const maxCapacity = parsePositiveInteger(form.max_capacity, 'El cupo maximo')
 
-  if (defaultCapacity && maxCapacity && defaultCapacity > maxCapacity) {
-    throw new Error('El cupo por defecto no puede superar el cupo maximo.')
-  }
-
   return {
     name: form.name,
     description: form.description,
@@ -249,31 +245,11 @@ function normalizeCapacityForActivity(
     return { capacity: '1', adjusted: currentCapacity !== '1' }
   }
 
-  const current = Number(currentCapacity)
-
   if (!currentCapacity.trim() && activity.default_capacity) {
     return { capacity: String(activity.default_capacity), adjusted: true }
   }
 
-  if (
-    activity.max_capacity &&
-    Number.isFinite(current) &&
-    current > activity.max_capacity
-  ) {
-    return { capacity: String(activity.max_capacity), adjusted: true }
-  }
-
   return { capacity: currentCapacity, adjusted: false }
-}
-
-function getActivityMaxCapacityMessage(activity: Activity) {
-  if (!activity.max_capacity) {
-    return null
-  }
-
-  return `${activity.name} permite maximo ${activity.max_capacity} alumno${
-    activity.max_capacity === 1 ? '' : 's'
-  }.`
 }
 
 export function AdminCalendarPage() {
@@ -441,9 +417,9 @@ export function AdminCalendarPage() {
     })
     setCapacityNotice(
       normalized.adjusted &&
-        nextActivity?.max_capacity &&
+        nextActivity?.default_capacity &&
         nextActivity.slug !== 'personalizado_1_1'
-        ? `Cupo ajustado al maximo permitido para ${nextActivity.name}.`
+        ? `Cupo sugerido para ${nextActivity.name}: ${nextActivity.default_capacity}. Podes cambiarlo para esta clase.`
         : null,
     )
     setError(null)
@@ -506,15 +482,6 @@ export function AdminCalendarPage() {
 
     if (!Number.isFinite(capacity) || capacity <= 0) {
       setError('El cupo debe ser mayor a cero.')
-      return
-    }
-
-    if (selectedActivity?.max_capacity && capacity > selectedActivity.max_capacity) {
-      setError(
-        `${selectedActivity.name} permite maximo ${selectedActivity.max_capacity} alumno${
-          selectedActivity.max_capacity === 1 ? '' : 's'
-        }.`,
-      )
       return
     }
 
@@ -837,11 +804,8 @@ export function AdminCalendarPage() {
                         </p>
                         <p className="mt-1 text-xs text-[var(--muted)]">
                           {selectedActivity.default_capacity
-                            ? `Cupo ${selectedActivity.default_capacity}`
+                            ? `Cupo sugerido ${selectedActivity.default_capacity}`
                             : 'Sin cupo por defecto'}
-                          {selectedActivity.max_capacity
-                            ? ` · maximo ${selectedActivity.max_capacity}`
-                            : ''}
                           {' · '}
                           {selectedActivity.requires_24h_cancel
                             ? 'cancelacion 24h'
@@ -1042,10 +1006,7 @@ export function AdminCalendarPage() {
                   aria-label="Cupo"
                   className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
                   disabled={isPersonalizedOneOnOne}
-                  max={
-                    selectedActivity?.max_capacity ??
-                    (isPersonalizedOneOnOne ? 1 : undefined)
-                  }
+                  max={isPersonalizedOneOnOne ? 1 : undefined}
                   min="1"
                   onChange={(event) => {
                     const nextCapacity = isPersonalizedOneOnOne
@@ -1069,11 +1030,6 @@ export function AdminCalendarPage() {
                 value={form.coach_name}
               />
             </div>
-            {selectedActivity?.max_capacity && !isPersonalizedOneOnOne ? (
-              <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
-                {getActivityMaxCapacityMessage(selectedActivity)}
-              </p>
-            ) : null}
             {capacityNotice ? (
               <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
                 {capacityNotice}
@@ -1364,7 +1320,7 @@ export function AdminCalendarPage() {
                 />
               </label>
               <label className="text-sm font-semibold">
-                Cupo maximo
+                Cupo maximo de referencia
                 <input
                   className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                   min="1"
@@ -1379,6 +1335,12 @@ export function AdminCalendarPage() {
                 />
               </label>
             </div>
+            {activityForm.max_capacity !== '1' ? (
+              <p className="rounded-2xl bg-[var(--page)] p-3 text-xs font-semibold text-[var(--muted)]">
+                El cupo maximo queda como referencia del tipo. Carolina puede
+                cargar una clase puntual con mas cupo si lo necesita.
+              </p>
+            ) : null}
             <div className="grid gap-2 sm:grid-cols-3">
               <label className="flex items-center gap-3 text-sm font-semibold">
                 <input

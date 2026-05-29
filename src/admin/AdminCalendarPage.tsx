@@ -756,10 +756,33 @@ export function AdminCalendarPage() {
                 onClick={resetForm}
                 type="button"
               >
-                Nueva
+                Nueva clase
               </button>
             ) : null}
           </div>
+
+          {!selectedSession ? (
+            <label className="mt-4 flex items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3 text-sm font-semibold text-[var(--ink)]">
+              <input
+                checked={recurrence.enabled}
+                className="mt-1"
+                onChange={(event) =>
+                  setRecurrence({
+                    ...recurrence,
+                    enabled: event.target.checked,
+                  })
+                }
+                type="checkbox"
+              />
+              <span>
+                Crear clase recurrente
+                <span className="block text-xs font-normal text-[var(--muted)]">
+                  Se repetira todas las semanas hasta que la pauses o
+                  modifiques. Si no lo tildas, se crea solo esta clase.
+                </span>
+              </span>
+            </label>
+          ) : null}
 
           <div className="mt-5 grid gap-3">
             <select
@@ -902,101 +925,78 @@ export function AdminCalendarPage() {
                 </label>
               </div>
             </div>
-            {!selectedSession ? (
+            {!selectedSession && recurrence.enabled ? (
               <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3">
-                <label className="flex items-start gap-3 text-sm font-semibold text-[var(--ink)]">
-                  <input
-                    checked={recurrence.enabled}
-                    className="mt-1"
-                    onChange={(event) =>
-                      setRecurrence({
-                        ...recurrence,
-                        enabled: event.target.checked,
-                      })
-                    }
-                    type="checkbox"
-                  />
-                  <span>
-                    Crear clase recurrente
-                    <span className="block text-xs font-normal text-[var(--muted)]">
-                      Se repetira todas las semanas hasta que la pauses o
-                      modifiques. El calendario crea las fechas necesarias al
-                      consultarlas.
-                    </span>
-                  </span>
-                </label>
-                {recurrence.enabled ? (
-                  <div className="grid gap-3">
+                <div className="grid gap-3">
+                  <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                    Dia de semana
+                    <select
+                      className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                      onChange={(event) =>
+                        setRecurrence({
+                          ...recurrence,
+                          weekday: event.target.value,
+                        })
+                      }
+                      value={recurrence.weekday}
+                    >
+                      {weekdayLabels.map((label, index) => (
+                        <option key={label} value={String(index)}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
-                      Dia de semana
-                      <select
+                      Fecha desde
+                      <input
                         className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
                         onChange={(event) =>
                           setRecurrence({
                             ...recurrence,
-                            weekday: event.target.value,
+                            date_from: event.target.value,
                           })
                         }
-                        value={recurrence.weekday}
-                      >
-                        {weekdayLabels.map((label, index) => (
-                          <option key={label} value={String(index)}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
+                        type="date"
+                        value={recurrence.date_from}
+                      />
                     </label>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
-                        Fecha desde
-                        <input
-                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
-                          onChange={(event) =>
-                            setRecurrence({
-                              ...recurrence,
-                              date_from: event.target.value,
-                            })
-                          }
-                          type="date"
-                          value={recurrence.date_from}
-                        />
-                      </label>
-                      <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
-                        Sin fecha de fin. Pausala cuando deje de estar vigente.
-                      </p>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
-                        Hora inicio
-                        <input
-                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
-                          onChange={(event) =>
-                            setRecurrence({
-                              ...recurrence,
-                              start_time: event.target.value,
-                            })
-                          }
-                          type="time"
-                          value={recurrence.start_time}
-                        />
-                      </label>
-                      <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
-                        Hora fin
-                        <input
-                          className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
-                          onChange={(event) =>
-                            setRecurrence({
-                              ...recurrence,
-                              end_time: event.target.value,
-                            })
-                          }
-                          type="time"
-                          value={recurrence.end_time}
-                        />
-                      </label>
-                    </div>
+                    <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                      Sin fecha de fin. Pausala cuando deje de estar vigente.
+                    </p>
                   </div>
-                ) : null}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                      Hora inicio
+                      <input
+                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                        onChange={(event) =>
+                          setRecurrence({
+                            ...recurrence,
+                            start_time: event.target.value,
+                          })
+                        }
+                        type="time"
+                        value={recurrence.start_time}
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
+                      Hora fin
+                      <input
+                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal text-[var(--ink)]"
+                        onChange={(event) =>
+                          setRecurrence({
+                            ...recurrence,
+                            end_time: event.target.value,
+                          })
+                        }
+                        type="time"
+                        value={recurrence.end_time}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2">

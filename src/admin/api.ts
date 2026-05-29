@@ -43,6 +43,12 @@ function getClient() {
   return supabase
 }
 
+function addDays(dateValue: string, days: number) {
+  const date = new Date(`${dateValue}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message
@@ -627,11 +633,12 @@ export async function deleteClassSession(sessionId: string) {
 
 export async function listAttendanceSessions(fromDate: string, toDate: string) {
   const client = getClient()
+  const materializeToDate = toDate <= fromDate ? addDays(fromDate, 1) : toDate
   const { error: materializeError } = await client.rpc(
     'materialize_recurring_class_sessions',
     {
       from_date: fromDate,
-      to_date: toDate,
+      to_date: materializeToDate,
     },
   )
 

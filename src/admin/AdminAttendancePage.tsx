@@ -38,6 +38,12 @@ function formatLocalDate(date: Date) {
   return `${year}-${month}-${day}`
 }
 
+function validateDateRange(fromDate: string, toDate: string) {
+  if (toDate < fromDate) {
+    throw new Error('La fecha hasta no puede ser anterior a la fecha desde.')
+  }
+}
+
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('es-AR', {
     dateStyle: 'short',
@@ -82,6 +88,7 @@ export function AdminAttendancePage() {
     setError(null)
     setSuccess(null)
     try {
+      validateDateRange(fromDate, toDate)
       const finalizeResult = await autoFinalizeAttendance(fromDate, toDate)
       const nextRows = await listAttendanceSessions(fromDate, toDate)
       setRows(nextRows)

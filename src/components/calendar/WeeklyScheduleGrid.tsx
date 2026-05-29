@@ -240,12 +240,30 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 }: WeeklyScheduleGridProps<TSession>) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const days = buildDays(fromDate, toDate)
+  const visibleDays = useMemo(() => new Set(days), [days])
+  const renderSessions = useMemo(
+    () =>
+      sessions.filter(
+        (session) =>
+          visibleDays.has(getDayKey(session.starts_at)) &&
+          (mode === 'admin' || (session.active && !session.cancelled_at)),
+      ),
+    [mode, sessions, visibleDays],
+  )
+  const slotSessions = useMemo(
+    () =>
+      renderSessions.filter(
+        (session) =>
+          mode === 'admin' || (session.active && !session.cancelled_at),
+      ),
+    [mode, renderSessions],
+  )
   const todayKey = formatLocalDate(new Date())
   const rangeStartKey = fromDate
   const timeSlots = useMemo(() => {
     const slotMap = new Map(canonicalTimeSlots.map((slot) => [slot.key, slot]))
 
-    sessions.forEach((session) => {
+    slotSessions.forEach((session) => {
       const timeKey = getTimeKey(session.starts_at)
       if (!slotMap.has(timeKey)) {
         slotMap.set(timeKey, { key: timeKey, label: timeKey })
@@ -255,11 +273,11 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
     return Array.from(slotMap.values()).sort(
       (a, b) => minutesFromTimeKey(a.key) - minutesFromTimeKey(b.key),
     )
-  }, [sessions])
+  }, [slotSessions])
   const sessionsByCell = useMemo(() => {
     const map = new Map<string, TSession[]>()
 
-    sessions.forEach((session) => {
+    renderSessions.forEach((session) => {
       const dayKey = getDayKey(session.starts_at)
       const timeKey = getTimeKey(session.starts_at)
       const cellKey = `${dayKey}|${timeKey}`
@@ -273,7 +291,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
     })
 
     return map
-  }, [sessions])
+  }, [renderSessions])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -281,7 +299,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
     }
   }, [fromDate, toDate])
 
-  if (days.length === 0 || sessions.length === 0) {
+  if (days.length === 0 || renderSessions.length === 0) {
     return (
       <div className="rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
         No hay clases cargadas para este rango.
@@ -339,7 +357,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
         {timeSlots.map((timeSlot) => (
           <div className="contents" key={timeSlot.key}>
-            <div className="z-10 flex min-h-[112px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-sm md:sticky md:left-0 md:z-20 md:min-h-[128px] md:px-3 md:py-4 md:text-sm md:shadow-md">
+            <div className="z-10 flex min-h-[72px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-sm md:sticky md:left-0 md:z-20 md:min-h-[84px] md:px-3 md:py-4 md:text-sm md:shadow-md">
               {timeSlot.label}
             </div>
             {days.map((day) => {
@@ -355,11 +373,15 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
               return (
                 <div
-                  className={`min-h-[112px] min-w-0 overflow-hidden rounded-2xl border p-2 md:min-h-[128px] ${cellTone}`}
+                  className={`min-w-0 overflow-hidden rounded-2xl border p-2 ${
+                    daySessions.length > 0
+                      ? 'min-h-[96px] md:min-h-[108px]'
+                      : 'min-h-[72px] md:min-h-[84px]'
+                  } ${cellTone}`}
                   key={`${day}-${timeSlot.key}`}
                 >
                   {daySessions.length === 0 ? (
-                    <div className="h-full rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface)]" />
+                    <div className="min-h-10 rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface)]" />
                   ) : (
                     <div className="grid gap-2">
                       {hasDuplicateActivity(daySessions) ? (

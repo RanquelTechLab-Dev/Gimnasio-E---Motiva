@@ -531,7 +531,7 @@ export function AdminCalendarPage() {
         setSuccess('Clase actualizada correctamente.')
         resetForm()
       } else if (recurrence.enabled) {
-        await createClassRecurringRule({
+        const recurringResult = await createClassRecurringRule({
           activity_id: normalizedForm.activity_id,
           title: normalizedForm.title.trim() || selectedActivityName,
           weekday: Number(recurrence.weekday),
@@ -542,7 +542,11 @@ export function AdminCalendarPage() {
           notes: normalizedForm.notes,
           valid_from: recurrence.date_from,
         })
-        setSuccess('Horario recurrente creado. Se repetira todas las semanas hasta que lo pauses o modifiques.')
+        setSuccess(
+          recurringResult.action === 'restored'
+            ? 'Clase restaurada correctamente.'
+            : 'Horario recurrente creado. Se repetira todas las semanas hasta que lo pauses o modifiques.',
+        )
       } else {
         await createClassSession(inputWithTitle)
         setSuccess('Clase creada.')

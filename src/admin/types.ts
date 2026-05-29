@@ -196,7 +196,13 @@ export type ClassRecurringRuleInput = {
 }
 
 export type AdminActionResult = {
-  action: 'archived' | 'created' | 'deactivated' | 'deleted' | 'updated'
+  action:
+    | 'archived'
+    | 'created'
+    | 'deactivated'
+    | 'deleted'
+    | 'restored'
+    | 'updated'
   student_id?: string
   plan_id?: string
   activity_id?: string

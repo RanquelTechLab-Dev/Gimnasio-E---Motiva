@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  archiveActivity,
   cancelClassSession,
   convertClassSessionToRecurringRule,
   createActivity,
@@ -653,33 +652,6 @@ export function AdminCalendarPage() {
     }
   }
 
-  async function handleArchiveActivity(activity = selectedManagedActivity) {
-    if (!activity) {
-      return
-    }
-
-    const confirmed = window.confirm(
-      'Archivar oculta para nuevas clases, pero conserva historial. ¿Continuar?',
-    )
-    if (!confirmed) {
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      await archiveActivity(activity.id)
-      setSuccess('Actividad archivada. No aparecera para nuevas clases.')
-      setShowActivityEditor(false)
-      await loadData()
-    } catch (archiveError) {
-      setError(formatAdminError(archiveError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function handleDeleteActivity(activity = selectedManagedActivity) {
     if (!activity) {
       return
@@ -1266,17 +1238,6 @@ export function AdminCalendarPage() {
                   type="button"
                 >
                   Editar tipo
-                </button>
-                <button
-                  className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-white disabled:opacity-60"
-                  disabled={saving || !activity.active}
-                  onClick={() => {
-                    setActivityForm(activityToForm(activity))
-                    void handleArchiveActivity(activity)
-                  }}
-                  type="button"
-                >
-                  Archivar tipo
                 </button>
                 <button
                   className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"

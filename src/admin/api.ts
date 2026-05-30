@@ -35,6 +35,8 @@ import type {
   DriveCleanupResult,
 } from './types'
 
+export type DeleteClassSessionScope = 'single' | 'series'
+
 function getClient() {
   if (!supabase) {
     throw new Error(supabaseConfigError ?? 'La app no esta configurada.')
@@ -551,6 +553,22 @@ export async function createClassRecurringRule(
   return data as AdminActionResult
 }
 
+export async function convertClassSessionToRecurringRule(sessionId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_convert_class_session_to_recurring_rule',
+    {
+      p_session_id: sessionId,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
 export async function archiveClassRecurringRule(ruleId: string) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_archive_class_recurring_rule', {
@@ -618,10 +636,14 @@ export async function cancelClassSession(sessionId: string, reason: string) {
   return data
 }
 
-export async function deleteClassSession(sessionId: string) {
+export async function deleteClassSession(
+  sessionId: string,
+  scope: DeleteClassSessionScope = 'single',
+) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_delete_class_session', {
     p_session_id: sessionId,
+    p_scope: scope,
   })
 
   if (error) {

@@ -198,9 +198,12 @@ export type ClassRecurringRuleInput = {
 export type AdminActionResult = {
   action:
     | 'archived'
+    | 'cancelled'
+    | 'converted'
     | 'created'
     | 'deactivated'
     | 'deleted'
+    | 'deleted_series'
     | 'restored'
     | 'updated'
   student_id?: string
@@ -383,6 +386,7 @@ export type MassEmailResult = {
 
 export type CalendarSession = {
   session_id: string
+  recurring_rule_id: string | null
   activity_id: string
   activity_name: string
   activity_slug: string

@@ -390,6 +390,7 @@ export type CalendarSession = {
   activity_id: string
   activity_name: string
   activity_slug: string
+  activity_color_hex: string | null
   requires_24h_cancel: boolean
   title: string
   starts_at: string

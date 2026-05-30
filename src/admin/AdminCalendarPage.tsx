@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  archiveActivity,
   cancelClassSession,
   convertClassSessionToRecurringRule,
   createActivity,
@@ -54,6 +53,12 @@ type ActivityFormState = {
   color_hex: string
   default_capacity: string
   max_capacity: string
+}
+
+type SessionDeleteRequest = {
+  scope: DeleteClassSessionScope
+  title: string
+  description: string
 }
 
 const weekdayLabels = [
@@ -277,6 +282,14 @@ export function AdminCalendarPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null)
+  const [activityDeleteTarget, setActivityDeleteTarget] =
+    useState<Activity | null>(null)
+  const [activityDeleteConfirmation, setActivityDeleteConfirmation] =
+    useState('')
+  const [sessionDeleteRequest, setSessionDeleteRequest] =
+    useState<SessionDeleteRequest | null>(null)
+  const [sessionDeleteConfirmation, setSessionDeleteConfirmation] =
+    useState('')
 
   const selectedSession = useMemo(
     () =>
@@ -618,6 +631,8 @@ export function AdminCalendarPage() {
             : 'Horario recurrente eliminado.',
         )
       }
+      setSessionDeleteRequest(null)
+      setSessionDeleteConfirmation('')
       resetForm()
       await loadData()
     } catch (deleteError) {
@@ -625,6 +640,21 @@ export function AdminCalendarPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  function requestDeleteSession(request: SessionDeleteRequest) {
+    setSessionDeleteRequest(request)
+    setSessionDeleteConfirmation('')
+    setError(null)
+    setSuccess(null)
+  }
+
+  async function confirmDeleteSession() {
+    if (!sessionDeleteRequest || sessionDeleteConfirmation !== 'ELIMINAR') {
+      return
+    }
+
+    await handleDeleteSession(sessionDeleteRequest.scope)
   }
 
   async function handleActivitySubmit(event: FormEvent<HTMLFormElement>) {
@@ -653,42 +683,20 @@ export function AdminCalendarPage() {
     }
   }
 
-  async function handleArchiveActivity(activity = selectedManagedActivity) {
+  function requestDeleteActivity(activity = selectedManagedActivity) {
     if (!activity) {
       return
     }
 
-    const confirmed = window.confirm(
-      'Archivar oculta para nuevas clases, pero conserva historial. ¿Continuar?',
-    )
-    if (!confirmed) {
-      return
-    }
-
-    setSaving(true)
+    setActivityDeleteTarget(activity)
+    setActivityDeleteConfirmation('')
+    setActivityForm(activityToForm(activity))
     setError(null)
     setSuccess(null)
-    try {
-      await archiveActivity(activity.id)
-      setSuccess('Actividad archivada. No aparecera para nuevas clases.')
-      setShowActivityEditor(false)
-      await loadData()
-    } catch (archiveError) {
-      setError(formatAdminError(archiveError))
-    } finally {
-      setSaving(false)
-    }
   }
 
-  async function handleDeleteActivity(activity = selectedManagedActivity) {
-    if (!activity) {
-      return
-    }
-
-    const confirmed = window.confirm(
-      'Eliminar solo esta disponible si nunca fue usada. Esta accion es definitiva. ¿Continuar?',
-    )
-    if (!confirmed) {
+  async function confirmDeleteActivity() {
+    if (!activityDeleteTarget || activityDeleteConfirmation !== 'ELIMINAR') {
       return
     }
 
@@ -696,9 +704,11 @@ export function AdminCalendarPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteActivity(activity.id)
+      await deleteActivity(activityDeleteTarget.id)
       setSuccess('Tipo de clase eliminado definitivamente.')
       setActivityForm(emptyActivityForm)
+      setActivityDeleteTarget(null)
+      setActivityDeleteConfirmation('')
       setShowActivityEditor(false)
       await loadData()
     } catch (deleteError) {
@@ -823,7 +833,7 @@ export function AdminCalendarPage() {
               {classActivities.map((activity) => (
                 <option key={activity.id} value={activity.id}>
                   {activity.name}
-                  {activity.active ? '' : ' (archivada)'}
+                  {activity.active ? '' : ' (inactiva)'}
                 </option>
               ))}
             </select>
@@ -864,7 +874,7 @@ export function AdminCalendarPage() {
                             ? ' · horario flexible'
                             : ''}
                           {' · '}
-                          {selectedActivity.active ? 'tipo activo' : 'archivado'}
+                          {selectedActivity.active ? 'tipo activo' : 'inactivo'}
                         </p>
                       </div>
                     </div>
@@ -1142,7 +1152,14 @@ export function AdminCalendarPage() {
                     <button
                       className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition disabled:opacity-60"
                       disabled={saving}
-                      onClick={() => void handleDeleteSession('series')}
+                      onClick={() =>
+                        requestDeleteSession({
+                          scope: 'series',
+                          title: 'Eliminar horario recurrente completo',
+                          description:
+                            'Esta accion elimina este horario de todas las semanas futuras. Despues podras crear otro igual.',
+                        })
+                      }
                       type="button"
                     >
                       Eliminar horario recurrente completo
@@ -1154,7 +1171,14 @@ export function AdminCalendarPage() {
                     <button
                       className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
                       disabled={saving}
-                      onClick={() => void handleDeleteSession('single')}
+                      onClick={() =>
+                        requestDeleteSession({
+                          scope: 'single',
+                          title: 'Cancelar solo esta fecha',
+                          description:
+                            'Esta accion solo cancela esta fecha. El horario recurrente seguira activo en proximas semanas.',
+                        })
+                      }
                       type="button"
                     >
                       Cancelar solo esta fecha
@@ -1169,7 +1193,14 @@ export function AdminCalendarPage() {
                     <button
                       className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition disabled:opacity-60"
                       disabled={saving}
-                      onClick={() => void handleDeleteSession('single')}
+                      onClick={() =>
+                        requestDeleteSession({
+                          scope: 'single',
+                          title: 'Eliminar clase',
+                          description:
+                            'Esta accion borra la clase si no tiene historial. Si tiene reservas o asistencia, la cancela sin borrar esos datos.',
+                        })
+                      }
                       type="button"
                     >
                       Eliminar clase
@@ -1246,7 +1277,7 @@ export function AdminCalendarPage() {
                     {activity.name}
                   </p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
-                    {activity.active ? 'Activa' : 'Archivada'} ·{' '}
+                    {activity.active ? 'Activa' : 'Inactiva'} ·{' '}
                     {activity.requires_24h_cancel
                       ? 'Cancelacion 24h'
                       : 'Cancelacion 12h'}
@@ -1268,22 +1299,10 @@ export function AdminCalendarPage() {
                   Editar tipo
                 </button>
                 <button
-                  className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-white disabled:opacity-60"
-                  disabled={saving || !activity.active}
-                  onClick={() => {
-                    setActivityForm(activityToForm(activity))
-                    void handleArchiveActivity(activity)
-                  }}
-                  type="button"
-                >
-                  Archivar tipo
-                </button>
-                <button
                   className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
                   disabled={saving}
                   onClick={() => {
-                    setActivityForm(activityToForm(activity))
-                    void handleDeleteActivity(activity)
+                    requestDeleteActivity(activity)
                   }}
                   type="button"
                 >
@@ -1323,8 +1342,8 @@ export function AdminCalendarPage() {
           </div>
           <p className="mt-3 text-xs text-[var(--muted)]">
             Estos cambios afectan al tipo de clase seleccionado y a futuras
-            clases de este tipo. Archivar oculta para nuevas clases, pero
-            conserva historial.
+            clases de este tipo. El color elegido se usa en las tarjetas del
+            calendario.
           </p>
 
           <div className="mt-4 grid gap-4">
@@ -1469,6 +1488,101 @@ export function AdminCalendarPage() {
           </form>
         ) : null}
       </div>
+      {activityDeleteTarget ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
+              Eliminacion definitiva
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Eliminar {activityDeleteTarget.name}
+            </h3>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Esta accion eliminara definitivamente este tipo de clase y sus
+              clases, reservas y asistencias operativas asociadas. No se podra
+              deshacer.
+            </p>
+            <label className="mt-4 block text-sm font-semibold">
+              Escribi ELIMINAR para confirmar
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setActivityDeleteConfirmation(event.target.value)
+                }
+                value={activityDeleteConfirmation}
+              />
+            </label>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
+                disabled={saving}
+                onClick={() => {
+                  setActivityDeleteTarget(null)
+                  setActivityDeleteConfirmation('')
+                }}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                disabled={saving || activityDeleteConfirmation !== 'ELIMINAR'}
+                onClick={() => void confirmDeleteActivity()}
+                type="button"
+              >
+                {saving ? 'Eliminando...' : 'Eliminar definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {sessionDeleteRequest ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
+              Confirmacion requerida
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              {sessionDeleteRequest.title}
+            </h3>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              {sessionDeleteRequest.description} No se podra deshacer sin
+              volver a crear la clase o el horario.
+            </p>
+            <label className="mt-4 block text-sm font-semibold">
+              Escribi ELIMINAR para confirmar
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setSessionDeleteConfirmation(event.target.value)
+                }
+                value={sessionDeleteConfirmation}
+              />
+            </label>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
+                disabled={saving}
+                onClick={() => {
+                  setSessionDeleteRequest(null)
+                  setSessionDeleteConfirmation('')
+                }}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                disabled={saving || sessionDeleteConfirmation !== 'ELIMINAR'}
+                onClick={() => void confirmDeleteSession()}
+                type="button"
+              >
+                {saving ? 'Procesando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

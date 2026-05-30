@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 
 export type ScheduleSession = {
   session_id: string
+  recurring_rule_id?: string | null
   activity_id: string
   activity_name: string
   activity_slug: string
@@ -357,7 +358,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
         {timeSlots.map((timeSlot) => (
           <div className="contents" key={timeSlot.key}>
-            <div className="z-10 flex min-h-[72px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-sm md:sticky md:left-0 md:z-20 md:min-h-[84px] md:px-3 md:py-4 md:text-sm md:shadow-md">
+            <div className="z-10 flex min-h-[56px] items-start rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-2 py-3 text-xs font-bold text-[var(--ink)] shadow-sm md:sticky md:left-0 md:z-20 md:min-h-[64px] md:px-3 md:py-4 md:text-sm md:shadow-md">
               {timeSlot.label}
             </div>
             {days.map((day) => {
@@ -375,8 +376,8 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                 <div
                   className={`min-w-0 overflow-hidden rounded-2xl border p-2 ${
                     daySessions.length > 0
-                      ? 'min-h-[96px] md:min-h-[108px]'
-                      : 'min-h-[72px] md:min-h-[84px]'
+                      ? 'min-h-[84px] md:min-h-[92px]'
+                      : 'min-h-[56px] md:min-h-[64px]'
                   } ${cellTone}`}
                   key={`${day}-${timeSlot.key}`}
                 >

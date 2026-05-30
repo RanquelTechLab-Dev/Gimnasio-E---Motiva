@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import {
   archiveActivity,
   cancelClassSession,
+  convertClassSessionToRecurringRule,
   createActivity,
   createClassSession,
   createClassRecurringRule,
@@ -14,6 +15,7 @@ import {
   updateActivity,
   updateClassSession,
 } from './api'
+import type { DeleteClassSessionScope } from './api'
 import type {
   Activity,
   ActivityInput,
@@ -121,11 +123,14 @@ function getDateTimeParts(value: string) {
   }
 }
 
-function buildRecurrenceForm(form: ClassFormState): RecurrenceFormState {
+function buildRecurrenceForm(
+  form: ClassFormState,
+  enabled = false,
+): RecurrenceFormState {
   const start = new Date(form.starts_at)
   const end = new Date(form.ends_at)
   return {
-    enabled: false,
+    enabled,
     weekday: String(start.getDay()),
     date_from: formatLocalDate(start),
     start_time: formatLocalTime(start),
@@ -303,6 +308,7 @@ export function AdminCalendarPage() {
   )
   const canSubmitClass =
     Boolean(selectedSession) || (hasActiveActivities && Boolean(form.activity_id))
+  const selectedIsRecurring = Boolean(selectedSession?.recurring_rule_id)
   const isPersonalizedOneOnOne =
     selectedActivity?.slug === 'personalizado_1_1'
   const startParts = getDateTimeParts(form.starts_at)
@@ -380,7 +386,7 @@ export function AdminCalendarPage() {
           : String(session.capacity),
     }
     setForm(nextForm)
-    setRecurrence(buildRecurrenceForm(nextForm))
+    setRecurrence(buildRecurrenceForm(nextForm, Boolean(session.recurring_rule_id)))
     setCancelReason('')
     setCapacityNotice(null)
     setError(null)
@@ -528,7 +534,17 @@ export function AdminCalendarPage() {
           session_id: selectedSession.session_id,
           active: form.active,
         } satisfies UpdateClassSessionInput)
-        setSuccess('Clase actualizada correctamente.')
+        if (recurrence.enabled && !selectedSession.recurring_rule_id) {
+          const recurringResult =
+            await convertClassSessionToRecurringRule(selectedSession.session_id)
+          setSuccess(
+            recurringResult.action === 'restored'
+              ? 'Clase restaurada correctamente.'
+              : 'Clase actualizada y convertida en horario recurrente.',
+          )
+        } else {
+          setSuccess('Clase actualizada correctamente.')
+        }
         resetForm()
       } else if (recurrence.enabled) {
         const recurringResult = await createClassRecurringRule({
@@ -579,15 +595,8 @@ export function AdminCalendarPage() {
     }
   }
 
-  async function handleDeleteSession() {
+  async function handleDeleteSession(scope: DeleteClassSessionScope) {
     if (!selectedSession) {
-      return
-    }
-
-    const confirmed = window.confirm(
-      'Solo se eliminara si la clase no tiene reservas ni asistencia. Si tiene historial, cancelala. ¿Continuar?',
-    )
-    if (!confirmed) {
       return
     }
 
@@ -595,8 +604,18 @@ export function AdminCalendarPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteClassSession(selectedSession.session_id)
-      setSuccess('Clase eliminada definitivamente.')
+      const result = await deleteClassSession(selectedSession.session_id, scope)
+      if (result.action === 'deleted_series') {
+        setSuccess('Horario recurrente eliminado. Podras crear otro igual si lo necesitas.')
+      } else if (result.action === 'cancelled') {
+        setSuccess('Clase cancelada de forma segura. El historial se conservo.')
+      } else {
+        setSuccess(
+          scope === 'single'
+            ? 'Clase eliminada. Si era recurrente, esta fecha no volvera a aparecer.'
+            : 'Horario recurrente eliminado.',
+        )
+      }
       resetForm()
       await loadData()
     } catch (deleteError) {
@@ -765,28 +784,30 @@ export function AdminCalendarPage() {
             ) : null}
           </div>
 
-          {!selectedSession ? (
-            <label className="mt-4 flex items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3 text-sm font-semibold text-[var(--ink)]">
-              <input
-                checked={recurrence.enabled}
-                className="mt-1"
-                onChange={(event) =>
-                  setRecurrence({
-                    ...recurrence,
-                    enabled: event.target.checked,
-                  })
-                }
-                type="checkbox"
-              />
-              <span>
-                Crear clase recurrente
-                <span className="block text-xs font-normal text-[var(--muted)]">
-                  Se repetira todas las semanas hasta que la pauses o
-                  modifiques. Si no lo tildas, se crea solo esta clase.
-                </span>
+          <label className="mt-4 flex items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3 text-sm font-semibold text-[var(--ink)]">
+            <input
+              checked={recurrence.enabled}
+              className="mt-1"
+              disabled={selectedIsRecurring}
+              onChange={(event) =>
+                setRecurrence({
+                  ...recurrence,
+                  enabled: event.target.checked,
+                })
+              }
+              type="checkbox"
+            />
+            <span>
+              Clase recurrente
+              <span className="block text-xs font-normal text-[var(--muted)]">
+                {selectedIsRecurring
+                  ? 'Esta clase ya pertenece a un horario recurrente. Los cambios del formulario afectan esta fecha; para quitar toda la serie usa la accion de eliminacion recurrente.'
+                  : selectedSession
+                    ? 'Si lo tildas, esta clase se convierte en un horario recurrente usando la fecha y hora actuales.'
+                    : 'Si lo tildas, se repetira todas las semanas sin fecha de fin. Si no lo tildas, se crea solo esta clase.'}
               </span>
-            </label>
-          ) : null}
+            </span>
+          </label>
 
           <div className="mt-5 grid gap-3">
             <select
@@ -929,7 +950,7 @@ export function AdminCalendarPage() {
                 </label>
               </div>
             </div>
-            {!selectedSession && recurrence.enabled ? (
+            {recurrence.enabled && !selectedSession ? (
               <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3">
                 <div className="grid gap-3">
                   <label className="grid gap-1 text-xs font-bold text-[var(--muted)]">
@@ -1071,7 +1092,9 @@ export function AdminCalendarPage() {
               {saving
                 ? 'Guardando...'
                 : selectedSession
-                  ? 'Guardar clase'
+                  ? recurrence.enabled && !selectedIsRecurring
+                    ? 'Guardar y convertir en recurrente'
+                    : 'Guardar clase'
                   : recurrence.enabled
                     ? 'Crear horario recurrente'
                     : 'Crear clase'}
@@ -1107,17 +1130,40 @@ export function AdminCalendarPage() {
                 Eliminacion segura
               </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Esta clase solo se elimina si no tiene reservas ni asistencia.
-                Si tiene historial, no se puede eliminar; podes cancelarla.
+                Elegi si queres quitar solo esta fecha o todo el horario
+                recurrente hacia adelante. Si hay historial, se conserva y se
+                cancela de forma segura.
               </p>
-              <button
-                className="mt-3 rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
-                disabled={saving}
-                onClick={() => void handleDeleteSession()}
-                type="button"
-              >
-                Eliminar clase
-              </button>
+              <div className="mt-3 grid gap-2">
+                <button
+                  className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void handleDeleteSession('single')}
+                  type="button"
+                >
+                  Eliminar solo esta clase
+                </button>
+                <p className="text-xs text-[var(--muted)]">
+                  Cancela unicamente esta fecha. El horario recurrente seguira
+                  apareciendo en proximas semanas.
+                </p>
+                {selectedIsRecurring ? (
+                  <>
+                    <button
+                      className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition disabled:opacity-60"
+                      disabled={saving}
+                      onClick={() => void handleDeleteSession('series')}
+                      type="button"
+                    >
+                      Eliminar horario recurrente completo
+                    </button>
+                    <p className="text-xs text-[var(--muted)]">
+                      Elimina este horario de todas las semanas futuras. Despues
+                      podras crear otro igual si lo necesitas.
+                    </p>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}

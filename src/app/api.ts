@@ -49,7 +49,43 @@ export async function listCalendarSessions(fromDate: string, toDate: string) {
     throw error
   }
 
-  return (data ?? []) as CalendarSession[]
+  return hydrateCalendarSessionColors(client, (data ?? []) as CalendarSession[])
+}
+
+async function hydrateCalendarSessionColors(
+  client: ReturnType<typeof getClient>,
+  sessions: CalendarSession[],
+) {
+  const missingColorActivityIds = Array.from(
+    new Set(
+      sessions
+        .filter((session) => !session.activity_color_hex)
+        .map((session) => session.activity_id),
+    ),
+  )
+
+  if (missingColorActivityIds.length === 0) {
+    return sessions
+  }
+
+  const { data, error } = await client
+    .from('activities')
+    .select('id, color_hex')
+    .in('id', missingColorActivityIds)
+
+  if (error) {
+    return sessions
+  }
+
+  const colorsByActivity = new Map(
+    (data ?? []).map((activity) => [activity.id, activity.color_hex]),
+  )
+
+  return sessions.map((session) => ({
+    ...session,
+    activity_color_hex:
+      session.activity_color_hex ?? colorsByActivity.get(session.activity_id) ?? null,
+  }))
 }
 
 export async function bookClassSession(sessionId: string) {

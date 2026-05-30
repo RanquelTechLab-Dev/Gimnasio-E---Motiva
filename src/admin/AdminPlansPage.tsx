@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  archivePlan,
   createPlan,
   deletePlan,
   formatAdminError,
@@ -237,6 +236,8 @@ export function AdminPlansPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [planDeleteTarget, setPlanDeleteTarget] = useState<Plan | null>(null)
+  const [planDeleteConfirmation, setPlanDeleteConfirmation] = useState('')
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === planForm.id) ?? null,
@@ -352,41 +353,19 @@ export function AdminPlansPage() {
     }
   }
 
-  async function handleArchivePlan() {
+  function requestDeletePlan() {
     if (!selectedPlan) {
       return
     }
 
-    const confirmed = window.confirm(
-      'Archivar oculta para nuevos usos, pero conserva historial. ¿Continuar?',
-    )
-    if (!confirmed) {
-      return
-    }
-
-    setSaving(true)
     setError(null)
     setSuccess(null)
-    try {
-      await archivePlan(selectedPlan.id)
-      setSuccess('Plan archivado. No aparecera en nuevas asignaciones.')
-      await loadData()
-    } catch (archiveError) {
-      setError(formatAdminError(archiveError))
-    } finally {
-      setSaving(false)
-    }
+    setPlanDeleteTarget(selectedPlan)
+    setPlanDeleteConfirmation('')
   }
 
   async function handleDeletePlan() {
-    if (!selectedPlan) {
-      return
-    }
-
-    const confirmed = window.confirm(
-      'Eliminar solo esta disponible si nunca fue usado. Esta accion es definitiva. ¿Continuar?',
-    )
-    if (!confirmed) {
+    if (!planDeleteTarget || planDeleteConfirmation !== 'ELIMINAR') {
       return
     }
 
@@ -394,8 +373,10 @@ export function AdminPlansPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deletePlan(selectedPlan.id)
+      await deletePlan(planDeleteTarget.id)
       setSuccess('Plan eliminado definitivamente.')
+      setPlanDeleteTarget(null)
+      setPlanDeleteConfirmation('')
       setPlanForm(emptyPlanForm)
       await loadData()
     } catch (deleteError) {
@@ -484,7 +465,7 @@ export function AdminPlansPage() {
                     )}
                   </div>
                   <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-                    {plan.active ? 'Activo' : 'Archivado'} ·{' '}
+                    {plan.active ? 'Activo' : 'Inactivo'} ·{' '}
                     {plan.visible_to_students
                       ? 'Visible para alumnos'
                       : 'Oculto para alumnos'}{' '}
@@ -527,7 +508,7 @@ export function AdminPlansPage() {
           {selectedPlan ? (
             <p className="mt-3 rounded-2xl bg-[var(--brand-soft)] p-3 text-xs text-[var(--brand)]">
               {selectedPlanHasHistory
-                ? 'Este plan tiene historial. Solo se pueden editar datos administrativos. Para cambiar actividades, limites o tipo, crea un plan nuevo y archiva el anterior.'
+                ? 'Este plan tiene historial operativo. La eliminacion definitiva requiere confirmacion fuerte y no se ejecuta si tiene pagos reales.'
                 : 'Este plan no tiene membresias asociadas; se puede editar la configuracion completa.'}
             </p>
           ) : null}
@@ -793,22 +774,15 @@ export function AdminPlansPage() {
             {selectedPlan ? (
               <div className="grid gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
                 <p className="text-xs text-[var(--muted)]">
-                  Archivar oculta para nuevos usos, pero conserva historial.
-                  Eliminar solo esta disponible si nunca fue usado.
+                  Eliminar borra definitivamente el plan y sus relaciones
+                  operativas. Si tiene pagos reales, la base lo bloquea para
+                  evitar borrar cobros.
                 </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button
-                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-white disabled:opacity-60"
-                    disabled={saving || !selectedPlan.active}
-                    onClick={() => void handleArchivePlan()}
-                    type="button"
-                  >
-                    Archivar plan
-                  </button>
+                <div className="grid gap-2">
                   <button
                     className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
                     disabled={saving}
-                    onClick={() => void handleDeletePlan()}
+                    onClick={requestDeletePlan}
                     type="button"
                   >
                     Eliminar plan
@@ -830,6 +804,54 @@ export function AdminPlansPage() {
           </p>
         ) : null}
       </aside>
+      {planDeleteTarget ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
+              Eliminacion definitiva
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Eliminar {planDeleteTarget.name}
+            </h3>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Esta accion eliminara definitivamente este plan y sus relaciones
+              operativas. No se podra deshacer. Si tiene pagos reales, la base
+              lo va a bloquear.
+            </p>
+            <label className="mt-4 block text-sm font-semibold">
+              Escribi ELIMINAR para confirmar
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setPlanDeleteConfirmation(event.target.value)
+                }
+                value={planDeleteConfirmation}
+              />
+            </label>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
+                disabled={saving}
+                onClick={() => {
+                  setPlanDeleteTarget(null)
+                  setPlanDeleteConfirmation('')
+                }}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                disabled={saving || planDeleteConfirmation !== 'ELIMINAR'}
+                onClick={() => void handleDeletePlan()}
+                type="button"
+              >
+                {saving ? 'Eliminando...' : 'Eliminar definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

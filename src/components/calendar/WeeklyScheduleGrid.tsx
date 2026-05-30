@@ -6,6 +6,7 @@ export type ScheduleSession = {
   activity_id: string
   activity_name: string
   activity_slug: string
+  activity_color_hex?: string | null
   title: string
   starts_at: string
   ends_at: string
@@ -147,6 +148,36 @@ function toneForSession(session: ScheduleSession) {
     .split('')
     .reduce((sum, letter) => sum + letter.charCodeAt(0), 0)
   return activityTones[seed % activityTones.length]
+}
+
+function normalizeHexColor(value: string | null | undefined) {
+  const color = value?.trim()
+  return color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : null
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const normalized = normalizeHexColor(hex)
+  if (!normalized) {
+    return undefined
+  }
+
+  const value = normalized.slice(1)
+  const red = Number.parseInt(value.slice(0, 2), 16)
+  const green = Number.parseInt(value.slice(2, 4), 16)
+  const blue = Number.parseInt(value.slice(4, 6), 16)
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+function colorStyleForSession(session: ScheduleSession) {
+  const color = normalizeHexColor(session.activity_color_hex)
+  if (!color) {
+    return undefined
+  }
+
+  return {
+    borderColor: color,
+    backgroundColor: hexToRgba(color, 0.16),
+  }
 }
 
 function getStatus(session: ScheduleSession, mode: 'admin' | 'student') {
@@ -396,16 +427,20 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                         const busy = savingSessionId === session.session_id
                         const cancelBlockReason = getCancelBlockReason(session)
                         const sessionDetail = getSessionDetail(session)
+                        const sessionColorStyle = colorStyleForSession(session)
                         const planUsageLabel =
                           mode === 'student' ? getPlanUsageLabel(session) : null
                         return (
                           <article
-                            className={`min-w-0 overflow-hidden rounded-2xl border p-2 text-left shadow-sm transition md:p-3 ${toneForSession(session)} ${
+                            className={`min-w-0 overflow-hidden rounded-2xl border p-2 text-left shadow-sm transition md:p-3 ${
+                              sessionColorStyle ? '' : toneForSession(session)
+                            } ${
                               selected
                                 ? 'ring-2 ring-[var(--brand)]'
                                 : 'ring-0'
                             }`}
                             key={session.session_id}
+                            style={sessionColorStyle}
                           >
                             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">

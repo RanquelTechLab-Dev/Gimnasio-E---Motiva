@@ -638,12 +638,12 @@ export async function cancelClassSession(sessionId: string, reason: string) {
 
 export async function deleteClassSession(
   sessionId: string,
-  scope: DeleteClassSessionScope = 'single',
+  scope?: DeleteClassSessionScope,
 ) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_delete_class_session', {
     p_session_id: sessionId,
-    p_scope: scope,
+    p_scope: scope ?? null,
   })
 
   if (error) {

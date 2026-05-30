@@ -611,8 +611,10 @@ export function AdminCalendarPage() {
         setSuccess('Clase cancelada de forma segura. El historial se conservo.')
       } else {
         setSuccess(
-          scope === 'single'
-            ? 'Clase eliminada. Si era recurrente, esta fecha no volvera a aparecer.'
+          scope === 'single' && selectedSession.recurring_rule_id
+            ? 'Fecha cancelada. El horario recurrente sigue activo en proximas semanas.'
+            : scope === 'single'
+              ? 'Clase eliminada.'
             : 'Horario recurrente eliminado.',
         )
       }
@@ -1130,23 +1132,11 @@ export function AdminCalendarPage() {
                 Eliminacion segura
               </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Elegi si queres quitar solo esta fecha o todo el horario
-                recurrente hacia adelante. Si hay historial, se conserva y se
-                cancela de forma segura.
+                {selectedIsRecurring
+                  ? 'Elimina el horario recurrente completo o cancela solo esta fecha si queres conservar las proximas semanas.'
+                  : 'Elimina esta clase. Si tiene historial, se conserva y se cancela de forma segura.'}
               </p>
               <div className="mt-3 grid gap-2">
-                <button
-                  className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
-                  disabled={saving}
-                  onClick={() => void handleDeleteSession('single')}
-                  type="button"
-                >
-                  Eliminar solo esta clase
-                </button>
-                <p className="text-xs text-[var(--muted)]">
-                  Cancela unicamente esta fecha. El horario recurrente seguira
-                  apareciendo en proximas semanas.
-                </p>
                 {selectedIsRecurring ? (
                   <>
                     <button
@@ -1161,8 +1151,35 @@ export function AdminCalendarPage() {
                       Elimina este horario de todas las semanas futuras. Despues
                       podras crear otro igual si lo necesitas.
                     </p>
+                    <button
+                      className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                      disabled={saving}
+                      onClick={() => void handleDeleteSession('single')}
+                      type="button"
+                    >
+                      Cancelar solo esta fecha
+                    </button>
+                    <p className="text-xs text-[var(--muted)]">
+                      Solo oculta o cancela esta fecha. El horario recurrente
+                      seguira activo en proximas semanas.
+                    </p>
                   </>
-                ) : null}
+                ) : (
+                  <>
+                    <button
+                      className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition disabled:opacity-60"
+                      disabled={saving}
+                      onClick={() => void handleDeleteSession('single')}
+                      type="button"
+                    >
+                      Eliminar clase
+                    </button>
+                    <p className="text-xs text-[var(--muted)]">
+                      Borra la clase si no tiene historial. Si tiene reservas o
+                      asistencia, la cancela sin borrar esos datos.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>

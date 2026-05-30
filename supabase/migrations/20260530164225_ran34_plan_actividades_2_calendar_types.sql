@@ -1,9 +1,9 @@
 -- RAN-34 follow-up:
 -- Align the operational recurring calendar with "Plan de Actividades (2)" and
--- make "Eliminar tipo" archive used activities instead of blocking Carolina.
+-- make "Eliminar tipo" hard-delete activities with their operational links.
 --
 -- This migration does not touch plans/prices, students, payments, Drive,
--- Mailjet, auth, or secrets. It preserves bookings/attendance history.
+-- Mailjet, auth, or secrets.
 
 create or replace function public.admin_delete_activity(p_activity_id uuid)
 returns jsonb
@@ -15,10 +15,14 @@ declare
   v_actor uuid;
   v_activity public.activities%rowtype;
   v_plan_links integer;
+  v_recurring_rules integer;
+  v_rule_exceptions integer;
+  v_session_exceptions integer;
   v_sessions integer;
   v_bookings integer;
   v_attendance integer;
-  v_usage integer;
+  v_rule_ids uuid[];
+  v_session_ids uuid[];
 begin
   v_actor := private.ensure_admin();
 
@@ -35,67 +39,86 @@ begin
   from public.plan_activities pa
   where pa.activity_id = p_activity_id;
 
-  select count(*) into v_sessions
+  select coalesce(array_agg(r.id), array[]::uuid[]) into v_rule_ids
+  from public.class_recurring_rules r
+  where r.activity_id = p_activity_id;
+
+  v_recurring_rules := cardinality(v_rule_ids);
+
+  select coalesce(array_agg(s.id), array[]::uuid[]) into v_session_ids
   from public.class_sessions s
-  where s.activity_id = p_activity_id;
+  where s.activity_id = p_activity_id
+     or s.recurring_rule_id = any(v_rule_ids);
+
+  v_sessions := cardinality(v_session_ids);
+
+  select count(*) into v_rule_exceptions
+  from public.class_recurring_rule_exceptions e
+  where e.recurring_rule_id = any(v_rule_ids);
+
+  select count(*) into v_session_exceptions
+  from public.class_recurring_rule_exceptions e
+  where e.class_session_id = any(v_session_ids);
 
   select count(*) into v_bookings
   from public.bookings b
-  join public.class_sessions s on s.id = b.session_id
-  where s.activity_id = p_activity_id;
+  where b.session_id = any(v_session_ids);
 
   select count(*) into v_attendance
   from public.attendance att
-  join public.class_sessions s on s.id = att.session_id
-  where s.activity_id = p_activity_id;
-
-  v_usage := v_plan_links + v_sessions + v_bookings + v_attendance;
-
-  if v_usage > 0 then
-    update public.activities a
-    set active = false,
-        updated_at = now()
-    where a.id = p_activity_id;
-
-    insert into public.audit_logs (actor_id, entity_type, entity_id, action, metadata)
-    values (
-      v_actor,
-      'activity',
-      p_activity_id,
-      'activity.archived_by_delete',
-      jsonb_build_object(
-        'name', v_activity.name,
-        'slug', v_activity.slug,
-        'plan_links', v_plan_links,
-        'sessions', v_sessions,
-        'bookings', v_bookings,
-        'attendance', v_attendance
-      )
-    );
-
-    return jsonb_build_object(
-      'action', 'archived',
-      'activity_id', p_activity_id,
-      'has_history', true
-    );
-  end if;
-
-  delete from public.activities a
-  where a.id = p_activity_id;
+  where att.session_id = any(v_session_ids);
 
   insert into public.audit_logs (actor_id, entity_type, entity_id, action, metadata)
   values (
     v_actor,
     'activity',
     p_activity_id,
-    'activity.deleted',
-    jsonb_build_object('name', v_activity.name, 'slug', v_activity.slug)
+    'activity.deleted_with_operational_cleanup',
+    jsonb_build_object(
+      'name', v_activity.name,
+      'slug', v_activity.slug,
+      'plan_links', v_plan_links,
+      'recurring_rules', v_recurring_rules,
+      'rule_exceptions', v_rule_exceptions,
+      'session_exceptions', v_session_exceptions,
+      'sessions', v_sessions,
+      'bookings', v_bookings,
+      'attendance', v_attendance
+    )
   );
+
+  delete from public.class_recurring_rule_exceptions e
+  where e.recurring_rule_id = any(v_rule_ids)
+     or e.class_session_id = any(v_session_ids);
+
+  delete from public.attendance att
+  where att.session_id = any(v_session_ids);
+
+  delete from public.bookings b
+  where b.session_id = any(v_session_ids);
+
+  delete from public.class_sessions s
+  where s.id = any(v_session_ids);
+
+  delete from public.class_recurring_rules r
+  where r.id = any(v_rule_ids);
+
+  delete from public.plan_activities pa
+  where pa.activity_id = p_activity_id;
+
+  delete from public.activities a
+  where a.id = p_activity_id;
 
   return jsonb_build_object(
     'action', 'deleted',
     'activity_id', p_activity_id,
-    'has_history', false
+    'deleted_plan_links', v_plan_links,
+    'deleted_recurring_rules', v_recurring_rules,
+    'deleted_rule_exceptions', v_rule_exceptions,
+    'deleted_session_exceptions', v_session_exceptions,
+    'deleted_sessions', v_sessions,
+    'deleted_bookings', v_bookings,
+    'deleted_attendance', v_attendance
   );
 end;
 $$;

@@ -1495,12 +1495,13 @@ export function AdminCalendarPage() {
               Eliminacion definitiva
             </p>
             <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-              Eliminar {activityDeleteTarget.name}
+              Eliminar definitivamente {activityDeleteTarget.name}
             </h3>
             <p className="mt-3 text-sm text-[var(--muted)]">
-              Esta accion eliminara definitivamente este tipo de clase y sus
-              clases, reservas y asistencias operativas asociadas. No se podra
-              deshacer.
+              Esta accion eliminara definitivamente este tipo de clase y todos
+              sus datos operativos relacionados: clases, horarios, reservas,
+              asistencia y vinculos con planes. Los planes, alumnos y pagos no
+              se eliminaran. No se podra deshacer.
             </p>
             <label className="mt-4 block text-sm font-semibold">
               Escribi ELIMINAR para confirmar

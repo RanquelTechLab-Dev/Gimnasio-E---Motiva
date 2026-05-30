@@ -686,7 +686,7 @@ export function AdminCalendarPage() {
     }
 
     const confirmed = window.confirm(
-      'Eliminar solo esta disponible si nunca fue usada. Esta accion es definitiva. ¿Continuar?',
+      'Si este tipo ya tiene historial, se archivara para conservar datos anteriores y no aparecera en nuevas clases. Si nunca fue usado, se eliminara. ¿Continuar?',
     )
     if (!confirmed) {
       return
@@ -696,8 +696,12 @@ export function AdminCalendarPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteActivity(activity.id)
-      setSuccess('Tipo de clase eliminado definitivamente.')
+      const result = await deleteActivity(activity.id)
+      setSuccess(
+        result.action === 'archived'
+          ? 'Tipo de clase archivado. Ya no aparecera para nuevas clases y el historial se conserva.'
+          : 'Tipo de clase eliminado.',
+      )
       setActivityForm(emptyActivityForm)
       setShowActivityEditor(false)
       await loadData()

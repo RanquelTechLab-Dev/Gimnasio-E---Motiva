@@ -347,6 +347,8 @@ do $$
 declare
   v_future_from timestamptz := timestamptz '2026-05-30 00:00:00-03';
   v_future_to timestamptz := timestamptz '2026-08-31 00:00:00-03';
+  v_materialize_from timestamptz;
+  v_materialize_to timestamptz;
   v_cognitivo_price numeric;
 begin
   create temporary table ran34_out_of_program_plan_slugs (slug text primary key) on commit drop;
@@ -810,7 +812,13 @@ begin
   where s.recurring_rule_id = r.id
     and s.starts_at >= v_future_from;
 
-  perform private.materialize_recurring_class_sessions(v_future_from, v_future_to);
+  v_materialize_from := v_future_from;
+
+  while v_materialize_from < v_future_to loop
+    v_materialize_to := least(v_materialize_from + interval '60 days', v_future_to);
+    perform private.materialize_recurring_class_sessions(v_materialize_from, v_materialize_to);
+    v_materialize_from := v_materialize_to;
+  end loop;
 end;
 $$;
 

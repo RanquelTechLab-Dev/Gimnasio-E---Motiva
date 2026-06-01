@@ -343,101 +343,19 @@ begin
 end;
 $$;
 
-create or replace function public.admin_delete_plan(p_plan_id uuid)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public, private
-as $$
-declare
-  v_actor uuid;
-  v_plan public.plans%rowtype;
-  v_plan_links integer;
-  v_memberships integer;
-  v_payments integer;
-begin
-  v_actor := private.ensure_admin();
-
-  select * into v_plan
-  from public.plans p
-  where p.id = p_plan_id
-  for update;
-
-  if not found then
-    raise exception 'No se encontro el plan.';
-  end if;
-
-  select count(*) into v_payments
-  from public.payments pay
-  join public.memberships m on m.id = pay.membership_id
-  where m.plan_id = p_plan_id;
-
-  if v_payments > 0 then
-    raise exception 'Este plan tiene pagos reales. No se puede eliminar sin autorizacion especial.';
-  end if;
-
-  select count(*) into v_plan_links
-  from public.plan_activities pa
-  where pa.plan_id = p_plan_id;
-
-  select count(*) into v_memberships
-  from public.memberships m
-  where m.plan_id = p_plan_id;
-
-  insert into public.audit_logs (actor_id, entity_type, entity_id, action, metadata)
-  values (
-    v_actor,
-    'plan',
-    p_plan_id,
-    'plan.deleted_with_operational_cleanup',
-    jsonb_build_object(
-      'name', v_plan.name,
-      'slug', v_plan.slug,
-      'plan_links', v_plan_links,
-      'memberships_without_payments', v_memberships
-    )
-  );
-
-  delete from public.plan_activities pa
-  where pa.plan_id = p_plan_id;
-
-  delete from public.memberships m
-  where m.plan_id = p_plan_id;
-
-  delete from public.plans p
-  where p.id = p_plan_id;
-
-  return jsonb_build_object(
-    'action', 'deleted',
-    'plan_id', p_plan_id,
-    'deleted_plan_links', v_plan_links,
-    'deleted_memberships', v_memberships
-  );
-end;
-$$;
-
 do $$
 declare
   v_future_from timestamptz := timestamptz '2026-05-30 00:00:00-03';
   v_future_to timestamptz := timestamptz '2026-08-31 00:00:00-03';
-  v_payments_for_deleted_plans integer;
+  v_materialize_from timestamptz;
+  v_materialize_to timestamptz;
   v_cognitivo_price numeric;
 begin
-  create temporary table ran34_delete_plan_slugs (slug text primary key) on commit drop;
-  insert into ran34_delete_plan_slugs (slug)
+  create temporary table ran34_out_of_program_plan_slugs (slug text primary key) on commit drop;
+  insert into ran34_out_of_program_plan_slugs (slug)
   values
     ('programa_kids_3_veces_por_semana'),
     ('combo_semipersonalizado_y_funcional');
-
-  select count(*) into v_payments_for_deleted_plans
-  from public.payments pay
-  join public.memberships m on m.id = pay.membership_id
-  join public.plans p on p.id = m.plan_id
-  join ran34_delete_plan_slugs d on d.slug = p.slug;
-
-  if v_payments_for_deleted_plans > 0 then
-    raise exception 'No se puede limpiar Plan 2: hay pagos reales vinculados a planes que se quieren eliminar.';
-  end if;
 
   create temporary table ran34_final_activities (
     slug text primary key,
@@ -524,19 +442,18 @@ begin
     raise exception 'Faltan actividades finales requeridas para Plan de Actividades 2.';
   end if;
 
-  -- Remove plans that Walter confirmed are outside the current program.
+  -- Keep plans and memberships. Only unlink out-of-program plans from
+  -- activities that are no longer part of the current class type catalog.
   delete from public.plan_activities pa
-  using public.plans p, ran34_delete_plan_slugs d
+  using public.plans p, ran34_out_of_program_plan_slugs d
   where pa.plan_id = p.id
     and p.slug = d.slug;
 
-  delete from public.memberships m
-  using public.plans p, ran34_delete_plan_slugs d
-  where m.plan_id = p.id
-    and p.slug = d.slug;
-
-  delete from public.plans p
-  using ran34_delete_plan_slugs d
+  update public.plans p
+  set
+    visible_to_students = false,
+    updated_at = now()
+  from ran34_out_of_program_plan_slugs d
   where p.slug = d.slug;
 
   -- Clean operational data for activities no longer in the program or duplicate Personalizado.
@@ -895,7 +812,13 @@ begin
   where s.recurring_rule_id = r.id
     and s.starts_at >= v_future_from;
 
-  perform private.materialize_recurring_class_sessions(v_future_from, v_future_to);
+  v_materialize_from := v_future_from;
+
+  while v_materialize_from < v_future_to loop
+    v_materialize_to := least(v_materialize_from + interval '60 days', v_future_to);
+    perform private.materialize_recurring_class_sessions(v_materialize_from, v_materialize_to);
+    v_materialize_from := v_materialize_to;
+  end loop;
 end;
 $$;
 
@@ -904,6 +827,3 @@ grant execute on function public.list_calendar_sessions(timestamptz, timestamptz
 
 revoke all on function public.admin_delete_activity(uuid) from public, anon;
 grant execute on function public.admin_delete_activity(uuid) to authenticated;
-
-revoke all on function public.admin_delete_plan(uuid) from public, anon;
-grant execute on function public.admin_delete_plan(uuid) to authenticated;

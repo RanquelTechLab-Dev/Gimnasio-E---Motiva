@@ -37,8 +37,8 @@ function membershipClassesSummary(
 
   if (membership.plan_type === 'weekly') {
     return {
-      label: 'Plan semanal',
-      value: 'Por semana',
+      label: 'Plan por periodo',
+      value: 'Por periodo',
       detail: 'El calendario muestra cuantas clases quedan por actividad.',
     }
   }

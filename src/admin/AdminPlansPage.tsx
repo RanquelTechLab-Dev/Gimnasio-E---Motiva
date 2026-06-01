@@ -119,11 +119,11 @@ function planAccessLabel(plan: Plan) {
       .filter((value): value is number => value !== null)
 
     if (limits.length === 0) {
-      return 'Limite semanal pendiente'
+      return 'Limite del periodo pendiente'
     }
 
     const total = limits.reduce((sum, value) => sum + value, 0)
-    return `${total} clases por semana`
+    return `${total} clases por periodo`
   }
 
   if (plan.plan_type === 'package') {
@@ -141,7 +141,7 @@ function planActivityLabel(item: NonNullable<Plan['plan_activities']>[number]) {
   }
 
   if (item.weekly_class_limit !== null) {
-    return `${item.activities.name} · ${item.weekly_class_limit} por semana`
+    return `${item.activities.name} · ${item.weekly_class_limit} por periodo`
   }
 
   if (item.monthly_credits !== null) {
@@ -238,7 +238,7 @@ function toPlanInput(form: PlanFormState): PlanInput {
         form.plan_type === 'weekly'
           ? parsePositiveInteger(
               item.weekly_class_limit,
-              'El limite semanal',
+              'El limite del periodo',
               true,
             )
           : null,
@@ -249,7 +249,7 @@ function toPlanInput(form: PlanFormState): PlanInput {
     }))
 
   if (form.plan_type === 'weekly' && activities.length === 0) {
-    throw new Error('Los planes semanales requieren al menos una actividad.')
+    throw new Error('Los planes por periodo requieren al menos una actividad.')
   }
 
   return {
@@ -707,7 +707,7 @@ export function AdminPlansPage() {
               </div>
               {planForm.activities.length === 0 ? (
                 <p className="text-xs text-[var(--muted)]">
-                  Agrega actividades para planes semanales o paquetes.
+                  Agrega actividades para planes por periodo o paquetes.
                 </p>
               ) : null}
               {planForm.activities.map((item, index) => (
@@ -743,7 +743,7 @@ export function AdminPlansPage() {
                         ) : null}
                         {planForm.plan_type === 'weekly' ? (
                           <label className="text-xs font-semibold">
-                            Clases por semana para esta actividad
+                            Clases por periodo para esta actividad
                             <input
                               className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
                               min="1"
@@ -933,7 +933,7 @@ export function AdminPlansPage() {
             </h3>
             <p className="mt-3 text-sm text-[var(--muted)]">
               Este plan tiene historial operativo. Si cambiás las actividades
-              incluidas o las clases por semana, se modificará qué clases pueden
+              incluidas o las clases por periodo, se modificará qué clases pueden
               reservar los alumnos con este plan desde ahora. No se eliminarán
               pagos, alumnos ni membresías. Para confirmar, escribí EDITAR.
             </p>

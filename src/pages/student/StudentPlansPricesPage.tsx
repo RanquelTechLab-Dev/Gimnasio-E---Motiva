@@ -5,7 +5,7 @@ import type { StudentPlanCatalogItem } from '../../app/types'
 
 function planTypeLabel(plan: StudentPlanCatalogItem) {
   if (plan.plan_type === 'weekly') {
-    return 'Plan semanal'
+    return 'Plan por periodo'
   }
 
   if (plan.plan_type === 'package') {
@@ -22,7 +22,7 @@ function planClassesLabel(plan: StudentPlanCatalogItem) {
       0,
     )
 
-    return total > 0 ? `${total} clases por semana` : 'Clases por semana segun actividad'
+    return total > 0 ? `${total} clases por periodo` : 'Clases por periodo segun actividad'
   }
 
   if (plan.plan_type === 'package') {
@@ -41,7 +41,7 @@ function activityLabel(
   const name = activity.activities?.name ?? 'Actividad'
 
   if (planType === 'weekly' && activity.weekly_class_limit) {
-    return `${name}: ${activity.weekly_class_limit} por semana`
+    return `${name}: ${activity.weekly_class_limit} por periodo`
   }
 
   return name

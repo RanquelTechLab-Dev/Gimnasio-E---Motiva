@@ -76,8 +76,8 @@ function describeMembership(membership: Membership, plan?: Plan | null) {
       }, 0)
 
       return weeklyTotal > 0
-        ? `${weeklyTotal} clases por semana`
-        : 'limite semanal pendiente'
+        ? `${weeklyTotal} clases por periodo`
+        : 'limite del periodo pendiente'
     }
 
     if (membership.remaining_credits === null) {

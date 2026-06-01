@@ -9,7 +9,7 @@ function classesLabel(membership: StudentProfileSummary['active_membership']) {
   }
 
   if (membership.plan_type === 'weekly') {
-    return 'El calendario muestra las clases disponibles por semana.'
+    return 'El calendario muestra las clases disponibles dentro de tu periodo pago.'
   }
 
   if (membership.plan_type === 'package') {

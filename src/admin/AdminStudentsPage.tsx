@@ -188,7 +188,7 @@ function weeklyPlanLabel(plan: Plan) {
     return sum + (item.weekly_class_limit ?? 0)
   }, 0)
 
-  return total > 0 ? `${total} por semana` : 'limite semanal pendiente'
+  return total > 0 ? `${total} por periodo` : 'limite del periodo pendiente'
 }
 
 function planDefaultPackageClasses(plan?: Plan | null) {
@@ -1885,7 +1885,7 @@ export function AdminStudentsPage() {
                 }
                 placeholder={
                   selectedMembershipPlan?.plan_type === 'weekly'
-                    ? 'Se controla por semana'
+                    ? 'Se controla por periodo'
                     : 'Clases del paquete'
                 }
                 type="number"
@@ -1893,7 +1893,7 @@ export function AdminStudentsPage() {
               />
               <p className="-mt-1 text-xs text-[var(--muted)]">
                 {selectedMembershipPlan?.plan_type === 'weekly'
-                  ? 'Los planes semanales limitan reservas por semana y no usan saldo visible.'
+                  ? 'Los planes por periodo limitan reservas dentro de la vigencia paga y no usan saldo visible.'
                   : 'Las clases se cargan desde el paquete elegido y pueden ajustarse antes de asignar la membresia.'}
               </p>
               <button

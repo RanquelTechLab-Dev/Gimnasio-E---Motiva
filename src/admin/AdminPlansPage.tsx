@@ -40,6 +40,11 @@ type PlanFormState = {
   }>
 }
 
+type PendingPlanEdit = {
+  planId: string
+  input: PlanInput
+}
+
 const emptyPlanForm: PlanFormState = {
   id: null,
   name: '',
@@ -171,6 +176,39 @@ function planHasHistory(plan: Plan | null) {
   return Boolean(plan?.memberships?.length)
 }
 
+function normalizePlanActivities(plan: Plan | null) {
+  return (plan?.plan_activities ?? [])
+    .map((item) => ({
+      activity_id: item.activities?.id ?? item.activity_id ?? '',
+      monthly_credits: item.monthly_credits ?? null,
+      weekly_class_limit: item.weekly_class_limit ?? null,
+    }))
+    .filter((item) => item.activity_id)
+    .sort((left, right) => left.activity_id.localeCompare(right.activity_id))
+}
+
+function normalizeFormActivities(form: PlanFormState) {
+  return form.activities
+    .filter((item) => item.activity_id)
+    .map((item) => ({
+      activity_id: item.activity_id,
+      monthly_credits:
+        form.plan_type === 'weekly' || !item.monthly_credits.trim()
+          ? null
+          : Number(item.monthly_credits),
+      weekly_class_limit:
+        form.plan_type === 'weekly' ? Number(item.weekly_class_limit) : null,
+    }))
+    .sort((left, right) => left.activity_id.localeCompare(right.activity_id))
+}
+
+function planActivitiesChanged(plan: Plan | null, form: PlanFormState) {
+  return (
+    JSON.stringify(normalizePlanActivities(plan)) !==
+    JSON.stringify(normalizeFormActivities(form))
+  )
+}
+
 function toPlanInput(form: PlanFormState): PlanInput {
   const price = parseNonNegativeNumber(form.price, 'El precio')
   const billingPeriodDays = parsePositiveInteger(
@@ -238,6 +276,10 @@ export function AdminPlansPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [planDeleteTarget, setPlanDeleteTarget] = useState<Plan | null>(null)
   const [planDeleteConfirmation, setPlanDeleteConfirmation] = useState('')
+  const [pendingPlanEdit, setPendingPlanEdit] = useState<PendingPlanEdit | null>(
+    null,
+  )
+  const [planEditConfirmation, setPlanEditConfirmation] = useState('')
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === planForm.id) ?? null,
@@ -282,6 +324,8 @@ export function AdminPlansPage() {
     setPlanForm(planToForm(plan))
     setSuccess(null)
     setError(null)
+    setPendingPlanEdit(null)
+    setPlanEditConfirmation('')
   }
 
   function addPlanActivity() {
@@ -328,6 +372,18 @@ export function AdminPlansPage() {
     })
   }
 
+  async function savePlan(input: PlanInput, planId: string | null) {
+    const result = planId ? await updatePlan(planId, input) : await createPlan(input)
+    setSuccess(
+      result.has_history
+        ? 'Plan guardado. Tiene historial: no se eliminaron pagos, alumnos ni membresias.'
+        : planId
+          ? 'Plan actualizado.'
+          : 'Plan creado.',
+    )
+    await loadData()
+  }
+
   async function handlePlanSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSaving(true)
@@ -335,17 +391,36 @@ export function AdminPlansPage() {
     setSuccess(null)
     try {
       const input = toPlanInput(planForm)
-      const result = planForm.id
-        ? await updatePlan(planForm.id, input)
-        : await createPlan(input)
-      setSuccess(
-        result.has_history
-          ? 'Plan guardado. Tiene historial: solo se actualizaron datos administrativos.'
-          : planForm.id
-            ? 'Plan actualizado.'
-            : 'Plan creado.',
-      )
-      await loadData()
+      if (
+        planForm.id &&
+        selectedPlanHasHistory &&
+        planActivitiesChanged(selectedPlan, planForm)
+      ) {
+        setPendingPlanEdit({ input, planId: planForm.id })
+        setPlanEditConfirmation('')
+        return
+      }
+
+      await savePlan(input, planForm.id)
+    } catch (saveError) {
+      setError(formatAdminError(saveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleConfirmPlanEdit() {
+    if (!pendingPlanEdit || planEditConfirmation !== 'EDITAR') {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await savePlan(pendingPlanEdit.input, pendingPlanEdit.planId)
+      setPendingPlanEdit(null)
+      setPlanEditConfirmation('')
     } catch (saveError) {
       setError(formatAdminError(saveError))
     } finally {
@@ -508,7 +583,7 @@ export function AdminPlansPage() {
           {selectedPlan ? (
             <p className="mt-3 rounded-2xl bg-[var(--brand-soft)] p-3 text-xs text-[var(--brand)]">
               {selectedPlanHasHistory
-                ? 'Este plan tiene historial operativo. La eliminacion definitiva requiere confirmacion fuerte y no se ejecuta si tiene pagos reales.'
+                ? 'Este plan tiene historial operativo. Podes editar sus actividades incluidas; los cambios aplican hacia adelante y no eliminan pagos, alumnos ni membresias.'
                 : 'Este plan no tiene membresias asociadas; se puede editar la configuracion completa.'}
             </p>
           ) : null}
@@ -624,7 +699,6 @@ export function AdminPlansPage() {
                 </div>
                 <button
                   className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
-                  disabled={selectedPlanHasHistory}
                   onClick={addPlanActivity}
                   type="button"
                 >
@@ -649,7 +723,6 @@ export function AdminPlansPage() {
                       <>
                         <select
                           className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
-                          disabled={selectedPlanHasHistory}
                           onChange={(event) =>
                             updatePlanActivity(index, {
                               activity_id: event.target.value,
@@ -673,7 +746,6 @@ export function AdminPlansPage() {
                             Clases por semana para esta actividad
                             <input
                               className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
-                              disabled={selectedPlanHasHistory}
                               min="1"
                               onChange={(event) =>
                                 updatePlanActivity(index, {
@@ -689,7 +761,6 @@ export function AdminPlansPage() {
                             Clases asociadas opcionales
                             <input
                               className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
-                              disabled={selectedPlanHasHistory}
                               min="1"
                               onChange={(event) =>
                                 updatePlanActivity(index, {
@@ -703,7 +774,6 @@ export function AdminPlansPage() {
                         )}
                         <button
                           className="justify-self-start rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
-                          disabled={selectedPlanHasHistory}
                           onClick={() => removePlanActivity(index)}
                           type="button"
                         >
@@ -847,6 +917,55 @@ export function AdminPlansPage() {
                 type="button"
               >
                 {saving ? 'Eliminando...' : 'Eliminar definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {pendingPlanEdit ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
+              Editar plan
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Editar plan con historial
+            </h3>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Este plan tiene historial operativo. Si cambiás las actividades
+              incluidas o las clases por semana, se modificará qué clases pueden
+              reservar los alumnos con este plan desde ahora. No se eliminarán
+              pagos, alumnos ni membresías. Para confirmar, escribí EDITAR.
+            </p>
+            <label className="mt-4 block text-sm font-semibold">
+              Escribí EDITAR para confirmar
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setPlanEditConfirmation(event.target.value)
+                }
+                value={planEditConfirmation}
+              />
+            </label>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
+                disabled={saving}
+                onClick={() => {
+                  setPendingPlanEdit(null)
+                  setPlanEditConfirmation('')
+                }}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-2xl bg-[var(--brand)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                disabled={saving || planEditConfirmation !== 'EDITAR'}
+                onClick={() => void handleConfirmPlanEdit()}
+                type="button"
+              >
+                {saving ? 'Guardando...' : 'Confirmar edición'}
               </button>
             </div>
           </div>

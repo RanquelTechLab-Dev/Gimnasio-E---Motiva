@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  approveManualPayment,
   formatAdminError,
   listMemberships,
   listPayments,
   listPlans,
   listStudents,
   registerManualPayment,
-  rejectManualPayment,
   updatePayment,
   voidPayment,
 } from './api'
@@ -98,7 +96,7 @@ export function AdminPaymentsPage() {
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
-  const [filter, setFilter] = useState<PaymentFilter>('pending')
+  const [filter, setFilter] = useState<PaymentFilter>('approved')
   const [form, setForm] = useState<PaymentFormState>({
     student_id: '',
     membership_id: '',
@@ -107,7 +105,6 @@ export function AdminPaymentsPage() {
     payment_date: todayDate(),
     notes: '',
   })
-  const [rejectReason, setRejectReason] = useState<Record<string, string>>({})
   const [voidReason, setVoidReason] = useState<Record<string, string>>({})
   const [voidFeedback, setVoidFeedback] = useState<
     Record<string, PaymentFeedback>
@@ -219,41 +216,11 @@ export function AdminPaymentsPage() {
         payment_date: form.payment_date,
         notes: form.notes,
       })
-      setSuccess('Pago manual registrado como pendiente.')
+      setSuccess('Pago registrado y membresia activada.')
       setForm({ ...form, amount: '', payment_date: todayDate(), notes: '' })
       await loadData(filter)
     } catch (saveError) {
       setError(formatAdminError(saveError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleApprove(paymentId: string) {
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      await approveManualPayment(paymentId)
-      setSuccess(`Pago aprobado. Fecha operativa: ${todayDate()}.`)
-      await loadData(filter)
-    } catch (approveError) {
-      setError(formatAdminError(approveError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleReject(paymentId: string) {
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      await rejectManualPayment(paymentId, rejectReason[paymentId] ?? '')
-      setSuccess('Pago rechazado.')
-      await loadData(filter)
-    } catch (rejectError) {
-      setError(formatAdminError(rejectError))
     } finally {
       setSaving(false)
     }
@@ -380,9 +347,7 @@ export function AdminPaymentsPage() {
             </h3>
           </div>
           <div className="flex flex-wrap gap-2">
-            {(
-              ['pending', 'approved', 'rejected', 'voided', 'all'] as PaymentFilter[]
-            ).map((item) => (
+            {(['approved', 'voided', 'all'] as PaymentFilter[]).map((item) => (
                 <button
                   className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                     filter === item
@@ -564,38 +529,6 @@ export function AdminPaymentsPage() {
                         </button>
                       </div>
                     </form>
-                  ) : null}
-
-                  {payment.status === 'pending' ? (
-                    <div className="mt-4 grid gap-2 lg:grid-cols-[1fr_auto_auto]">
-                      <input
-                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
-                        onChange={(event) =>
-                          setRejectReason({
-                            ...rejectReason,
-                            [payment.id]: event.target.value,
-                          })
-                        }
-                        placeholder="Motivo si se rechaza"
-                        value={rejectReason[payment.id] ?? ''}
-                      />
-                      <button
-                        className="rounded-2xl bg-[var(--brand)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-                        disabled={saving}
-                        onClick={() => void handleApprove(payment.id)}
-                        type="button"
-                      >
-                        Aprobar
-                      </button>
-                      <button
-                        className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-                        disabled={saving}
-                        onClick={() => void handleReject(payment.id)}
-                        type="button"
-                      >
-                        Rechazar
-                      </button>
-                    </div>
                   ) : null}
 
                   {payment.status !== 'voided' ? (

@@ -73,6 +73,23 @@ function studentFullName(student: StudentProfile) {
   return `${student.first_name} ${student.last_name}`.trim()
 }
 
+function studentMatchesQuery(student: StudentProfile, query: string) {
+  const normalizedQuery = query.trim().toLowerCase()
+  if (!normalizedQuery) {
+    return true
+  }
+
+  return [
+    student.first_name,
+    student.last_name,
+    student.email,
+    student.phone ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(normalizedQuery)
+}
+
 function programSummary(program: StudentProgram) {
   const payment =
     program.payment_state === 'paid'
@@ -135,23 +152,12 @@ export function AdminAttendancePage() {
   const selectedStudent =
     students.find((student) => student.id === selectedStudentId) ?? null
   const filteredStudents = useMemo(() => {
-    const query = studentSearch.trim().toLowerCase()
-    if (!query) {
-      return students
-    }
-
-    return students.filter((student) =>
-      [
-        student.first_name,
-        student.last_name,
-        student.email,
-        student.phone ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    )
+    return students.filter((student) => studentMatchesQuery(student, studentSearch))
   }, [studentSearch, students])
+  const singleFilteredStudent =
+    studentSearch.trim() && filteredStudents.length === 1
+      ? filteredStudents[0]
+      : null
 
   async function loadData() {
     setLoading(true)
@@ -187,7 +193,6 @@ export function AdminAttendancePage() {
     try {
       const nextStudents = await listStudents()
       setStudents(nextStudents)
-      setSelectedStudentId((current) => current || nextStudents[0]?.id || '')
     } catch (loadError) {
       setError(formatAdminError(loadError))
     }
@@ -211,10 +216,23 @@ export function AdminAttendancePage() {
       setStudentPrograms(programs)
       setStudentSessions(sessions)
     } catch (loadError) {
-      setError(formatAdminError(loadError))
+      setError(
+        `No se pudo cargar el calendario del alumno: ${formatAdminError(
+          loadError,
+        )}`,
+      )
     } finally {
       setBookingLoading(false)
     }
+  }
+
+  function handleSelectStudent(studentId: string) {
+    setSelectedStudentId(studentId)
+    setStudentSearch('')
+    setStudentPrograms([])
+    setStudentSessions([])
+    setError(null)
+    setSuccess(null)
   }
 
   useEffect(() => {
@@ -392,7 +410,8 @@ export function AdminAttendancePage() {
                 value={bookingToDate}
               />
               <button
-                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"
+                disabled={!selectedStudentId || bookingLoading}
                 onClick={() => void loadStudentCalendar()}
                 type="button"
               >
@@ -410,10 +429,48 @@ export function AdminAttendancePage() {
                 placeholder="Buscar por nombre, email o telefono"
                 value={studentSearch}
               />
+              {studentSearch.trim() ? (
+                <div className="rounded-[18px] border border-[var(--line)] bg-white p-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+                    Coincidencias
+                  </p>
+                  {filteredStudents.length === 0 ? (
+                    <p className="mt-2 text-sm text-[var(--muted)]">
+                      No hay alumnos que coincidan con la busqueda.
+                    </p>
+                  ) : (
+                    <div className="mt-2 grid gap-2">
+                      {filteredStudents.slice(0, 5).map((student) => (
+                        <button
+                          className="rounded-2xl border border-[var(--line)] px-3 py-2 text-left text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+                          key={student.id}
+                          onClick={() => handleSelectStudent(student.id)}
+                          type="button"
+                        >
+                          {studentFullName(student)}
+                          <span className="block text-xs font-normal text-[var(--muted)]">
+                            {student.email}
+                            {student.phone ? ` · ${student.phone}` : ''}
+                          </span>
+                        </button>
+                      ))}
+                      {singleFilteredStudent ? (
+                        <button
+                          className="rounded-2xl bg-[var(--brand)] px-3 py-2 text-sm font-bold text-white"
+                          onClick={() => handleSelectStudent(singleFilteredStudent.id)}
+                          type="button"
+                        >
+                          Usar este alumno
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
               <select
                 aria-label="Alumno para reservar"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) => setSelectedStudentId(event.target.value)}
+                onChange={(event) => handleSelectStudent(event.target.value)}
                 value={selectedStudentId}
               >
                 <option value="">Seleccionar alumno</option>
@@ -483,7 +540,7 @@ export function AdminAttendancePage() {
                 </>
               ) : (
                 <div className="rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
-                  El calendario aparece despues de elegir un alumno.
+                  Elegi un alumno del desplegable para ver el calendario.
                 </div>
               )}
             </div>

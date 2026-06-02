@@ -190,7 +190,7 @@ export async function listPlans() {
   const { data, error } = await client
     .from('plans')
     .select(
-      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, visible_to_students, max_active_memberships, memberships(id), plan_activities(activity_id, monthly_credits, weekly_class_limit, activities(id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity))',
+      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, visible_to_students, max_active_memberships, memberships(id), plan_activities(activity_id, monthly_credits, weekly_class_limit, activities(id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity, booking_cutoff_hours, cancellation_cutoff_hours))',
     )
     .order('active', { ascending: false })
     .order('name', { ascending: true })
@@ -207,7 +207,7 @@ export async function listActivities(includeInactive = false) {
   let query = client
     .from('activities')
     .select(
-      'id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity',
+      'id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity, booking_cutoff_hours, cancellation_cutoff_hours',
     )
     .order('name', { ascending: true })
 
@@ -249,6 +249,8 @@ function activityRpcInput(input: ActivityInput) {
     p_color_hex: input.color_hex.trim() || null,
     p_default_capacity: input.default_capacity,
     p_max_capacity: input.max_capacity,
+    p_booking_cutoff_hours: input.booking_cutoff_hours ?? 3,
+    p_cancellation_cutoff_hours: input.cancellation_cutoff_hours ?? 3,
   }
 }
 

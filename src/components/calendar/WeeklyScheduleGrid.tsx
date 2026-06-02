@@ -22,6 +22,10 @@ export type ScheduleSession = {
   can_book: boolean
   block_reason: string | null
   requires_24h_cancel: boolean
+  booking_cutoff_hours: number
+  cancellation_cutoff_hours: number
+  booking_deadline: string
+  cancellation_deadline: string
   plan_type: 'weekly' | 'package' | 'manual' | null
   weekly_class_limit: number | null
   weekly_classes_used: number | null
@@ -208,11 +212,46 @@ function getStatus(session: ScheduleSession, mode: 'admin' | 'student') {
   }
 }
 
+function cutoffText(
+  action: 'booking' | 'cancellation',
+  hours: number | null | undefined,
+  mode: 'admin' | 'student',
+) {
+  const normalizedHours = hours ?? 3
+  const base =
+    action === 'booking'
+      ? mode === 'admin'
+        ? 'Reserva'
+        : 'Reservas'
+      : mode === 'admin'
+        ? 'Cancela'
+        : 'Cancelaciones'
+
+  if (normalizedHours === 0) {
+    return mode === 'admin'
+      ? `${base} hasta el inicio`
+      : `${base} hasta el inicio de la clase`
+  }
+
+  const unit = normalizedHours === 1 ? '1 h' : `${normalizedHours} h`
+  return mode === 'admin'
+    ? `${base} hasta ${unit} antes`
+    : `${base} hasta ${unit} antes del inicio`
+}
+
 function getCancelBlockReason(session: ScheduleSession) {
-  const cancelLimit = new Date(session.starts_at).getTime() - 3 * 60 * 60 * 1000
+  const cancelLimit = new Date(session.cancellation_deadline).getTime()
 
   if (Date.now() > cancelLimit) {
-    return 'Ya no podés cancelar esta reserva desde la app porque faltan menos de 3 horas para la clase. Si reservaste por error, escribile a Carolina para que la cancele manualmente.'
+    const hours = session.cancellation_cutoff_hours ?? 3
+    const limit =
+      hours === 0
+        ? 'hasta el inicio de la clase'
+        : hours === 1
+          ? 'hasta 1 h antes del inicio'
+          : `hasta ${hours} h antes del inicio`
+
+    return `Ya no podes cancelar esta reserva desde la app porque el limite de cancelacion es ${limit}. Si reservaste por error, escribile a Carolina para que la cancele manualmente.`
   }
 
   return null
@@ -478,7 +517,18 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                                 {getCapacityLabel(session, mode)}
                               </span>
                               <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
-                                Cancela hasta 3h antes
+                                {cutoffText(
+                                  'booking',
+                                  session.booking_cutoff_hours,
+                                  mode,
+                                )}
+                              </span>
+                              <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
+                                {cutoffText(
+                                  'cancellation',
+                                  session.cancellation_cutoff_hours,
+                                  mode,
+                                )}
                               </span>
                               {session.trainer_name ? (
                                 <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">

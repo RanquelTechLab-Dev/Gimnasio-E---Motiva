@@ -229,7 +229,7 @@ export function AdminAttendancePage() {
                     </p>
                     <p className="mt-1 text-xs text-[var(--muted)]">
                       Cupo {sessionRows.length}/{session.capacity}
-                      {' · cancelacion alumnos hasta 3h antes'}
+                      {' · cancelacion manual admin disponible'}
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-[var(--ink)]">

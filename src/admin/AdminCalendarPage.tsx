@@ -53,6 +53,8 @@ type ActivityFormState = {
   color_hex: string
   default_capacity: string
   max_capacity: string
+  booking_cutoff_hours: string
+  cancellation_cutoff_hours: string
 }
 
 type SessionDeleteRequest = {
@@ -81,6 +83,8 @@ const emptyActivityForm: ActivityFormState = {
   color_hex: '',
   default_capacity: '',
   max_capacity: '',
+  booking_cutoff_hours: '3',
+  cancellation_cutoff_hours: '3',
 }
 
 function formatLocalDate(date: Date) {
@@ -175,6 +179,10 @@ function activityToForm(activity: Activity): ActivityFormState {
       ? String(activity.default_capacity)
       : '',
     max_capacity: activity.max_capacity ? String(activity.max_capacity) : '',
+    booking_cutoff_hours: String(activity.booking_cutoff_hours ?? 3),
+    cancellation_cutoff_hours: String(
+      activity.cancellation_cutoff_hours ?? 3,
+    ),
   }
 }
 
@@ -189,6 +197,15 @@ function parsePositiveInteger(value: string, label: string, required = false) {
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${label} debe ser un numero entero mayor a cero.`)
+  }
+
+  return parsed
+}
+
+function parseCutoffHours(value: string, label: string) {
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 168) {
+    throw new Error(`${label} debe ser un numero entero entre 0 y 168.`)
   }
 
   return parsed
@@ -210,7 +227,24 @@ function toActivityInput(form: ActivityFormState): ActivityInput {
     color_hex: form.color_hex,
     default_capacity: defaultCapacity,
     max_capacity: maxCapacity,
+    booking_cutoff_hours: parseCutoffHours(
+      form.booking_cutoff_hours,
+      'Las horas limite para reservar',
+    ),
+    cancellation_cutoff_hours: parseCutoffHours(
+      form.cancellation_cutoff_hours,
+      'Las horas limite para cancelar',
+    ),
   }
+}
+
+function cutoffSummaryLabel(value: number | null | undefined, action: string) {
+  const hours = value ?? 3
+  if (hours === 0) {
+    return `${action} hasta el inicio`
+  }
+
+  return `${action} hasta ${hours}h antes`
 }
 
 function getSessionDetail(session: CalendarSession) {
@@ -867,7 +901,15 @@ export function AdminCalendarPage() {
                             ? `Cupo sugerido ${selectedActivity.default_capacity}`
                             : 'Sin cupo por defecto'}
                           {' · '}
-                          cancelacion alumnos hasta 3h antes
+                          {cutoffSummaryLabel(
+                            selectedActivity.booking_cutoff_hours,
+                            'reserva',
+                          )}
+                          {' · '}
+                          {cutoffSummaryLabel(
+                            selectedActivity.cancellation_cutoff_hours,
+                            'cancelacion alumnos',
+                          )}
                           {selectedActivity.flexible_schedule
                             ? ' · horario flexible'
                             : ''}
@@ -1276,7 +1318,12 @@ export function AdminCalendarPage() {
                   </p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     {activity.active ? 'Activa' : 'Inactiva'} ·{' '}
-                    Cancelacion alumnos hasta 3h antes
+                    {cutoffSummaryLabel(activity.booking_cutoff_hours, 'Reserva')}
+                    {' · '}
+                    {cutoffSummaryLabel(
+                      activity.cancellation_cutoff_hours,
+                      'cancelacion alumnos',
+                    )}
                     {activity.default_capacity
                       ? ` · cupo ${activity.default_capacity}`
                       : ''}
@@ -1415,6 +1462,46 @@ export function AdminCalendarPage() {
                   type="number"
                   value={activityForm.max_capacity}
                 />
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold">
+                Reservar hasta cuantas horas antes
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  min="0"
+                  max="168"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      booking_cutoff_hours: event.target.value,
+                    })
+                  }
+                  type="number"
+                  value={activityForm.booking_cutoff_hours}
+                />
+                <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
+                  0 significa hasta el inicio de la clase.
+                </span>
+              </label>
+              <label className="text-sm font-semibold">
+                Cancelar hasta cuantas horas antes
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  min="0"
+                  max="168"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      cancellation_cutoff_hours: event.target.value,
+                    })
+                  }
+                  type="number"
+                  value={activityForm.cancellation_cutoff_hours}
+                />
+                <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
+                  0 significa hasta el inicio de la clase.
+                </span>
               </label>
             </div>
             {activityForm.max_capacity !== '1' ? (

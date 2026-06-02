@@ -5,6 +5,10 @@ export type CalendarSession = {
   activity_slug: string
   activity_color_hex: string | null
   requires_24h_cancel: boolean
+  booking_cutoff_hours: number
+  cancellation_cutoff_hours: number
+  booking_deadline: string
+  cancellation_deadline: string
   title: string
   starts_at: string
   ends_at: string
@@ -162,6 +166,8 @@ export type StudentPlanCatalogActivity = {
     color_hex: string | null
     default_capacity: number | null
     max_capacity: number | null
+    booking_cutoff_hours: number
+    cancellation_cutoff_hours: number
   } | null
 }
 

@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   adminCancelBooking,
+  adminBookClassForStudent,
   autoFinalizeAttendance,
   formatAdminError,
+  listCalendarSessionsForStudent,
   listAttendanceSessions,
+  listStudentPrograms,
+  listStudents,
   markAttendance,
 } from './api'
-import type { AttendanceSessionRow, AttendanceStatus } from './types'
+import { WeeklyScheduleGrid } from '../components/calendar/WeeklyScheduleGrid'
+import type {
+  AttendanceSessionRow,
+  AttendanceStatus,
+  CalendarSession,
+  StudentProfile,
+  StudentProgram,
+} from './types'
 
 type AttendanceGroup = {
   session: AttendanceSessionRow
@@ -29,7 +40,7 @@ const bookingLabels: Record<AttendanceSessionRow['booking_status'], string> = {
 const correctionLabels: Record<AttendanceStatus, string> = {
   present: 'Corregir a asistio',
   absent: 'Corregir a ausente',
-  justified: 'Corregir a justificado',
+  justified: 'Justificado historico',
 }
 
 function formatLocalDate(date: Date) {
@@ -50,6 +61,32 @@ function formatDateTime(value: string) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+function addDays(dateValue: string, days: number) {
+  const date = new Date(`${dateValue}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  return formatLocalDate(date)
+}
+
+function studentFullName(student: StudentProfile) {
+  return `${student.first_name} ${student.last_name}`.trim()
+}
+
+function programSummary(program: StudentProgram) {
+  const payment =
+    program.payment_state === 'paid'
+      ? 'Pagado completo'
+      : program.payment_state === 'partial'
+        ? `Pago incompleto · saldo $${program.pending_amount}`
+        : 'Sin pago'
+
+  const credits =
+    program.plan_type === 'package'
+      ? ` · ${program.remaining_credits ?? 0} clases disponibles`
+      : ''
+
+  return `${program.plan_name} · ${program.status} · ${payment}${credits}`
 }
 
 function studentName(row: AttendanceSessionRow) {
@@ -73,16 +110,48 @@ function groupRows(rows: AttendanceSessionRow[]) {
 
 export function AdminAttendancePage() {
   const today = useMemo(() => formatLocalDate(new Date()), [])
+  const weekEnd = useMemo(() => addDays(today, 6), [today])
+  const [activeTab, setActiveTab] = useState<'attendance' | 'booking'>(
+    'attendance',
+  )
   const [fromDate, setFromDate] = useState(today)
   const [toDate, setToDate] = useState(today)
   const [rows, setRows] = useState<AttendanceSessionRow[]>([])
+  const [students, setStudents] = useState<StudentProfile[]>([])
+  const [studentSearch, setStudentSearch] = useState('')
+  const [selectedStudentId, setSelectedStudentId] = useState('')
+  const [studentPrograms, setStudentPrograms] = useState<StudentProgram[]>([])
+  const [bookingFromDate, setBookingFromDate] = useState(today)
+  const [bookingToDate, setBookingToDate] = useState(weekEnd)
+  const [studentSessions, setStudentSessions] = useState<CalendarSession[]>([])
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
+  const [bookingLoading, setBookingLoading] = useState(false)
   const [savingBookingId, setSavingBookingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
   const groups = useMemo(() => groupRows(rows), [rows])
+  const selectedStudent =
+    students.find((student) => student.id === selectedStudentId) ?? null
+  const filteredStudents = useMemo(() => {
+    const query = studentSearch.trim().toLowerCase()
+    if (!query) {
+      return students
+    }
+
+    return students.filter((student) =>
+      [
+        student.first_name,
+        student.last_name,
+        student.email,
+        student.phone ?? '',
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    )
+  }, [studentSearch, students])
 
   async function loadData() {
     setLoading(true)
@@ -114,6 +183,40 @@ export function AdminAttendancePage() {
     }
   }
 
+  async function loadStudents() {
+    try {
+      const nextStudents = await listStudents()
+      setStudents(nextStudents)
+      setSelectedStudentId((current) => current || nextStudents[0]?.id || '')
+    } catch (loadError) {
+      setError(formatAdminError(loadError))
+    }
+  }
+
+  async function loadStudentCalendar(studentId = selectedStudentId) {
+    if (!studentId) {
+      setStudentPrograms([])
+      setStudentSessions([])
+      return
+    }
+
+    setBookingLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const [programs, sessions] = await Promise.all([
+        listStudentPrograms(studentId),
+        listCalendarSessionsForStudent(studentId, bookingFromDate, bookingToDate),
+      ])
+      setStudentPrograms(programs)
+      setStudentSessions(sessions)
+    } catch (loadError) {
+      setError(formatAdminError(loadError))
+    } finally {
+      setBookingLoading(false)
+    }
+  }
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadData()
@@ -121,6 +224,23 @@ export function AdminAttendancePage() {
     return () => window.clearTimeout(timeoutId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadStudents()
+    }, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'booking' && selectedStudentId) {
+      const timeoutId = window.setTimeout(() => {
+        void loadStudentCalendar(selectedStudentId)
+      }, 0)
+      return () => window.clearTimeout(timeoutId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedStudentId, bookingFromDate, bookingToDate])
 
   async function handleMark(row: AttendanceSessionRow, status: AttendanceStatus) {
     setSavingBookingId(row.booking_id)
@@ -163,8 +283,213 @@ export function AdminAttendancePage() {
     }
   }
 
+  async function handleBookForStudent(session: CalendarSession) {
+    if (!selectedStudent) {
+      return
+    }
+
+    setSavingBookingId(session.session_id)
+    setError(null)
+    setSuccess(null)
+    try {
+      await adminBookClassForStudent(selectedStudent.id, session.session_id)
+      setSuccess(`Reserva creada para ${studentFullName(selectedStudent)}.`)
+      await loadStudentCalendar(selectedStudent.id)
+      await loadData()
+    } catch (bookingError) {
+      setError(formatAdminError(bookingError))
+    } finally {
+      setSavingBookingId(null)
+    }
+  }
+
+  async function handleCancelForStudent(session: CalendarSession) {
+    if (!selectedStudent || !session.own_booking_id) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Vas a cancelar la reserva de ${studentFullName(selectedStudent)}. ¿Continuar?`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setSavingBookingId(session.session_id)
+    setError(null)
+    setSuccess(null)
+    try {
+      await adminCancelBooking(
+        session.own_booking_id,
+        'Cancelacion manual desde reservar por alumno.',
+      )
+      setSuccess(`Reserva cancelada para ${studentFullName(selectedStudent)}.`)
+      await loadStudentCalendar(selectedStudent.id)
+      await loadData()
+    } catch (cancelError) {
+      setError(formatAdminError(cancelError))
+    } finally {
+      setSavingBookingId(null)
+    }
+  }
+
   return (
     <section className="grid gap-5">
+      <div className="flex flex-wrap gap-2">
+        <button
+          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+            activeTab === 'attendance'
+              ? 'bg-[var(--brand)] text-white'
+              : 'border border-[var(--line)] bg-white text-[var(--ink)] hover:bg-[var(--brand-soft)]'
+          }`}
+          onClick={() => setActiveTab('attendance')}
+          type="button"
+        >
+          Asistencia
+        </button>
+        <button
+          className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+            activeTab === 'booking'
+              ? 'bg-[var(--brand)] text-white'
+              : 'border border-[var(--line)] bg-white text-[var(--ink)] hover:bg-[var(--brand-soft)]'
+          }`}
+          onClick={() => setActiveTab('booking')}
+          type="button"
+        >
+          Reservar por alumno
+        </button>
+      </div>
+
+      {activeTab === 'booking' ? (
+        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+                Reservar por alumno
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                Operar reservas desde admin
+              </h3>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Elegi un alumno para ver sus clases disponibles, reservar por el
+                y cancelar reservas activas sin iniciar sesion como alumno.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <input
+                aria-label="Fecha desde para reservar por alumno"
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                onChange={(event) => setBookingFromDate(event.target.value)}
+                type="date"
+                value={bookingFromDate}
+              />
+              <input
+                aria-label="Fecha hasta para reservar por alumno"
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                onChange={(event) => setBookingToDate(event.target.value)}
+                type="date"
+                value={bookingToDate}
+              />
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+                onClick={() => void loadStudentCalendar()}
+                type="button"
+              >
+                Actualizar
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(260px,360px)_1fr]">
+            <div className="grid gap-3">
+              <input
+                aria-label="Buscar alumno"
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) => setStudentSearch(event.target.value)}
+                placeholder="Buscar por nombre, email o telefono"
+                value={studentSearch}
+              />
+              <select
+                aria-label="Alumno para reservar"
+                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) => setSelectedStudentId(event.target.value)}
+                value={selectedStudentId}
+              >
+                <option value="">Seleccionar alumno</option>
+                {filteredStudents.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {studentFullName(student)} · {student.email}
+                  </option>
+                ))}
+              </select>
+
+              {selectedStudent ? (
+                <div className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+                  <p className="font-bold text-[var(--ink)]">
+                    {studentFullName(selectedStudent)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    {selectedStudent.email}
+                    {selectedStudent.phone ? ` · ${selectedStudent.phone}` : ''}
+                  </p>
+                  <div className="mt-3 grid gap-2">
+                    {studentPrograms.length === 0 ? (
+                      <p className="text-xs text-[var(--muted)]">
+                        Sin programas asignados.
+                      </p>
+                    ) : (
+                      studentPrograms.map((program) => (
+                        <p
+                          className="rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-[var(--ink)]"
+                          key={program.program_id}
+                        >
+                          {programSummary(program)}
+                        </p>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[20px] border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)]">
+                  Selecciona un alumno para ver sus programas y clases.
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              {bookingLoading ? (
+                <p className="text-sm text-[var(--muted)]">
+                  Cargando calendario del alumno...
+                </p>
+              ) : selectedStudent ? (
+                <>
+                  <p className="mb-3 text-sm font-semibold text-[var(--ink)]">
+                    Reservas para {studentFullName(selectedStudent)}
+                  </p>
+                  <WeeklyScheduleGrid
+                    fromDate={bookingFromDate}
+                    mode="student"
+                    onBookSession={(session) =>
+                      void handleBookForStudent(session)
+                    }
+                    onCancelBooking={(session) =>
+                      void handleCancelForStudent(session)
+                    }
+                    savingSessionId={savingBookingId}
+                    sessions={studentSessions}
+                    toDate={bookingToDate}
+                  />
+                </>
+              ) : (
+                <div className="rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
+                  El calendario aparece despues de elegir un alumno.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -317,7 +642,7 @@ export function AdminAttendancePage() {
                                 </button>
                               ) : null}
                               {row.attendance_status ? (
-                                (['present', 'absent', 'justified'] as const).map(
+                                (['present', 'absent'] as const).map(
                                   (status) => (
                                     <button
                                       className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"
@@ -347,17 +672,18 @@ export function AdminAttendancePage() {
           </div>
         )}
 
-        {error ? (
-          <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
-            {error}
-          </p>
-        ) : null}
-        {success ? (
-          <p className="mt-4 rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
-            {success}
-          </p>
-        ) : null}
       </div>
+      )}
+      {error ? (
+        <p className="rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+          {error}
+        </p>
+      ) : null}
+      {success ? (
+        <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
+          {success}
+        </p>
+      ) : null}
     </section>
   )
 }

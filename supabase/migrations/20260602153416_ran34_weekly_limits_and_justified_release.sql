@@ -321,7 +321,18 @@ begin
       a.active as activity_active,
       private.class_reservation_cutoff(s.starts_at) as reservation_cutoff,
       private.class_reservation_block_reason(s.starts_at) as reservation_block_reason,
-      (select count(*)::int from public.bookings b where b.session_id = s.id and b.status = 'booked') as active_bookings,
+      (
+        select count(*)::int
+        from public.bookings b
+        left join public.attendance att on att.booking_id = b.id
+        where b.session_id = s.id
+          and b.status in (
+            'booked'::public.booking_status,
+            'attended'::public.booking_status,
+            'no_show'::public.booking_status
+          )
+          and coalesce(att.status <> 'justified'::public.attendance_status, true)
+      ) as active_bookings,
       (select b.id from public.bookings b where b.session_id = s.id and b.student_id = v_actor and b.status = 'booked' limit 1) as own_booking_id,
       (select b.status from public.bookings b where b.session_id = s.id and b.student_id = v_actor order by b.created_at desc limit 1) as own_booking_status,
       em.plan_type,

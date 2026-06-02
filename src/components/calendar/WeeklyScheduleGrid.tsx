@@ -225,7 +225,7 @@ function getPlanUsageLabel(session: ScheduleSession) {
       session.weekly_classes_remaining ??
       Math.max(session.weekly_class_limit - used, 0)
 
-    return `${remaining}/${session.weekly_class_limit} este periodo`
+    return `${remaining}/${session.weekly_class_limit} esta semana`
   }
 
   if (

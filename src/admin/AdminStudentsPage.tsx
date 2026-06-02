@@ -1061,8 +1061,9 @@ export function AdminStudentsPage() {
   }
 
   return (
-    <section className="grid w-full min-w-0 max-w-full gap-5 overflow-x-auto pb-24 min-[2200px]:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+    <section className="grid w-full min-w-0 max-w-full gap-5 overflow-x-auto pb-24">
+      <div className="contents">
+        <div className="order-1 min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -1153,9 +1154,11 @@ export function AdminStudentsPage() {
             )}
           </div>
         )}
+        </div>
 
         {selectedStudent ? (
-          <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(260px,0.8fr)_minmax(420px,1.2fr)]">
+          <div className="contents">
+            <div className="order-2 grid min-w-0 gap-5 xl:grid-cols-[minmax(260px,0.8fr)_minmax(420px,1.2fr)]">
             <article className="min-w-0 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
                 Ficha
@@ -1306,8 +1309,9 @@ export function AdminStudentsPage() {
                 )}
               </div>
             </article>
+            </div>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+            <article className="order-9 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
                 Plan de entrenamiento
               </p>
@@ -1332,14 +1336,14 @@ export function AdminStudentsPage() {
               )}
             </article>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 xl:col-span-2">
+            <article className="order-8 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
                     Plan y observaciones
                   </p>
                   <h4 className="mt-2 font-display text-xl font-bold">
-                    Seguimiento operativo
+                    Registrar nota
                   </h4>
                 </div>
                 <button
@@ -1419,7 +1423,15 @@ export function AdminStudentsPage() {
                   {trainingNoteForm.note_id ? 'Actualizar nota' : 'Guardar nota'}
                 </button>
               </form>
+            </article>
 
+            <article className="order-10 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
+                Seguimiento operativo
+              </p>
+              <h4 className="mt-2 font-display text-xl font-bold">
+                Notas y actividad registrada
+              </h4>
               <div className="mt-4 grid gap-2 text-sm">
                 {selectedTrainingNotes.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-[var(--muted)]">
@@ -1476,7 +1488,7 @@ export function AdminStudentsPage() {
               </div>
             </article>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 xl:col-span-2">
+            <article className="order-11 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
@@ -1797,15 +1809,15 @@ export function AdminStudentsPage() {
               </div>
             </article>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 xl:col-span-2">
+            <article className="order-7 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
                 Pagos
               </p>
-              <div className="mt-3 grid gap-2 text-sm">
+              <div className="mt-3 grid max-h-[260px] gap-2 overflow-y-auto pr-1 text-sm">
                 {selectedPayments.length === 0 ? (
                   <p className="text-[var(--muted)]">Sin pagos registrados.</p>
                 ) : (
-                  selectedPayments.slice(0, 5).map((payment) => (
+                  selectedPayments.map((payment) => (
                     <div
                       className="flex flex-col gap-1 rounded-2xl border border-[var(--line)] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
                       key={payment.id}
@@ -1825,14 +1837,14 @@ export function AdminStudentsPage() {
             </article>
           </div>
         ) : (
-          <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
+          <div className="order-2 rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
             Selecciona un alumno de la tabla para ver la ficha, editar datos,
                 asignar programas o registrar pagos.
           </div>
         )}
       </div>
 
-      <aside className="grid min-w-0 gap-5 min-[2200px]:max-h-[calc(100vh-2rem)] min-[2200px]:overflow-y-auto min-[2200px]:pr-1">
+      <aside className="order-3 grid min-w-0 gap-5">
         <form
           className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
           onSubmit={handleCreateStudent}

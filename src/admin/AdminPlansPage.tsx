@@ -158,7 +158,7 @@ function activitySummary(activity: Activity | null | undefined) {
 
   const parts = [
     activity.active ? 'Activa' : 'Archivada',
-    activity.requires_24h_cancel ? 'Cancelacion 24h' : 'Cancelacion 12h',
+    'Cancelacion alumnos hasta 3h antes',
   ]
 
   if (activity.default_capacity) {

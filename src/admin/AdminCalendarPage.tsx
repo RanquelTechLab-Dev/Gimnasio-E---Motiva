@@ -867,9 +867,7 @@ export function AdminCalendarPage() {
                             ? `Cupo sugerido ${selectedActivity.default_capacity}`
                             : 'Sin cupo por defecto'}
                           {' · '}
-                          {selectedActivity.requires_24h_cancel
-                            ? 'cancelacion 24h'
-                            : 'cancelacion 12h'}
+                          cancelacion alumnos hasta 3h antes
                           {selectedActivity.flexible_schedule
                             ? ' · horario flexible'
                             : ''}
@@ -1278,9 +1276,7 @@ export function AdminCalendarPage() {
                   </p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     {activity.active ? 'Activa' : 'Inactiva'} ·{' '}
-                    {activity.requires_24h_cancel
-                      ? 'Cancelacion 24h'
-                      : 'Cancelacion 12h'}
+                    Cancelacion alumnos hasta 3h antes
                     {activity.default_capacity
                       ? ` · cupo ${activity.default_capacity}`
                       : ''}
@@ -1427,20 +1423,7 @@ export function AdminCalendarPage() {
                 cargar una clase puntual con mas cupo si lo necesita.
               </p>
             ) : null}
-            <div className="grid gap-2 sm:grid-cols-3">
-              <label className="flex items-center gap-3 text-sm font-semibold">
-                <input
-                  checked={activityForm.requires_24h_cancel}
-                  onChange={(event) =>
-                    setActivityForm({
-                      ...activityForm,
-                      requires_24h_cancel: event.target.checked,
-                    })
-                  }
-                  type="checkbox"
-                />
-                Cancelacion 24h
-              </label>
+            <div className="grid gap-2 sm:grid-cols-2">
               <label className="flex items-center gap-3 text-sm font-semibold">
                 <input
                   checked={activityForm.flexible_schedule}

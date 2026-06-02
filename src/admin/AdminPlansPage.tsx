@@ -1212,7 +1212,7 @@ export function AdminPlansPage() {
               Esta accion eliminara definitivamente esta actividad principal y
               sus datos operativos relacionados. Se quitara de los planes que la
               usen y no se podra deshacer. No se borraran alumnos, pagos,
-              membresias ni planes. Para confirmar, escribi ELIMINAR.
+              programas asignados ni planes. Para confirmar, escribi ELIMINAR.
             </p>
             <p className="mt-3 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm font-semibold text-[var(--accent)]">
               {activityDeleteTarget.name}

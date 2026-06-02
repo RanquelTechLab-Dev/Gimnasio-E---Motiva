@@ -233,6 +233,11 @@ export function AdminAttendancePage() {
     setStudentSessions([])
     setError(null)
     setSuccess(null)
+    if (studentId) {
+      window.setTimeout(() => {
+        void loadStudentCalendar(studentId)
+      }, 0)
+    }
   }
 
   useEffect(() => {
@@ -258,7 +263,7 @@ export function AdminAttendancePage() {
       return () => window.clearTimeout(timeoutId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedStudentId, bookingFromDate, bookingToDate])
+  }, [activeTab, bookingFromDate, bookingToDate])
 
   async function handleMark(row: AttendanceSessionRow, status: AttendanceStatus) {
     setSavingBookingId(row.booking_id)

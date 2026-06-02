@@ -76,7 +76,7 @@ const emptyActivityForm: ActivityFormState = {
   description: '',
   color_hex: '#75cfc2',
   default_capacity: '10',
-  max_capacity: '',
+  max_capacity: '10',
   active: true,
 }
 
@@ -159,8 +159,8 @@ function planAccessLabel(plan: Plan) {
 
   if (plan.plan_type === 'package') {
     return plan.package_class_count
-      ? `${plan.package_class_count} clases del paquete`
-      : 'Paquete sin cantidad definida'
+      ? `${plan.package_class_count} clases configuradas`
+      : 'Clases sin cantidad definida'
   }
 
   return 'Configuracion manual'
@@ -192,12 +192,8 @@ function activitySummary(activity: Activity | null | undefined) {
     'Cancelacion alumnos hasta 3h antes',
   ]
 
-  if (activity.default_capacity) {
-    parts.push(`cupo ${activity.default_capacity}`)
-  }
-
-  if (activity.max_capacity) {
-    parts.push(`maximo ${activity.max_capacity}`)
+  if (activity.max_capacity ?? activity.default_capacity) {
+    parts.push(`cupo maximo ${activity.max_capacity ?? activity.default_capacity}`)
   }
 
   return parts.join(' · ')
@@ -251,7 +247,7 @@ function toPlanInput(form: PlanFormState): PlanInput {
     form.plan_type === 'package'
       ? parsePositiveInteger(
           form.package_class_count,
-          'La cantidad de clases del paquete',
+          'La cantidad de clases del plan',
           true,
         )
       : null
@@ -310,8 +306,8 @@ function toActivityInput(form: ActivityFormState): ActivityInput {
     active: form.active,
     color_hex: form.color_hex.trim() || '#75cfc2',
     default_capacity: parsePositiveInteger(
-      form.default_capacity,
-      'El cupo predeterminado',
+      form.max_capacity || form.default_capacity,
+      'El cupo maximo',
       false,
     ),
     max_capacity: parsePositiveInteger(
@@ -727,9 +723,9 @@ export function AdminPlansPage() {
       </div>
 
       <aside className="grid gap-5">
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-2">
+        <div className="inline-flex w-fit max-w-full flex-wrap gap-1 rounded-full border border-[var(--line)] bg-white p-1 shadow-sm">
           <button
-            className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+            className={`rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
               editorMode === 'activity'
                 ? 'bg-[var(--brand)] text-white'
                 : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
@@ -745,7 +741,7 @@ export function AdminPlansPage() {
             Nueva actividad principal
           </button>
           <button
-            className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+            className={`rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
               editorMode === 'plan'
                 ? 'bg-[var(--brand)] text-white'
                 : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
@@ -846,40 +842,23 @@ export function AdminPlansPage() {
                   type="number"
                   value={planForm.billing_period_days}
                 />
+                <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
+                  La vigencia corre desde el dia de pago hasta el mismo dia del
+                  mes siguiente.
+                </span>
               </label>
             </div>
-            <label className="text-sm font-semibold">
-              Tipo de plan
-              <select
-                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                disabled={selectedPlanHasHistory}
-                onChange={(event) =>
-                  setPlanForm({
-                    ...planForm,
-                    plan_type: event.target.value as PlanType,
-                    package_class_count:
-                      event.target.value === 'package'
-                        ? planForm.package_class_count
-                        : '',
-                    activities: planForm.activities.map((item) => ({
-                      ...item,
-                      weekly_class_limit:
-                        event.target.value === 'weekly'
-                          ? item.weekly_class_limit || '1'
-                          : '',
-                    })),
-                  })
-                }
-                value={planForm.plan_type}
-              >
-                <option value="weekly">Semanal</option>
-                <option value="package">Paquete</option>
-                <option value="manual">Manual</option>
-              </select>
-            </label>
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3 text-sm">
+              <p className="font-bold text-[var(--ink)]">Regla de uso</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {planForm.plan_type === 'weekly'
+                  ? 'Este plan habilita clases por semana dentro de la vigencia paga. Las clases no usadas no se acumulan.'
+                  : 'Este plan conserva una configuracion anterior de clases. Para convertirlo a clases semanales hace falta una migracion aprobada.'}
+              </p>
+            </div>
             {planForm.plan_type === 'package' ? (
               <label className="text-sm font-semibold">
-                Clases del paquete
+                Clases configuradas del plan
                 <input
                   className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                   disabled={selectedPlanHasHistory}
@@ -974,7 +953,7 @@ export function AdminPlansPage() {
                           </label>
                         ) : (
                           <label className="text-xs font-semibold">
-                            Clases asociadas opcionales
+                            Clases para esta actividad
                             <input
                               className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
                               min="1"
@@ -1134,7 +1113,7 @@ export function AdminPlansPage() {
                   value={activityForm.description}
                 />
               </label>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-sm font-semibold">
                   Color
                   <input
@@ -1150,21 +1129,6 @@ export function AdminPlansPage() {
                   />
                 </label>
                 <label className="text-sm font-semibold">
-                  Cupo predeterminado
-                  <input
-                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                    min="1"
-                    onChange={(event) =>
-                      setActivityForm({
-                        ...activityForm,
-                        default_capacity: event.target.value,
-                      })
-                    }
-                    type="number"
-                    value={activityForm.default_capacity}
-                  />
-                </label>
-                <label className="text-sm font-semibold">
                   Cupo maximo
                   <input
                     className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
@@ -1172,13 +1136,17 @@ export function AdminPlansPage() {
                     onChange={(event) =>
                       setActivityForm({
                         ...activityForm,
+                        default_capacity: event.target.value,
                         max_capacity: event.target.value,
                       })
                     }
-                    placeholder="Opcional"
                     type="number"
-                    value={activityForm.max_capacity}
+                    value={activityForm.max_capacity || activityForm.default_capacity}
                   />
+                  <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
+                    El cupo maximo define cuantos alumnos pueden reservar una
+                    clase de esta actividad.
+                  </span>
                 </label>
               </div>
               <label className="flex items-center gap-3 text-sm font-semibold">

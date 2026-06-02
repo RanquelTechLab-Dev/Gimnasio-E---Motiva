@@ -232,10 +232,23 @@ function getPlanUsageLabel(session: ScheduleSession) {
     session.plan_type === 'package' &&
     session.package_classes_remaining !== null
   ) {
-    return `${session.package_classes_remaining} clases del paquete`
+    return `${session.package_classes_remaining} clases disponibles`
   }
 
   return null
+}
+
+function getCapacityLabel(
+  session: ScheduleSession,
+  mode: 'admin' | 'student',
+) {
+  if (mode === 'admin') {
+    return `${session.reserved_count}/${session.capacity} reservados`
+  }
+
+  return session.spots_left === 1
+    ? '1 lugar disponible'
+    : `${session.spots_left} lugares disponibles`
 }
 
 function getSessionDetail(session: ScheduleSession) {
@@ -462,7 +475,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
 
                             <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-bold text-[var(--ink)] sm:mt-3 sm:gap-1.5 sm:text-[11px]">
                               <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
-                                {session.spots_left}/{session.capacity} cupos
+                                {getCapacityLabel(session, mode)}
                               </span>
                               <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
                                 Cancela hasta 3h antes

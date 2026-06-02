@@ -70,8 +70,8 @@ export function MyBookingsPage() {
             Mis reservas
           </h3>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Podes cancelar hasta 3 horas antes de la clase. Si falta menos,
-            escribile a Carolina para que la cancele manualmente.
+            Cada actividad define hasta cuando podes cancelar. Si ya paso el
+            limite, escribile a Carolina para que la cancele manualmente.
           </p>
         </div>
         <button

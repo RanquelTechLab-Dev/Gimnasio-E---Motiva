@@ -203,7 +203,7 @@ export async function listActivePlansCatalog() {
   const { data, error } = await client
     .from('plans')
     .select(
-      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, visible_to_students, plan_activities(activity_id, monthly_credits, weekly_class_limit, activities(id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity))',
+      'id, name, slug, description, price, billing_period_days, plan_type, package_class_count, active, visible_to_students, plan_activities(activity_id, monthly_credits, weekly_class_limit, activities(id, name, slug, description, requires_24h_cancel, flexible_schedule, active, color_hex, default_capacity, max_capacity, booking_cutoff_hours, cancellation_cutoff_hours))',
     )
     .eq('active', true)
     .eq('visible_to_students', true)

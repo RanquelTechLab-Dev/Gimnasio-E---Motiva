@@ -277,14 +277,6 @@ function programDisplayStatus(program: StudentProgram) {
   return programStatusLabels[program.status]
 }
 
-function programPaymentSummary(program: StudentProgram) {
-  return [
-    `Precio: ${moneyFormatter.format(program.plan_price)}`,
-    `Pagado: ${moneyFormatter.format(program.approved_paid_total)}`,
-    `Saldo: ${moneyFormatter.format(program.pending_amount)}`,
-  ].join(' · ')
-}
-
 function programHasHistory(program: StudentProgram) {
   return (
     program.has_history ||
@@ -1069,8 +1061,8 @@ export function AdminStudentsPage() {
   }
 
   return (
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
-      <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
+    <section className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -1121,8 +1113,8 @@ export function AdminStudentsPage() {
                 No hay alumnos que coincidan con la busqueda.
               </div>
             ) : (
-              <div className="overflow-hidden rounded-[20px] border border-[var(--line)]">
-            <div className="grid min-w-[780px] grid-cols-[1.4fr_1.4fr_0.8fr_0.8fr_0.9fr] bg-[var(--surface-strong)] px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+              <div className="overflow-x-auto rounded-[20px] border border-[var(--line)]">
+            <div className="grid min-w-[700px] grid-cols-[1.2fr_1.4fr_0.8fr_0.7fr_0.8fr] bg-[var(--surface-strong)] px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
               <span>Nombre</span>
               <span>Email</span>
               <span>Telefono</span>
@@ -1132,7 +1124,7 @@ export function AdminStudentsPage() {
             <div className="grid max-h-[520px] overflow-auto">
               {filteredStudents.map((student) => (
                 <button
-                  className={`grid min-w-[780px] grid-cols-[1.4fr_1.4fr_0.8fr_0.8fr_0.9fr] px-4 py-3 text-left text-sm transition ${
+                  className={`grid min-w-[700px] grid-cols-[1.2fr_1.4fr_0.8fr_0.7fr_0.8fr] px-4 py-3 text-left text-sm transition ${
                     selectedStudent?.id === student.id
                       ? 'bg-[var(--brand-soft)]'
                       : 'bg-white hover:bg-[var(--surface-strong)]'
@@ -1163,8 +1155,8 @@ export function AdminStudentsPage() {
         )}
 
         {selectedStudent ? (
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+          <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(260px,0.8fr)_minmax(420px,1.2fr)]">
+            <article className="min-w-0 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
                 Ficha
               </p>
@@ -1208,50 +1200,33 @@ export function AdminStudentsPage() {
                     const plan = plansById.get(program.plan_id)
                     return (
                       <div
-                        className="rounded-2xl border border-[var(--line)] bg-white p-3"
+                        className="grid min-w-0 gap-4 rounded-2xl border border-[var(--line)] bg-white p-4"
                         key={program.program_id}
                       >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <p className="font-semibold">
+                        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0">
+                            <p className="break-words text-base font-semibold leading-snug">
                               {program.plan_name ?? plan?.name ?? 'Plan no disponible'}
                             </p>
-                            <p className="text-[var(--muted)]">
-                              {programDisplayStatus(program)} ·{' '}
-                              {program.start_date} a {program.end_date}
-                            </p>
-                            <p
-                              className={`mt-2 rounded-xl px-3 py-2 text-xs font-bold ${
-                                program.is_fully_paid
-                                  ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
-                                  : 'bg-[var(--accent-soft)] text-[var(--accent)]'
-                              }`}
-                            >
-                              {programPaymentStateLabels[program.payment_state]}
-                            </p>
-                            <p className="mt-1 text-xs text-[var(--muted)]">
-                              {programPaymentSummary(program)}
-                            </p>
-                            <p className="mt-1 text-xs text-[var(--muted)]">
-                              {program.remaining_credits === null
-                                ? 'Clases disponibles segun limite del programa'
-                                : `${program.remaining_credits} clases disponibles`}
-                            </p>
-                            {program.last_payment_at ? (
-                              <p className="mt-1 text-xs text-[var(--muted)]">
-                                Ultimo pago vinculado:{' '}
-                                {new Date(program.last_payment_at).toLocaleDateString(
-                                  'es-AR',
-                                )}
-                              </p>
-                            ) : null}
-                            {programHasHistory(program) ? (
-                              <p className="mt-2 rounded-xl bg-[var(--page)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">
-                                Historial: {programHistorySummary(program)}
-                              </p>
-                            ) : null}
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold">
+                              <span className="rounded-full bg-[var(--surface-strong)] px-3 py-1 text-[var(--muted)]">
+                                {programDisplayStatus(program)}
+                              </span>
+                              <span className="rounded-full bg-[var(--surface-strong)] px-3 py-1 text-[var(--muted)]">
+                                {program.start_date} a {program.end_date}
+                              </span>
+                              <span
+                                className={`rounded-full px-3 py-1 ${
+                                  program.is_fully_paid
+                                    ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                                    : 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                                }`}
+                              >
+                                {programPaymentStateLabels[program.payment_state]}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex shrink-0 flex-wrap gap-2">
+                          <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:min-w-[260px]">
                             <button
                               className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-[var(--brand-soft)]"
                               onClick={() =>
@@ -1273,6 +1248,58 @@ export function AdminStudentsPage() {
                             </button>
                           </div>
                         </div>
+
+                        <dl className="grid gap-2 sm:grid-cols-3">
+                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                            <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+                              Precio
+                            </dt>
+                            <dd className="mt-1 text-sm font-bold">
+                              {moneyFormatter.format(program.plan_price)}
+                            </dd>
+                          </div>
+                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                            <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+                              Pagado
+                            </dt>
+                            <dd className="mt-1 text-sm font-bold">
+                              {moneyFormatter.format(program.approved_paid_total)}
+                            </dd>
+                          </div>
+                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                            <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+                              Saldo
+                            </dt>
+                            <dd className="mt-1 text-sm font-bold">
+                              {moneyFormatter.format(program.pending_amount)}
+                            </dd>
+                          </div>
+                        </dl>
+
+                        <div className="grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-2">
+                          <p className="rounded-xl border border-[var(--line)] px-3 py-2">
+                            {program.remaining_credits === null
+                              ? 'Clases disponibles segun limite del programa'
+                              : `${program.remaining_credits} clases disponibles`}
+                          </p>
+                          <p className="rounded-xl border border-[var(--line)] px-3 py-2">
+                            Ultimo pago vinculado:{' '}
+                            {program.last_payment_at
+                              ? new Date(program.last_payment_at).toLocaleDateString(
+                                  'es-AR',
+                                )
+                              : 'Sin pago'}
+                          </p>
+                        </div>
+
+                        {programHasHistory(program) ? (
+                          <div className="rounded-xl bg-[var(--page)] px-3 py-2 text-xs text-[var(--muted)]">
+                            <p className="font-bold text-[var(--ink)]">Historial</p>
+                            <p className="mt-1 font-semibold">
+                              {programHistorySummary(program)}
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
                     )
                   })
@@ -1305,7 +1332,7 @@ export function AdminStudentsPage() {
               )}
             </article>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 lg:col-span-2">
+            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 xl:col-span-2">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">

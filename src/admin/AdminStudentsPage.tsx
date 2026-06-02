@@ -20,6 +20,7 @@ import {
   registerManualPayment,
   updateStudentProgram,
   updateStudentFileMetadata,
+  updateStudentPassword,
   updateStudent,
   uploadStudentFile,
   upsertTrainingNote,
@@ -54,6 +55,11 @@ type EditStudentState = {
   phone: string
   active: boolean
   receives_emails: boolean
+}
+
+type PasswordFormState = {
+  password: string
+  confirmation: string
 }
 
 type MembershipFormState = {
@@ -385,6 +391,10 @@ export function AdminStudentsPage() {
     receives_emails: true,
   })
   const [editForm, setEditForm] = useState<EditStudentState | null>(null)
+  const [passwordForm, setPasswordForm] = useState<PasswordFormState>({
+    password: '',
+    confirmation: '',
+  })
   const [membershipForm, setMembershipForm] = useState<MembershipFormState>(
     buildMembershipForm([]),
   )
@@ -592,6 +602,7 @@ export function AdminStudentsPage() {
     setProgramEditForm(null)
     setProgramDeleteTarget(null)
     setProgramDeleteConfirmation('')
+    setPasswordForm({ password: '', confirmation: '' })
     setDriveStatus(null)
     setUploadInputKey((current) => current + 1)
     void loadSelectedStudentOperations(student.id)
@@ -636,6 +647,45 @@ export function AdminStudentsPage() {
       await updateStudent(selectedStudent.id, editForm)
       setSuccess('Alumno actualizado.')
       await loadData()
+    } catch (updateError) {
+      setError(formatAdminError(updateError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleUpdateStudentPassword() {
+    if (!selectedStudent) {
+      return
+    }
+
+    const nextPassword = passwordForm.password.trim()
+    const confirmation = passwordForm.confirmation.trim()
+
+    if (nextPassword.length < 8) {
+      setError('La nueva contrasena debe tener al menos 8 caracteres.')
+      return
+    }
+
+    if (nextPassword !== confirmation) {
+      setError('La confirmacion de contrasena no coincide.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await updateStudentPassword({
+        student_id: selectedStudent.id,
+        password: nextPassword,
+      })
+      setPasswordForm({ password: '', confirmation: '' })
+      setSuccess(
+        result.warning
+          ? `Contrasena del alumno actualizada. ${result.warning}`
+          : 'Contrasena del alumno actualizada.',
+      )
     } catch (updateError) {
       setError(formatAdminError(updateError))
     } finally {
@@ -1999,6 +2049,55 @@ export function AdminStudentsPage() {
               <p className="-mt-2 text-xs text-[var(--muted)]">
                 Recibe emails indica si acepta comunicaciones informativas.
               </p>
+              <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+                    Acceso del alumno
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Esto cambiará la contraseña de acceso del alumno. No se
+                    guarda ni se muestra la contraseña actual.
+                  </p>
+                </div>
+                <input
+                  aria-label="Nueva contrasena del alumno"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      password: event.target.value,
+                    })
+                  }
+                  placeholder="Nueva contraseña"
+                  type="password"
+                  value={passwordForm.password}
+                />
+                <input
+                  aria-label="Confirmar nueva contrasena del alumno"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setPasswordForm({
+                      ...passwordForm,
+                      confirmation: event.target.value,
+                    })
+                  }
+                  placeholder="Confirmar nueva contraseña"
+                  type="password"
+                  value={passwordForm.confirmation}
+                />
+                <button
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-bold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"
+                  disabled={
+                    saving ||
+                    passwordForm.password.trim().length === 0 ||
+                    passwordForm.confirmation.trim().length === 0
+                  }
+                  onClick={() => void handleUpdateStudentPassword()}
+                  type="button"
+                >
+                  Cambiar contraseña
+                </button>
+              </div>
               <button
                 className="w-full rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
                 disabled={saving}

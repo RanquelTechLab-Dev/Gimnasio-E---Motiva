@@ -139,6 +139,11 @@ export type UpdateStudentInput = {
   receives_emails: boolean
 }
 
+export type UpdateStudentPasswordInput = {
+  student_id: string
+  password: string
+}
+
 export type AssignMembershipInput = {
   student_id: string
   plan_id: string
@@ -272,6 +277,7 @@ export type AdminActionResult = {
   has_history?: boolean
   future_active_bookings_cancelled?: number
   credits_returned?: number
+  warning?: string
 }
 
 export type AdminTrainingNote = {

@@ -215,28 +215,16 @@ function getStatus(session: ScheduleSession, mode: 'admin' | 'student') {
 function cutoffText(
   action: 'booking' | 'cancellation',
   hours: number | null | undefined,
-  mode: 'admin' | 'student',
 ) {
   const normalizedHours = hours ?? 3
-  const base =
-    action === 'booking'
-      ? mode === 'admin'
-        ? 'Reserva'
-        : 'Reservas'
-      : mode === 'admin'
-        ? 'Cancela'
-        : 'Cancelaciones'
+  const base = action === 'booking' ? 'Reserva' : 'Cancela'
 
   if (normalizedHours === 0) {
-    return mode === 'admin'
-      ? `${base} hasta el inicio`
-      : `${base} hasta el inicio de la clase`
+    return `${base}: hasta inicio`
   }
 
   const unit = normalizedHours === 1 ? '1 h' : `${normalizedHours} h`
-  return mode === 'admin'
-    ? `${base} hasta ${unit} antes`
-    : `${base} hasta ${unit} antes del inicio`
+  return `${base}: ${unit} antes`
 }
 
 function getCancelBlockReason(session: ScheduleSession) {
@@ -478,6 +466,15 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                         const sessionColorStyle = colorStyleForSession(session)
                         const planUsageLabel =
                           mode === 'student' ? getPlanUsageLabel(session) : null
+                        const capacityLabel = getCapacityLabel(session, mode)
+                        const bookingCutoffLabel = cutoffText(
+                          'booking',
+                          session.booking_cutoff_hours,
+                        )
+                        const cancellationCutoffLabel = cutoffText(
+                          'cancellation',
+                          session.cancellation_cutoff_hours,
+                        )
                         return (
                           <article
                             className={`min-w-0 overflow-hidden rounded-2xl border p-2 text-left shadow-sm transition md:p-3 ${
@@ -512,33 +509,18 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                               </span>
                             </div>
 
-                            <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-bold text-[var(--ink)] sm:mt-3 sm:gap-1.5 sm:text-[11px]">
-                              <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
-                                {getCapacityLabel(session, mode)}
-                              </span>
-                              <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
-                                {cutoffText(
-                                  'booking',
-                                  session.booking_cutoff_hours,
-                                  mode,
-                                )}
-                              </span>
-                              <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
-                                {cutoffText(
-                                  'cancellation',
-                                  session.cancellation_cutoff_hours,
-                                  mode,
-                                )}
-                              </span>
+                            <div className="mt-2 grid min-w-0 gap-1 rounded-xl bg-white/70 px-2 py-1.5 text-[10px] font-bold leading-snug text-[var(--ink)] sm:mt-2 sm:text-[11px]">
+                              <p className="min-w-0 break-words">
+                                {capacityLabel}
+                                {planUsageLabel ? ` · ${planUsageLabel}` : ''}
+                              </p>
+                              <p className="min-w-0 break-words text-[var(--ink)]/75">
+                                {bookingCutoffLabel} · {cancellationCutoffLabel}
+                              </p>
                               {session.trainer_name ? (
-                                <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
+                                <p className="min-w-0 break-words text-[var(--ink)]/75">
                                   {session.trainer_name}
-                                </span>
-                              ) : null}
-                              {planUsageLabel ? (
-                                <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
-                                  {planUsageLabel}
-                                </span>
+                                </p>
                               ) : null}
                             </div>
 

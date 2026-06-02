@@ -139,6 +139,11 @@ export type UpdateStudentInput = {
   receives_emails: boolean
 }
 
+export type UpdateStudentPasswordInput = {
+  student_id: string
+  password: string
+}
+
 export type AssignMembershipInput = {
   student_id: string
   plan_id: string

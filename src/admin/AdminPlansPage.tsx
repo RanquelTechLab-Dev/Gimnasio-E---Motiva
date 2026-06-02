@@ -732,6 +732,44 @@ export function AdminPlansPage() {
   const selectableActivities = activities.filter(
     (activity) => activity.active || planFormActivityIds.has(activity.id),
   )
+  const editorTabs = (
+    <div className="inline-flex h-auto w-fit max-w-full flex-wrap items-center gap-1 rounded-full border border-[var(--line)] bg-white p-1 shadow-sm">
+      <button
+        className={`h-auto rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
+          editorMode === 'activity'
+            ? 'bg-[var(--brand)] text-white'
+            : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
+        }`}
+        onClick={() => {
+          setEditorMode('activity')
+          startNewActivity()
+          setError(null)
+          setSuccess(null)
+        }}
+        type="button"
+      >
+        Nueva actividad principal
+      </button>
+      <button
+        className={`h-auto rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
+          editorMode === 'plan'
+            ? 'bg-[var(--brand)] text-white'
+            : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
+        }`}
+        onClick={() => {
+          setEditorMode('plan')
+          setPlanForm(emptyPlanForm)
+          setPendingPlanEdit(null)
+          setPlanEditConfirmation('')
+          setError(null)
+          setSuccess(null)
+        }}
+        type="button"
+      >
+        Nuevo plan
+      </button>
+    </div>
+  )
 
   return (
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
@@ -822,48 +860,13 @@ export function AdminPlansPage() {
 
       </div>
 
-      <aside className="grid gap-5">
-        <div className="inline-flex h-auto w-fit max-w-full self-start flex-wrap items-center gap-1 rounded-full border border-[var(--line)] bg-white p-1 shadow-sm">
-          <button
-            className={`h-auto rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
-              editorMode === 'activity'
-                ? 'bg-[var(--brand)] text-white'
-                : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
-            }`}
-            onClick={() => {
-              setEditorMode('activity')
-              startNewActivity()
-              setError(null)
-              setSuccess(null)
-            }}
-            type="button"
-          >
-            Nueva actividad principal
-          </button>
-          <button
-            className={`h-auto rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
-              editorMode === 'plan'
-                ? 'bg-[var(--brand)] text-white'
-                : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
-            }`}
-            onClick={() => {
-              setEditorMode('plan')
-              setPlanForm(emptyPlanForm)
-              setPendingPlanEdit(null)
-              setPlanEditConfirmation('')
-              setError(null)
-              setSuccess(null)
-            }}
-            type="button"
-          >
-            Nuevo plan
-          </button>
-        </div>
+      <aside className="grid content-start gap-3 self-start">
         {editorMode === 'plan' ? (
         <form
           className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
           onSubmit={handlePlanSubmit}
         >
+          <div className="mb-4">{editorTabs}</div>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -1168,6 +1171,7 @@ export function AdminPlansPage() {
             className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
             onSubmit={handleActivitySubmit}
           >
+            <div className="mb-4">{editorTabs}</div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
               Actividad principal
             </p>

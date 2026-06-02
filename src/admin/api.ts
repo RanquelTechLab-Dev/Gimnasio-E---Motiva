@@ -23,10 +23,13 @@ import type {
   ActivityInput,
   PlanInput,
   RegisterPaymentInput,
+  RegisterPaymentResult,
+  StudentProgram,
   StudentFileMetadataInput,
   StudentProfile,
   UpdateClassSessionInput,
   UpdatePaymentInput,
+  UpdateStudentProgramInput,
   UpdateStudentInput,
   UploadStudentFileInput,
   UploadStudentFileResult,
@@ -377,6 +380,19 @@ export async function listMemberships(studentId?: string) {
   return (data ?? []) as Membership[]
 }
 
+export async function listStudentPrograms(studentId?: string | null) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_list_student_programs', {
+    p_student_id: studentId ?? null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as StudentProgram[]
+}
+
 export async function assignMembership(input: AssignMembershipInput) {
   const client = getClient()
   const { data, error } = await client.rpc('assign_membership', {
@@ -392,6 +408,42 @@ export async function assignMembership(input: AssignMembershipInput) {
   }
 
   return data
+}
+
+export async function updateStudentProgram(input: UpdateStudentProgramInput) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_update_student_program', {
+    p_program_id: input.program_id,
+    p_plan_id: input.plan_id,
+    p_status: input.status,
+    p_start_date: input.start_date,
+    p_end_date: input.end_date,
+    p_remaining_credits: input.remaining_credits,
+    p_confirm_history: input.confirm_history ?? null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
+export async function deleteStudentProgram(
+  programId: string,
+  confirmation: string,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_delete_student_program', {
+    p_program_id: programId,
+    p_confirm: confirmation,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
 }
 
 export async function listPayments(status?: PaymentStatus | 'all') {
@@ -431,7 +483,7 @@ export async function registerManualPayment(input: RegisterPaymentInput) {
     throw error
   }
 
-  return data
+  return data as RegisterPaymentResult
 }
 
 export async function approveManualPayment(paymentId: string) {

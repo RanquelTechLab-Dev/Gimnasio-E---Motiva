@@ -208,7 +208,7 @@ export function AdminPaymentsPage() {
     setError(null)
     setSuccess(null)
     try {
-      await registerManualPayment({
+      const paymentResult = await registerManualPayment({
         student_id: form.student_id,
         membership_id: form.membership_id,
         amount,
@@ -216,7 +216,11 @@ export function AdminPaymentsPage() {
         payment_date: form.payment_date,
         notes: form.notes,
       })
-      setSuccess('Pago registrado y membresia activada.')
+      setSuccess(
+        paymentResult.is_fully_paid === false
+          ? `Pago registrado, pero el programa todavia no se activa porque falta ${moneyFormatter.format(paymentResult.pending_amount ?? 0)}.`
+          : 'Pago registrado y programa activado.',
+      )
       setForm({ ...form, amount: '', payment_date: todayDate(), notes: '' })
       await loadData(filter)
     } catch (saveError) {
@@ -289,7 +293,7 @@ export function AdminPaymentsPage() {
 
     const confirmed = window.confirm(
       payment.membership_id
-        ? 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. Este pago esta vinculado a una membresia: la anulacion no elimina automaticamente la membresia. ¿Continuar?'
+        ? 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. Si el programa vinculado deja de estar pago completo, se suspendera y se cancelaran sus reservas futuras activas. ¿Continuar?'
         : 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. ¿Continuar?',
     )
 

@@ -8,15 +8,17 @@ import {
   createStudentFileMetadata,
   createStudent,
   deactivateStudent,
+  deleteStudentProgram,
   deleteStudent,
   formatAdminError,
   listStudentFiles,
+  listStudentPrograms,
   listStudentTrainingNotes,
-  listMemberships,
   listPayments,
   listPlans,
   listStudents,
   registerManualPayment,
+  updateStudentProgram,
   updateStudentFileMetadata,
   updateStudent,
   uploadStudentFile,
@@ -27,10 +29,11 @@ import type {
   AdminTrainingNote,
   DriveStatusResult,
   FileKind,
-  Membership,
+  MembershipStatus,
   PaymentMethod,
   Payment,
   Plan,
+  StudentProgram,
   StudentProfile,
   StudentFileMetadataInput,
   TrainingNoteType,
@@ -58,6 +61,12 @@ type MembershipFormState = {
   start_date: string
   end_date: string
   remaining_credits: string
+}
+
+type ProgramEditFormState = MembershipFormState & {
+  program_id: string
+  status: MembershipStatus
+  confirmation: string
 }
 
 type PaymentFormState = {
@@ -112,6 +121,20 @@ const paymentMethodLabels: Record<PaymentMethod, string> = {
   cash: 'Efectivo',
   transfer: 'Transferencia',
 }
+
+const programStatusLabels: Record<MembershipStatus, string> = {
+  active: 'Activo',
+  cancelled: 'Eliminado',
+  expired: 'Vencido',
+  suspended: 'Suspendido',
+}
+
+const programPaymentStateLabels: Record<StudentProgram['payment_state'], string> =
+  {
+    paid: 'Pagado completo',
+    partial: 'Pago incompleto',
+    unpaid: 'Sin pago',
+  }
 
 const noteTypeLabels: Record<TrainingNoteType, string> = {
   admin_note: 'Nota administrativa',
@@ -224,21 +247,76 @@ function describePlanOption(plan: Plan) {
     : `${plan.name} · ${price}`
 }
 
-function describeMembershipOption(membership: Membership, plan?: Plan | null) {
+function describeProgramOption(program: StudentProgram, plan?: Plan | null) {
   const classes = (() => {
     if (plan?.plan_type === 'weekly') {
       return weeklyPlanLabel(plan)
     }
 
-    if (membership.remaining_credits === null) {
+    if (program.remaining_credits === null) {
       return 'clases segun plan'
     }
 
-    return `${membership.remaining_credits} clases restantes`
+    return `${program.remaining_credits} clases restantes`
   })()
   const price = plan ? ` · ${moneyFormatter.format(plan.price)}` : ''
+  const payment = program.is_fully_paid
+    ? 'Pagado completo'
+    : program.approved_paid_total > 0
+      ? `Pago incompleto: falta ${moneyFormatter.format(program.pending_amount)}`
+      : 'Sin pago'
 
-  return `${plan?.name ?? 'Plan'}${price} · ${classes} · ${membership.start_date} a ${membership.end_date}`
+  return `${program.plan_name ?? plan?.name ?? 'Plan'}${price} · ${classes} · ${program.start_date} a ${program.end_date} · ${payment}`
+}
+
+function programDisplayStatus(program: StudentProgram) {
+  if (program.status === 'suspended' && !program.is_fully_paid) {
+    return 'Pendiente de pago'
+  }
+
+  return programStatusLabels[program.status]
+}
+
+function programPaymentSummary(program: StudentProgram) {
+  return [
+    `Precio: ${moneyFormatter.format(program.plan_price)}`,
+    `Pagado: ${moneyFormatter.format(program.approved_paid_total)}`,
+    `Saldo: ${moneyFormatter.format(program.pending_amount)}`,
+  ].join(' · ')
+}
+
+function programHasHistory(program: StudentProgram) {
+  return (
+    program.has_history ||
+    program.payments_count > 0 ||
+    program.future_bookings_count > 0 ||
+    program.past_bookings_count > 0 ||
+    program.attendance_count > 0
+  )
+}
+
+function programHistorySummary(program: StudentProgram) {
+  const parts = [
+    `${program.payments_count} pagos`,
+    `${program.future_active_bookings_count} reservas futuras activas`,
+    `${program.past_bookings_count} reservas pasadas`,
+    `${program.attendance_count} asistencias`,
+  ]
+
+  return parts.join(' · ')
+}
+
+function buildProgramEditForm(program: StudentProgram): ProgramEditFormState {
+  return {
+    program_id: program.program_id,
+    plan_id: program.plan_id,
+    start_date: program.start_date,
+    end_date: program.end_date,
+    remaining_credits:
+      program.remaining_credits === null ? '' : String(program.remaining_credits),
+    status: program.status,
+    confirmation: '',
+  }
 }
 
 function buildMembershipForm(plans: Plan[]): MembershipFormState {
@@ -300,7 +378,7 @@ function formatSize(value: number | null) {
 export function AdminStudentsPage() {
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
-  const [memberships, setMemberships] = useState<Membership[]>([])
+  const [studentPrograms, setStudentPrograms] = useState<StudentProgram[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [trainingNotes, setTrainingNotes] = useState<AdminTrainingNote[]>([])
   const [studentFiles, setStudentFiles] = useState<AdminStudentFile[]>([])
@@ -318,6 +396,11 @@ export function AdminStudentsPage() {
   const [membershipForm, setMembershipForm] = useState<MembershipFormState>(
     buildMembershipForm([]),
   )
+  const [programEditForm, setProgramEditForm] =
+    useState<ProgramEditFormState | null>(null)
+  const [programDeleteTarget, setProgramDeleteTarget] =
+    useState<StudentProgram | null>(null)
+  const [programDeleteConfirmation, setProgramDeleteConfirmation] = useState('')
   const [paymentForm, setPaymentForm] = useState<PaymentFormState>({
     membership_id: '',
     amount: '',
@@ -357,8 +440,11 @@ export function AdminStudentsPage() {
     () => new Map(plans.map((plan) => [plan.id, plan])),
     [plans],
   )
-  const selectedMemberships = memberships.filter(
-    (membership) => membership.student_id === selectedStudent?.id,
+  const selectedStudentPrograms = studentPrograms.filter(
+    (program) => program.student_id === selectedStudent?.id,
+  )
+  const payableSelectedStudentPrograms = selectedStudentPrograms.filter(
+    (program) => program.status !== 'cancelled',
   )
   const selectedPayments = payments.filter(
     (payment) => payment.student_id === selectedStudent?.id,
@@ -378,21 +464,29 @@ export function AdminStudentsPage() {
   )
   const activePlans = plans.filter((plan) => plan.active)
   const selectedMembershipPlan = plansById.get(membershipForm.plan_id) ?? null
+  const selectedProgramEditPlan = programEditForm
+    ? plansById.get(programEditForm.plan_id) ?? null
+    : null
+  const programEditTarget = programEditForm
+    ? studentPrograms.find(
+        (program) => program.program_id === programEditForm.program_id,
+      ) ?? null
+    : null
 
   async function loadData() {
     setLoading(true)
     setError(null)
     try {
-      const [nextStudents, nextPlans, nextMemberships, nextPayments] =
+      const [nextStudents, nextPlans, nextPrograms, nextPayments] =
         await Promise.all([
           listStudents(),
           listPlans(),
-          listMemberships(),
+          listStudentPrograms(),
           listPayments('all'),
         ])
       setStudents(nextStudents)
       setPlans(nextPlans)
-      setMemberships(nextMemberships)
+      setStudentPrograms(nextPrograms)
       setPayments(nextPayments)
       const nextSelected =
         nextStudents.find((student) => student.id === selectedStudentId) ??
@@ -401,12 +495,14 @@ export function AdminStudentsPage() {
       setSelectedStudentId(nextSelected?.id ?? null)
       setEditForm(nextSelected ? studentToEditForm(nextSelected) : null)
       setMembershipForm(buildMembershipForm(nextPlans))
-      const firstMembership = nextMemberships.find(
-        (membership) => membership.student_id === nextSelected?.id,
+      const firstProgram = nextPrograms.find(
+        (program) =>
+          program.student_id === nextSelected?.id &&
+          program.status !== 'cancelled',
       )
       setPaymentForm((current) => ({
         ...current,
-        membership_id: firstMembership?.id ?? '',
+        membership_id: firstProgram?.program_id ?? '',
         payment_date: current.payment_date || todayDate(),
       }))
       if (nextSelected) {
@@ -452,6 +548,9 @@ export function AdminStudentsPage() {
     setTrainingNoteForm(buildTrainingNoteForm())
     setFileMetadataForm(buildFileMetadataForm())
     setUploadFileForm(buildUploadFileForm())
+    setProgramEditForm(null)
+    setProgramDeleteTarget(null)
+    setProgramDeleteConfirmation('')
     setDriveStatus(null)
     setUploadInputKey((current) => current + 1)
     setMembershipForm(buildMembershipForm(plans))
@@ -481,20 +580,24 @@ export function AdminStudentsPage() {
   }
 
   function selectStudent(student: StudentProfile) {
-    const firstMembership = memberships.find(
-      (membership) => membership.student_id === student.id,
+    const firstProgram = studentPrograms.find(
+      (program) =>
+        program.student_id === student.id && program.status !== 'cancelled',
     )
     setSelectedStudentId(student.id)
     setEditForm(studentToEditForm(student))
     setPaymentForm((current) => ({
       ...current,
-      membership_id: firstMembership?.id ?? '',
+      membership_id: firstProgram?.program_id ?? '',
     }))
     setError(null)
     setSuccess(null)
     setTrainingNoteForm(buildTrainingNoteForm())
     setFileMetadataForm(buildFileMetadataForm())
     setUploadFileForm(buildUploadFileForm())
+    setProgramEditForm(null)
+    setProgramDeleteTarget(null)
+    setProgramDeleteConfirmation('')
     setDriveStatus(null)
     setUploadInputKey((current) => current + 1)
     void loadSelectedStudentOperations(student.id)
@@ -621,6 +724,19 @@ export function AdminStudentsPage() {
     })
   }
 
+  function handleProgramEditPlanChange(planId: string) {
+    if (!programEditForm) {
+      return
+    }
+
+    const plan = plansById.get(planId)
+    setProgramEditForm({
+      ...programEditForm,
+      plan_id: planId,
+      remaining_credits: planDefaultPackageClasses(plan),
+    })
+  }
+
   async function handleAssignMembership(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!selectedStudent) {
@@ -640,10 +756,80 @@ export function AdminStudentsPage() {
           ? Number(membershipForm.remaining_credits)
           : null,
       })
-      setSuccess('Membresia asignada.')
+      setSuccess('Programa asignado. Queda pendiente hasta registrar pago completo.')
       await loadData()
     } catch (assignError) {
       setError(formatAdminError(assignError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleUpdateProgram(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!programEditForm || !programEditTarget) {
+      return
+    }
+
+    if (
+      programHasHistory(programEditTarget) &&
+      programEditForm.confirmation !== 'EDITAR'
+    ) {
+      setError('Para editar un programa con historial escribi EDITAR.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await updateStudentProgram({
+        program_id: programEditForm.program_id,
+        plan_id: programEditForm.plan_id,
+        status: programEditForm.status,
+        start_date: programEditForm.start_date,
+        end_date: programEditForm.end_date,
+        remaining_credits: programEditForm.remaining_credits
+          ? Number(programEditForm.remaining_credits)
+          : null,
+        confirm_history: programHasHistory(programEditTarget)
+          ? programEditForm.confirmation
+          : null,
+      })
+      setSuccess('Programa actualizado.')
+      setProgramEditForm(null)
+      await loadData()
+    } catch (updateError) {
+      setError(formatAdminError(updateError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteProgram() {
+    if (!programDeleteTarget || programDeleteConfirmation !== 'ELIMINAR') {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await deleteStudentProgram(
+        programDeleteTarget.program_id,
+        programDeleteConfirmation,
+      )
+      const cancelledCount = result.future_active_bookings_cancelled ?? 0
+      setSuccess(
+        cancelledCount > 0
+          ? `Programa eliminado del alumno. Reservas futuras canceladas: ${cancelledCount}.`
+          : 'Programa eliminado del alumno.',
+      )
+      setProgramDeleteTarget(null)
+      setProgramDeleteConfirmation('')
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
     } finally {
       setSaving(false)
     }
@@ -665,7 +851,7 @@ export function AdminStudentsPage() {
     setError(null)
     setSuccess(null)
     try {
-      await registerManualPayment({
+      const paymentResult = await registerManualPayment({
         student_id: selectedStudent.id,
         membership_id: paymentForm.membership_id,
         amount,
@@ -673,7 +859,11 @@ export function AdminStudentsPage() {
         payment_date: paymentForm.payment_date,
         notes: paymentForm.notes,
       })
-      setSuccess('Pago manual registrado como pendiente.')
+      setSuccess(
+        paymentResult.is_fully_paid === false
+          ? `Pago registrado, pero el programa todavia no se activa porque falta ${moneyFormatter.format(paymentResult.pending_amount ?? 0)}.`
+          : 'Pago registrado y programa activado.',
+      )
       setPaymentForm({
         ...paymentForm,
         amount: '',
@@ -1006,28 +1196,83 @@ export function AdminStudentsPage() {
 
             <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
-                Membresias
+                Programas asignados
               </p>
-              <div className="mt-3 grid gap-2 text-sm">
-                {selectedMemberships.length === 0 ? (
+              <div className="mt-3 grid gap-3 text-sm">
+                {selectedStudentPrograms.length === 0 ? (
                   <p className="text-[var(--muted)]">
-                    Sin membresias asignadas.
+                    Sin programas asignados.
                   </p>
                 ) : (
-                  selectedMemberships.map((membership) => {
-                    const plan = plansById.get(membership.plan_id)
+                  selectedStudentPrograms.map((program) => {
+                    const plan = plansById.get(program.plan_id)
                     return (
                       <div
                         className="rounded-2xl border border-[var(--line)] bg-white p-3"
-                        key={membership.id}
+                        key={program.program_id}
                       >
-                        <p className="font-semibold">
-                          {plan?.name ?? 'Plan no disponible'}
-                        </p>
-                        <p className="text-[var(--muted)]">
-                          {membership.status} · {membership.start_date} a{' '}
-                          {membership.end_date}
-                        </p>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-semibold">
+                              {program.plan_name ?? plan?.name ?? 'Plan no disponible'}
+                            </p>
+                            <p className="text-[var(--muted)]">
+                              {programDisplayStatus(program)} ·{' '}
+                              {program.start_date} a {program.end_date}
+                            </p>
+                            <p
+                              className={`mt-2 rounded-xl px-3 py-2 text-xs font-bold ${
+                                program.is_fully_paid
+                                  ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                                  : 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                              }`}
+                            >
+                              {programPaymentStateLabels[program.payment_state]}
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--muted)]">
+                              {programPaymentSummary(program)}
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--muted)]">
+                              {program.remaining_credits === null
+                                ? 'Clases disponibles segun limite del programa'
+                                : `${program.remaining_credits} clases disponibles`}
+                            </p>
+                            {program.last_payment_at ? (
+                              <p className="mt-1 text-xs text-[var(--muted)]">
+                                Ultimo pago vinculado:{' '}
+                                {new Date(program.last_payment_at).toLocaleDateString(
+                                  'es-AR',
+                                )}
+                              </p>
+                            ) : null}
+                            {programHasHistory(program) ? (
+                              <p className="mt-2 rounded-xl bg-[var(--page)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">
+                                Historial: {programHistorySummary(program)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            <button
+                              className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-[var(--brand-soft)]"
+                              onClick={() =>
+                                setProgramEditForm(buildProgramEditForm(program))
+                              }
+                              type="button"
+                            >
+                              Editar programa
+                            </button>
+                            <button
+                              className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)]"
+                              onClick={() => {
+                                setProgramDeleteTarget(program)
+                                setProgramDeleteConfirmation('')
+                              }}
+                              type="button"
+                            >
+                              Eliminar programa
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )
                   })
@@ -1555,7 +1800,7 @@ export function AdminStudentsPage() {
         ) : (
           <div className="mt-5 rounded-[20px] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]">
             Selecciona un alumno de la tabla para ver la ficha, editar datos,
-            asignar membresias o registrar pagos.
+                asignar programas o registrar pagos.
           </div>
         )}
       </div>
@@ -1776,7 +2021,7 @@ export function AdminStudentsPage() {
                 </p>
                 <ul className="mt-2 grid gap-1 text-sm text-[var(--muted)]">
                   <li>Pagos</li>
-                  <li>Membresías</li>
+                  <li>Programas</li>
                   <li>Reservas</li>
                   <li>Asistencia</li>
                   <li>Archivos</li>
@@ -1824,16 +2069,226 @@ export function AdminStudentsPage() {
           </div>
         ) : null}
 
+        {programEditForm && programEditTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+            <form
+              aria-modal="true"
+              className="w-full max-w-2xl rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow)]"
+              onSubmit={handleUpdateProgram}
+              role="dialog"
+            >
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+                Programa asignado
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                Editar programa
+              </h3>
+              {programHasHistory(programEditTarget) ? (
+                <div className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-4 text-sm text-[var(--accent)]">
+                  <p className="font-bold">Editar programa con historial</p>
+                  <p className="mt-2">
+                    Este programa tiene pagos, reservas o asistencia asociados.
+                    Si lo editas, puede cambiar que clases puede reservar el
+                    alumno desde ahora. No se eliminaran pagos ni historial.
+                    Para confirmar, escribi EDITAR.
+                  </p>
+                  <input
+                    aria-label="Confirmar edicion de programa con historial"
+                    className="mt-3 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)]"
+                    onChange={(event) =>
+                      setProgramEditForm({
+                        ...programEditForm,
+                        confirmation: event.target.value,
+                      })
+                    }
+                    placeholder="Escribi EDITAR"
+                    value={programEditForm.confirmation}
+                  />
+                </div>
+              ) : null}
+
+              <div className="mt-5 grid gap-3">
+                <select
+                  aria-label="Programa asignado"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    handleProgramEditPlanChange(event.target.value)
+                  }
+                  value={programEditForm.plan_id}
+                >
+                  {activePlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {describePlanOption(plan)}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Estado del programa"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setProgramEditForm({
+                      ...programEditForm,
+                      status: event.target.value as MembershipStatus,
+                    })
+                  }
+                  value={programEditForm.status}
+                >
+                  <option value="active">Activo</option>
+                  <option value="suspended">Suspendido</option>
+                  <option value="expired">Vencido</option>
+                  <option value="cancelled">Eliminado</option>
+                </select>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    aria-label="Fecha de inicio del programa"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setProgramEditForm({
+                        ...programEditForm,
+                        start_date: event.target.value,
+                      })
+                    }
+                    type="date"
+                    value={programEditForm.start_date}
+                  />
+                  <input
+                    aria-label="Fecha de vencimiento del programa"
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    onChange={(event) =>
+                      setProgramEditForm({
+                        ...programEditForm,
+                        end_date: event.target.value,
+                      })
+                    }
+                    type="date"
+                    value={programEditForm.end_date}
+                  />
+                </div>
+                <input
+                  aria-label="Clases disponibles del programa"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  disabled={selectedProgramEditPlan?.plan_type === 'weekly'}
+                  onChange={(event) =>
+                    setProgramEditForm({
+                      ...programEditForm,
+                      remaining_credits: event.target.value,
+                    })
+                  }
+                  placeholder={
+                    selectedProgramEditPlan?.plan_type === 'weekly'
+                      ? 'Se controla por periodo'
+                      : 'Clases disponibles'
+                  }
+                  type="number"
+                  value={programEditForm.remaining_credits}
+                />
+                <p className="-mt-1 text-xs text-[var(--muted)]">
+                  {selectedProgramEditPlan?.plan_type === 'weekly'
+                    ? 'Los programas por periodo limitan reservas dentro de la vigencia paga y no usan saldo visible.'
+                    : 'Las clases disponibles aplican a paquetes o programas con saldo.'}
+                </p>
+              </div>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => setProgramEditForm(null)}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-2xl bg-[var(--brand)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                  disabled={
+                    saving ||
+                    (programHasHistory(programEditTarget) &&
+                      programEditForm.confirmation !== 'EDITAR')
+                  }
+                  type="submit"
+                >
+                  {saving ? 'Guardando...' : 'Confirmar edicion'}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
+
+        {programDeleteTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+            <div
+              aria-modal="true"
+              className="w-full max-w-xl rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow)]"
+              role="dialog"
+            >
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
+                Eliminar programa asignado
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                {programDeleteTarget.plan_name}
+              </h3>
+              <p className="mt-3 text-sm text-[var(--muted)]">
+                Vas a eliminar este programa asignado al alumno. No se
+                eliminaran pagos, alumno, plan ni auditoria. Si hay reservas
+                futuras vinculadas, se cancelaran. Esta accion no se puede
+                deshacer. Para confirmar, escribi ELIMINAR.
+              </p>
+              {programDeleteTarget.future_active_bookings_count > 0 ? (
+                <p className="mt-3 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm font-semibold text-[var(--accent)]">
+                  Reservas futuras activas vinculadas:{' '}
+                  {programDeleteTarget.future_active_bookings_count}. Se
+                  cancelaran si confirmas.
+                </p>
+              ) : null}
+              {programHasHistory(programDeleteTarget) ? (
+                <p className="mt-3 rounded-2xl bg-[var(--page)] p-3 text-xs font-semibold text-[var(--muted)]">
+                  Historial: {programHistorySummary(programDeleteTarget)}
+                </p>
+              ) : null}
+              <input
+                aria-label="Confirmar eliminacion de programa"
+                className="mt-4 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)]"
+                onChange={(event) =>
+                  setProgramDeleteConfirmation(event.target.value)
+                }
+                placeholder="Escribi ELIMINAR"
+                value={programDeleteConfirmation}
+              />
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => {
+                    setProgramDeleteTarget(null)
+                    setProgramDeleteConfirmation('')
+                  }}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                  disabled={saving || programDeleteConfirmation !== 'ELIMINAR'}
+                  onClick={() => void handleDeleteProgram()}
+                  type="button"
+                >
+                  {saving ? 'Eliminando...' : 'Eliminar programa'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {selectedStudent ? (
           <form
             className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
             onSubmit={handleAssignMembership}
           >
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
-              Membresia
+              Programa
             </p>
             <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-              Asignar plan
+              Asignar programa
             </h3>
             <div className="mt-5 grid gap-3">
               <select
@@ -1850,7 +2305,7 @@ export function AdminStudentsPage() {
                 ))}
               </select>
               <input
-                aria-label="Fecha de inicio de membresia"
+                aria-label="Fecha de inicio del programa"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 onChange={(event) =>
                   setMembershipForm({
@@ -1862,7 +2317,7 @@ export function AdminStudentsPage() {
                 value={membershipForm.start_date}
               />
               <input
-                aria-label="Fecha de fin de membresia"
+                aria-label="Fecha de vencimiento del programa"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 onChange={(event) =>
                   setMembershipForm({
@@ -1874,7 +2329,7 @@ export function AdminStudentsPage() {
                 value={membershipForm.end_date}
               />
               <input
-                aria-label="Clases del paquete de membresia"
+                aria-label="Clases disponibles del programa"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 disabled={selectedMembershipPlan?.plan_type === 'weekly'}
                 onChange={(event) =>
@@ -1894,14 +2349,14 @@ export function AdminStudentsPage() {
               <p className="-mt-1 text-xs text-[var(--muted)]">
                 {selectedMembershipPlan?.plan_type === 'weekly'
                   ? 'Los planes por periodo limitan reservas dentro de la vigencia paga y no usan saldo visible.'
-                  : 'Las clases se cargan desde el paquete elegido y pueden ajustarse antes de asignar la membresia.'}
+                  : 'Las clases se cargan desde el paquete elegido y pueden ajustarse antes de asignar el programa.'}
               </p>
               <button
                 className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
                 disabled={saving}
                 type="submit"
               >
-                Asignar membresia
+                Asignar programa
               </button>
             </div>
           </form>
@@ -1920,7 +2375,7 @@ export function AdminStudentsPage() {
             </h3>
             <div className="mt-5 grid gap-3">
               <select
-                aria-label="Membresia para pago manual"
+                aria-label="Programa para pago manual"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 onChange={(event) =>
                   setPaymentForm({
@@ -1930,12 +2385,12 @@ export function AdminStudentsPage() {
                 }
                 value={paymentForm.membership_id}
               >
-                <option value="">Seleccionar membresia</option>
-                {selectedMemberships.map((membership) => {
-                  const plan = plansById.get(membership.plan_id)
+                <option value="">Seleccionar programa</option>
+                {payableSelectedStudentPrograms.map((program) => {
+                  const plan = plansById.get(program.plan_id)
                   return (
-                    <option key={membership.id} value={membership.id}>
-                      {describeMembershipOption(membership, plan)}
+                    <option key={program.program_id} value={program.program_id}>
+                      {describeProgramOption(program, plan)}
                     </option>
                   )
                 })}

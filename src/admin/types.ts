@@ -66,6 +66,32 @@ export type Membership = {
   updated_at: string
 }
 
+export type StudentProgram = {
+  program_id: string
+  student_id: string
+  plan_id: string
+  plan_name: string
+  plan_type: PlanType
+  plan_price: number
+  approved_paid_total: number
+  pending_amount: number
+  is_fully_paid: boolean
+  payment_state: 'paid' | 'partial' | 'unpaid'
+  status: MembershipStatus
+  start_date: string
+  end_date: string
+  remaining_credits: number | null
+  payments_count: number
+  future_active_bookings_count: number
+  future_bookings_count: number
+  past_bookings_count: number
+  attendance_count: number
+  last_payment_at: string | null
+  has_history: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type PaymentMethod = 'cash' | 'transfer'
 export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'voided'
 export type AttendanceStatus = 'present' | 'absent' | 'justified'
@@ -119,6 +145,16 @@ export type AssignMembershipInput = {
   remaining_credits: number | null
 }
 
+export type UpdateStudentProgramInput = {
+  program_id: string
+  plan_id: string
+  status: MembershipStatus
+  start_date: string
+  end_date: string
+  remaining_credits: number | null
+  confirm_history?: string | null
+}
+
 export type RegisterPaymentInput = {
   student_id: string
   membership_id: string
@@ -126,6 +162,24 @@ export type RegisterPaymentInput = {
   method: PaymentMethod
   notes: string
   payment_date: string
+}
+
+export type RegisterPaymentResult = {
+  payment_id: string
+  payment_status: PaymentStatus
+  student_id: string
+  membership_id: string
+  membership_status: MembershipStatus
+  membership_start_date: string
+  membership_end_date: string
+  remaining_credits: number | null
+  amount: number
+  method: PaymentMethod
+  paid_at: string
+  payment_date: string
+  approved_paid_total?: number
+  pending_amount?: number
+  is_fully_paid?: boolean
 }
 
 export type UpdatePaymentInput = {
@@ -212,6 +266,8 @@ export type AdminActionResult = {
   session_id?: string
   rule_id?: string
   has_history?: boolean
+  future_active_bookings_cancelled?: number
+  credits_returned?: number
 }
 
 export type AdminTrainingNote = {

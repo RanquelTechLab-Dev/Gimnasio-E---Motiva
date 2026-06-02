@@ -336,7 +336,7 @@ export function AdminPlansPage() {
     null,
   )
   const [planEditConfirmation, setPlanEditConfirmation] = useState('')
-  const [activityFormOpen, setActivityFormOpen] = useState(false)
+  const [editorMode, setEditorMode] = useState<'activity' | 'plan'>('plan')
   const [activityForm, setActivityForm] =
     useState<ActivityFormState>(emptyActivityForm)
   const [activityDeleteTarget, setActivityDeleteTarget] =
@@ -389,6 +389,7 @@ export function AdminPlansPage() {
     setError(null)
     setPendingPlanEdit(null)
     setPlanEditConfirmation('')
+    setEditorMode('plan')
   }
 
   function addPlanActivity() {
@@ -491,7 +492,7 @@ export function AdminPlansPage() {
       }
 
       setActivityForm(emptyActivityForm)
-      setActivityFormOpen(false)
+      setEditorMode('plan')
       setSuccess(
         'Actividad principal creada. Ya podes asociarla a un plan.',
       )
@@ -522,7 +523,7 @@ export function AdminPlansPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteActivity(activityDeleteTarget.id)
+      await deleteActivity(activityDeleteTarget.id, activityDeleteConfirmation)
       setPlanForm((current) => ({
         ...current,
         activities: current.activities.filter(
@@ -726,6 +727,43 @@ export function AdminPlansPage() {
       </div>
 
       <aside className="grid gap-5">
+        <div className="grid gap-2 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-3 sm:grid-cols-2">
+          <button
+            className={`rounded-2xl px-4 py-3 text-sm font-bold transition ${
+              editorMode === 'activity'
+                ? 'bg-[var(--brand)] text-white'
+                : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
+            }`}
+            onClick={() => {
+              setEditorMode('activity')
+              setActivityForm(emptyActivityForm)
+              setError(null)
+              setSuccess(null)
+            }}
+            type="button"
+          >
+            Nueva actividad principal
+          </button>
+          <button
+            className={`rounded-2xl px-4 py-3 text-sm font-bold transition ${
+              editorMode === 'plan'
+                ? 'bg-[var(--brand)] text-white'
+                : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
+            }`}
+            onClick={() => {
+              setEditorMode('plan')
+              setPlanForm(emptyPlanForm)
+              setPendingPlanEdit(null)
+              setPlanEditConfirmation('')
+              setError(null)
+              setSuccess(null)
+            }}
+            type="button"
+          >
+            Nuevo plan
+          </button>
+        </div>
+        {editorMode === 'plan' ? (
         <form
           className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
           onSubmit={handlePlanSubmit}
@@ -741,7 +779,10 @@ export function AdminPlansPage() {
             </div>
             <button
               className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
-              onClick={() => setPlanForm(emptyPlanForm)}
+              onClick={() => {
+                setEditorMode('plan')
+                setPlanForm(emptyPlanForm)
+              }}
               type="button"
             >
               Nuevo plan
@@ -862,8 +903,9 @@ export function AdminPlansPage() {
                     Actividades incluidas
                   </p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
-                    Los planes solo indican que actividades incluye el alumno.
-                    Crear una actividad principal no crea horarios ni planes.
+                    Elegi que actividad principal habilita este plan. Por
+                    ejemplo, un plan Programa Kids 3 clases debe incluir la
+                    actividad principal Programa Kids.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -873,18 +915,6 @@ export function AdminPlansPage() {
                     type="button"
                   >
                     Agregar actividad al plan
-                  </button>
-                  <button
-                    className="rounded-2xl bg-[var(--brand)] px-3 py-2 text-xs font-bold text-white transition hover:brightness-95"
-                    onClick={() => {
-                      setActivityForm(emptyActivityForm)
-                      setActivityFormOpen(true)
-                      setError(null)
-                      setSuccess(null)
-                    }}
-                    type="button"
-                  >
-                    Crear nueva actividad principal
                   </button>
                 </div>
               </div>
@@ -1058,36 +1088,23 @@ export function AdminPlansPage() {
             ) : null}
           </div>
         </form>
-
-        {error ? (
-          <p className="rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
-            {error}
-          </p>
-        ) : null}
-        {success ? (
-          <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
-            {success}
-          </p>
-        ) : null}
-      </aside>
-      {activityFormOpen ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        ) : (
           <form
-            className="w-full max-w-xl rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl"
+            className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
             onSubmit={handleCreateActivity}
           >
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
               Actividad principal
             </p>
             <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-              Crear nueva actividad principal
+              Nueva actividad principal
             </h3>
             <p className="mt-3 text-sm text-[var(--muted)]">
-              Usá esto cuando el plan necesita un tipo de clase nuevo, por
-              ejemplo Programa Kids. Esto no crea horarios, clases recurrentes
-              ni planes.
+              Crea una actividad principal como Programa Kids, Pilates o
+              Funcional. Despues vas a poder usarla en uno o mas planes y crear
+              horarios en Calendario.
             </p>
-            <div className="mt-5 grid gap-3">
+            <div className="mt-5 grid gap-4">
               <label className="text-sm font-semibold">
                 Nombre
                 <input
@@ -1105,7 +1122,7 @@ export function AdminPlansPage() {
               <label className="text-sm font-semibold">
                 Descripcion
                 <textarea
-                  className="mt-2 min-h-20 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  className="mt-2 min-h-24 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                   onChange={(event) =>
                     setActivityForm({
                       ...activityForm,
@@ -1173,32 +1190,30 @@ export function AdminPlansPage() {
                   }
                   type="checkbox"
                 />
-                Actividad activa
+                Actividad activa / disponible para usar
               </label>
-            </div>
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
               <button
-                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
-                disabled={saving}
-                onClick={() => {
-                  setActivityFormOpen(false)
-                  setActivityForm(emptyActivityForm)
-                }}
-                type="button"
-              >
-                Cancelar
-              </button>
-              <button
-                className="rounded-2xl bg-[var(--brand)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
                 disabled={saving}
                 type="submit"
               >
-                {saving ? 'Creando...' : 'Crear actividad'}
+                {saving ? 'Creando...' : 'Crear actividad principal'}
               </button>
             </div>
           </form>
-        </div>
-      ) : null}
+        )}
+
+        {error ? (
+          <p className="rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+            {error}
+          </p>
+        ) : null}
+        {success ? (
+          <p className="rounded-2xl bg-[var(--brand-soft)] p-3 text-sm font-semibold text-[var(--brand)]">
+            {success}
+          </p>
+        ) : null}
+      </aside>
       {activityDeleteTarget ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">

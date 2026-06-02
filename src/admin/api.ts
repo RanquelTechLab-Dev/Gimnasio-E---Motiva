@@ -345,10 +345,11 @@ export async function archiveActivity(activityId: string) {
   return data as AdminActionResult
 }
 
-export async function deleteActivity(activityId: string) {
+export async function deleteActivity(activityId: string, confirm: string) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_delete_activity', {
     p_activity_id: activityId,
+    p_confirm: confirm,
   })
 
   if (error) {

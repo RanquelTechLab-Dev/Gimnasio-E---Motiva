@@ -704,7 +704,7 @@ export function AdminCalendarPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteActivity(activityDeleteTarget.id)
+      await deleteActivity(activityDeleteTarget.id, activityDeleteConfirmation)
       setSuccess('Tipo de clase eliminado definitivamente.')
       setActivityForm(emptyActivityForm)
       setActivityDeleteTarget(null)

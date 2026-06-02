@@ -8,6 +8,7 @@ import {
   formatAdminError,
   listActivities,
   listPlans,
+  updateActivity,
   updatePlan,
 } from './api'
 import type {
@@ -78,6 +79,21 @@ const emptyActivityForm: ActivityFormState = {
   default_capacity: '10',
   max_capacity: '10',
   active: true,
+}
+
+function activityToForm(activity: Activity): ActivityFormState {
+  const capacity = String(
+    activity.max_capacity ?? activity.default_capacity ?? 10,
+  )
+
+  return {
+    name: activity.name,
+    description: activity.description ?? '',
+    color_hex: activity.color_hex ?? '#75cfc2',
+    default_capacity: capacity,
+    max_capacity: capacity,
+    active: activity.active,
+  }
 }
 
 function planToForm(plan: Plan): PlanFormState {
@@ -335,6 +351,7 @@ export function AdminPlansPage() {
   const [editorMode, setEditorMode] = useState<'activity' | 'plan'>('plan')
   const [activityForm, setActivityForm] =
     useState<ActivityFormState>(emptyActivityForm)
+  const [selectedActivityId, setSelectedActivityId] = useState('')
   const [activityDeleteTarget, setActivityDeleteTarget] =
     useState<Activity | null>(null)
   const [activityDeleteConfirmation, setActivityDeleteConfirmation] =
@@ -345,6 +362,10 @@ export function AdminPlansPage() {
     [plans, planForm.id],
   )
   const selectedPlanHasHistory = planHasHistory(selectedPlan)
+  const selectedActivity = useMemo(
+    () => activities.find((activity) => activity.id === selectedActivityId) ?? null,
+    [activities, selectedActivityId],
+  )
 
   async function loadData() {
     setLoading(true)
@@ -361,6 +382,18 @@ export function AdminPlansPage() {
         const nextSelected = nextPlans.find((plan) => plan.id === planForm.id)
         if (nextSelected) {
           setPlanForm(planToForm(nextSelected))
+        }
+      }
+
+      if (selectedActivityId) {
+        const nextSelectedActivity = nextActivities.find(
+          (activity) => activity.id === selectedActivityId,
+        )
+        if (nextSelectedActivity) {
+          setActivityForm(activityToForm(nextSelectedActivity))
+        } else {
+          setSelectedActivityId('')
+          setActivityForm(emptyActivityForm)
         }
       }
 
@@ -386,6 +419,22 @@ export function AdminPlansPage() {
     setPendingPlanEdit(null)
     setPlanEditConfirmation('')
     setEditorMode('plan')
+  }
+
+  function selectActivity(activityId: string) {
+    setSelectedActivityId(activityId)
+    setError(null)
+    setSuccess(null)
+
+    const activity = activities.find((item) => item.id === activityId)
+    setActivityForm(activity ? activityToForm(activity) : emptyActivityForm)
+  }
+
+  function startNewActivity() {
+    setSelectedActivityId('')
+    setActivityForm(emptyActivityForm)
+    setError(null)
+    setSuccess(null)
   }
 
   function addPlanActivity() {
@@ -432,7 +481,7 @@ export function AdminPlansPage() {
     })
   }
 
-  async function handleCreateActivity(event: FormEvent<HTMLFormElement>) {
+  async function handleActivitySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSaving(true)
     setError(null)
@@ -441,7 +490,9 @@ export function AdminPlansPage() {
       const input = toActivityInput(activityForm)
       const nextNameKey = normalizeActivityName(input.name)
       const duplicate = activities.find(
-        (activity) => normalizeActivityName(activity.name) === nextNameKey,
+        (activity) =>
+          activity.id !== selectedActivityId &&
+          normalizeActivityName(activity.name) === nextNameKey,
       )
 
       if (duplicate) {
@@ -452,7 +503,9 @@ export function AdminPlansPage() {
         )
       }
 
-      const result = await createActivity(input)
+      const result = selectedActivityId
+        ? await updateActivity(selectedActivityId, input)
+        : await createActivity(input)
       const nextActivities = await listActivities(true)
       setActivities(nextActivities)
 
@@ -467,6 +520,7 @@ export function AdminPlansPage() {
         )
 
       if (createdActivity) {
+        setSelectedActivityId(createdActivity.id)
         setPlanForm((current) =>
           current.activities.some(
             (item) => item.activity_id === createdActivity.id,
@@ -487,10 +541,17 @@ export function AdminPlansPage() {
         )
       }
 
-      setActivityForm(emptyActivityForm)
-      setEditorMode('plan')
+      const updatedActivity =
+        nextActivities.find((activity) => activity.id === selectedActivityId) ??
+        createdActivity
+      if (updatedActivity) {
+        setActivityForm(activityToForm(updatedActivity))
+      }
+
       setSuccess(
-        'Actividad principal creada. Ya podes asociarla a un plan.',
+        selectedActivityId
+          ? 'Actividad principal actualizada.'
+          : 'Actividad principal creada. Ya podes asociarla a un plan.',
       )
     } catch (createError) {
       setError(formatAdminError(createError))
@@ -526,6 +587,10 @@ export function AdminPlansPage() {
           (item) => item.activity_id !== activityDeleteTarget.id,
         ),
       }))
+      if (selectedActivityId === activityDeleteTarget.id) {
+        setSelectedActivityId('')
+        setActivityForm(emptyActivityForm)
+      }
       setActivityDeleteTarget(null)
       setActivityDeleteConfirmation('')
       setSuccess('Actividad principal eliminada definitivamente.')
@@ -723,16 +788,16 @@ export function AdminPlansPage() {
       </div>
 
       <aside className="grid gap-5">
-        <div className="inline-flex w-fit max-w-full flex-wrap gap-1 rounded-full border border-[var(--line)] bg-white p-1 shadow-sm">
+        <div className="inline-flex h-auto w-fit max-w-full self-start flex-wrap items-center gap-1 rounded-full border border-[var(--line)] bg-white p-1 shadow-sm">
           <button
-            className={`rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
+            className={`h-auto rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
               editorMode === 'activity'
                 ? 'bg-[var(--brand)] text-white'
                 : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
             }`}
             onClick={() => {
               setEditorMode('activity')
-              setActivityForm(emptyActivityForm)
+              startNewActivity()
               setError(null)
               setSuccess(null)
             }}
@@ -741,7 +806,7 @@ export function AdminPlansPage() {
             Nueva actividad principal
           </button>
           <button
-            className={`rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
+            className={`h-auto rounded-full px-3 py-1.5 text-[11px] font-bold leading-none transition ${
               editorMode === 'plan'
                 ? 'bg-[var(--brand)] text-white'
                 : 'bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-[var(--brand-soft)]'
@@ -975,17 +1040,11 @@ export function AdminPlansPage() {
                           >
                             Quitar actividad del plan
                           </button>
-                          <button
-                            className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
-                            disabled={!selectedPlanActivity}
-                            onClick={() =>
-                              requestDeleteActivity(selectedPlanActivity)
-                            }
-                            type="button"
-                          >
-                            Eliminar actividad principal
-                          </button>
                         </div>
+                        <p className="text-[11px] text-[var(--muted)]">
+                          Esto solo quita la actividad de este plan. La
+                          actividad principal sigue existiendo.
+                        </p>
                       </>
                     )
                   })()}
@@ -1072,20 +1131,53 @@ export function AdminPlansPage() {
         ) : (
           <form
             className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
-            onSubmit={handleCreateActivity}
+            onSubmit={handleActivitySubmit}
           >
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
               Actividad principal
             </p>
             <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-              Nueva actividad principal
+              {selectedActivity ? 'Editar actividad principal' : 'Nueva actividad principal'}
             </h3>
             <p className="mt-3 text-sm text-[var(--muted)]">
-              Crea una actividad principal como Programa Kids, Pilates o
-              Funcional. Despues vas a poder usarla en uno o mas planes y crear
-              horarios en Calendario.
+              Administra el catalogo base de actividades. Despues podes usar
+              estas actividades en uno o mas planes y crear horarios en
+              Calendario.
             </p>
             <div className="mt-5 grid gap-4">
+              <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <label className="text-sm font-semibold sm:flex-1">
+                    Gestionar actividad principal
+                    <select
+                      className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                      onChange={(event) => selectActivity(event.target.value)}
+                      value={selectedActivityId}
+                    >
+                      <option value="">Crear nueva actividad</option>
+                      {activities
+                        .slice()
+                        .sort((left, right) => left.name.localeCompare(right.name))
+                        .map((activity) => (
+                          <option key={activity.id} value={activity.id}>
+                            {activity.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button
+                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-xs font-bold transition hover:bg-white"
+                    onClick={startNewActivity}
+                    type="button"
+                  >
+                    Crear nueva actividad
+                  </button>
+                </div>
+                <p className="text-xs text-[var(--muted)]">
+                  Crear o editar una actividad principal no crea horarios ni
+                  planes automaticamente.
+                </p>
+              </div>
               <label className="text-sm font-semibold">
                 Nombre
                 <input
@@ -1167,8 +1259,29 @@ export function AdminPlansPage() {
                 disabled={saving}
                 type="submit"
               >
-                {saving ? 'Creando...' : 'Crear actividad principal'}
+                {saving
+                  ? 'Guardando...'
+                  : selectedActivity
+                    ? 'Guardar cambios'
+                    : 'Crear actividad principal'}
               </button>
+              {selectedActivity ? (
+                <div className="grid gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+                  <p className="text-xs text-[var(--muted)]">
+                    Eliminar borra definitivamente esta actividad principal y
+                    sus datos operativos relacionados. Para evitar errores, se
+                    pide escribir ELIMINAR.
+                  </p>
+                  <button
+                    className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                    disabled={saving}
+                    onClick={() => requestDeleteActivity(selectedActivity)}
+                    type="button"
+                  >
+                    Eliminar actividad principal
+                  </button>
+                </div>
+              ) : null}
             </div>
           </form>
         )}

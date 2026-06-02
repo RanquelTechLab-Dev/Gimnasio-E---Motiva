@@ -1061,7 +1061,7 @@ export function AdminStudentsPage() {
   }
 
   return (
-    <section className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_380px]">
+    <section className="grid w-full min-w-0 max-w-full gap-5 overflow-x-auto pb-24 min-[2200px]:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -1114,17 +1114,17 @@ export function AdminStudentsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto rounded-[20px] border border-[var(--line)]">
-            <div className="grid min-w-[700px] grid-cols-[1.2fr_1.4fr_0.8fr_0.7fr_0.8fr] bg-[var(--surface-strong)] px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+            <div className="grid min-w-[760px] grid-cols-[1.2fr_1.5fr_0.85fr_0.65fr_0.8fr] bg-[var(--surface-strong)] px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
               <span>Nombre</span>
               <span>Email</span>
               <span>Telefono</span>
               <span>Estado</span>
               <span>Ultimo pago</span>
             </div>
-            <div className="grid max-h-[520px] overflow-auto">
+            <div className="grid max-h-[300px] overflow-y-auto overflow-x-hidden">
               {filteredStudents.map((student) => (
                 <button
-                  className={`grid min-w-[700px] grid-cols-[1.2fr_1.4fr_0.8fr_0.7fr_0.8fr] px-4 py-3 text-left text-sm transition ${
+                  className={`grid min-w-[760px] grid-cols-[1.2fr_1.5fr_0.85fr_0.65fr_0.8fr] px-4 py-3 text-left text-sm transition ${
                     selectedStudent?.id === student.id
                       ? 'bg-[var(--brand-soft)]'
                       : 'bg-white hover:bg-[var(--surface-strong)]'
@@ -1133,13 +1133,13 @@ export function AdminStudentsPage() {
                   onClick={() => selectStudent(student)}
                   type="button"
                 >
-                  <span className="font-semibold text-[var(--brand)] underline-offset-4 hover:underline">
+                  <span className="min-w-0 truncate font-semibold text-[var(--brand)] underline-offset-4 hover:underline">
                     {studentDisplayName(student)}
                   </span>
-                  <span>{student.email}</span>
-                  <span>{student.phone ?? '-'}</span>
-                  <span>{student.active ? 'Activo' : 'Inactivo'}</span>
-                  <span>
+                  <span className="min-w-0 truncate">{student.email}</span>
+                  <span className="min-w-0 truncate">{student.phone ?? '-'}</span>
+                  <span className="min-w-0 truncate">{student.active ? 'Activo' : 'Inactivo'}</span>
+                  <span className="min-w-0 truncate">
                     {student.last_payment_at
                       ? new Date(student.last_payment_at).toLocaleDateString(
                           'es-AR',
@@ -1186,11 +1186,11 @@ export function AdminStudentsPage() {
               </dl>
             </article>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+            <article className="min-w-0 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
                 Programas asignados
               </p>
-              <div className="mt-3 grid gap-3 text-sm">
+              <div className="mt-3 grid max-h-[460px] gap-3 overflow-y-auto pr-1 text-sm">
                 {selectedStudentPrograms.length === 0 ? (
                   <p className="text-[var(--muted)]">
                     Sin programas asignados.
@@ -1200,7 +1200,7 @@ export function AdminStudentsPage() {
                     const plan = plansById.get(program.plan_id)
                     return (
                       <div
-                        className="grid min-w-0 gap-4 rounded-2xl border border-[var(--line)] bg-white p-4"
+                        className="grid min-w-0 gap-3 rounded-2xl border border-[var(--line)] bg-white p-3"
                         key={program.program_id}
                       >
                         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1250,7 +1250,7 @@ export function AdminStudentsPage() {
                         </div>
 
                         <dl className="grid gap-2 sm:grid-cols-3">
-                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-1.5">
                             <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
                               Precio
                             </dt>
@@ -1258,7 +1258,7 @@ export function AdminStudentsPage() {
                               {moneyFormatter.format(program.plan_price)}
                             </dd>
                           </div>
-                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-1.5">
                             <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
                               Pagado
                             </dt>
@@ -1266,7 +1266,7 @@ export function AdminStudentsPage() {
                               {moneyFormatter.format(program.approved_paid_total)}
                             </dd>
                           </div>
-                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <div className="rounded-xl bg-[var(--surface-strong)] px-3 py-1.5">
                             <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
                               Saldo
                             </dt>
@@ -1277,12 +1277,12 @@ export function AdminStudentsPage() {
                         </dl>
 
                         <div className="grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-2">
-                          <p className="rounded-xl border border-[var(--line)] px-3 py-2">
+                          <p className="rounded-xl border border-[var(--line)] px-3 py-1.5">
                             {program.remaining_credits === null
                               ? 'Clases disponibles segun limite del programa'
                               : `${program.remaining_credits} clases disponibles`}
                           </p>
-                          <p className="rounded-xl border border-[var(--line)] px-3 py-2">
+                          <p className="rounded-xl border border-[var(--line)] px-3 py-1.5">
                             Ultimo pago vinculado:{' '}
                             {program.last_payment_at
                               ? new Date(program.last_payment_at).toLocaleDateString(
@@ -1293,7 +1293,7 @@ export function AdminStudentsPage() {
                         </div>
 
                         {programHasHistory(program) ? (
-                          <div className="rounded-xl bg-[var(--page)] px-3 py-2 text-xs text-[var(--muted)]">
+                          <div className="rounded-xl bg-[var(--page)] px-3 py-1.5 text-xs text-[var(--muted)]">
                             <p className="font-bold text-[var(--ink)]">Historial</p>
                             <p className="mt-1 font-semibold">
                               {programHistorySummary(program)}
@@ -1476,7 +1476,7 @@ export function AdminStudentsPage() {
               </div>
             </article>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 lg:col-span-2">
+            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 xl:col-span-2">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
@@ -1797,7 +1797,7 @@ export function AdminStudentsPage() {
               </div>
             </article>
 
-            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 lg:col-span-2">
+            <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4 xl:col-span-2">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
                 Pagos
               </p>
@@ -1832,9 +1832,9 @@ export function AdminStudentsPage() {
         )}
       </div>
 
-      <aside className="grid gap-5">
+      <aside className="grid min-w-0 gap-5 min-[2200px]:max-h-[calc(100vh-2rem)] min-[2200px]:overflow-y-auto min-[2200px]:pr-1">
         <form
-          className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
+          className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
           onSubmit={handleCreateStudent}
         >
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -1843,7 +1843,7 @@ export function AdminStudentsPage() {
           <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
             Crear alumno
           </h3>
-          <p className="mt-2 text-sm text-[var(--muted)]">
+          <p className="mt-2 whitespace-normal break-words text-sm text-[var(--muted)]">
             Creá la cuenta del alumno con una contraseña provisoria. La
             contraseña no queda visible después del alta.
           </p>
@@ -1909,7 +1909,7 @@ export function AdminStudentsPage() {
               Recibe emails
             </label>
             <button
-              className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+              className="w-full rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
               disabled={saving}
               type="submit"
             >
@@ -1920,7 +1920,7 @@ export function AdminStudentsPage() {
 
         {selectedStudent && editForm ? (
           <form
-            className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
+            className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
             onSubmit={handleUpdateStudent}
           >
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -1986,7 +1986,7 @@ export function AdminStudentsPage() {
                 Recibe emails indica si acepta comunicaciones informativas.
               </p>
               <button
-                className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                className="w-full rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
                 disabled={saving}
                 type="submit"
               >
@@ -1996,7 +1996,7 @@ export function AdminStudentsPage() {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
                   Baja segura
                 </p>
-                <p className="text-xs text-[var(--muted)]">
+                <p className="whitespace-normal break-words text-xs text-[var(--muted)]">
                   Desactivar conserva el historial y bloquea el acceso. Eliminar
                   borra definitivamente al alumno, su usuario de acceso y datos
                   asociados; usalo solo para pruebas o cargas por error.
@@ -2308,7 +2308,7 @@ export function AdminStudentsPage() {
 
         {selectedStudent ? (
           <form
-            className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
+            className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
             onSubmit={handleAssignMembership}
           >
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
@@ -2379,7 +2379,7 @@ export function AdminStudentsPage() {
                   : 'Las clases se cargan desde el paquete elegido y pueden ajustarse antes de asignar el programa.'}
               </p>
               <button
-                className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                className="w-full rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
                 disabled={saving}
                 type="submit"
               >
@@ -2391,7 +2391,7 @@ export function AdminStudentsPage() {
 
         {selectedStudent ? (
           <form
-            className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
+            className="min-w-0 rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5"
             onSubmit={handleRegisterPayment}
           >
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">

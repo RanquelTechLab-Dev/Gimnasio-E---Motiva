@@ -425,17 +425,33 @@ export function AdminAttendancePage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(260px,360px)_1fr]">
-            <div className="grid gap-3">
-              <input
-                aria-label="Buscar alumno"
-                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) => setStudentSearch(event.target.value)}
-                placeholder="Buscar por nombre, email o telefono"
-                value={studentSearch}
-              />
+          <div className="mt-5 grid gap-4">
+            <section className="rounded-[20px] border border-[var(--line)] bg-white p-4">
+              <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)]">
+                <input
+                  aria-label="Buscar alumno"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) => setStudentSearch(event.target.value)}
+                  placeholder="Buscar por nombre, email o telefono"
+                  value={studentSearch}
+                />
+                <select
+                  aria-label="Alumno para reservar"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) => handleSelectStudent(event.target.value)}
+                  value={selectedStudentId}
+                >
+                  <option value="">Seleccionar alumno</option>
+                  {filteredStudents.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {studentFullName(student)} · {student.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {studentSearch.trim() ? (
-                <div className="rounded-[18px] border border-[var(--line)] bg-white p-3">
+                <div className="mt-3 rounded-[18px] border border-[var(--line)] bg-[var(--surface)] p-3">
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
                     Coincidencias
                   </p>
@@ -444,10 +460,10 @@ export function AdminAttendancePage() {
                       No hay alumnos que coincidan con la busqueda.
                     </p>
                   ) : (
-                    <div className="mt-2 grid gap-2">
+                    <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                       {filteredStudents.slice(0, 5).map((student) => (
                         <button
-                          className="rounded-2xl border border-[var(--line)] px-3 py-2 text-left text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
+                          className="rounded-2xl border border-[var(--line)] bg-white px-3 py-2 text-left text-sm font-semibold transition hover:bg-[var(--brand-soft)]"
                           key={student.id}
                           onClick={() => handleSelectStudent(student.id)}
                           type="button"
@@ -472,33 +488,24 @@ export function AdminAttendancePage() {
                   )}
                 </div>
               ) : null}
-              <select
-                aria-label="Alumno para reservar"
-                className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) => handleSelectStudent(event.target.value)}
-                value={selectedStudentId}
-              >
-                <option value="">Seleccionar alumno</option>
-                {filteredStudents.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {studentFullName(student)} · {student.email}
-                  </option>
-                ))}
-              </select>
+            </section>
 
-              {selectedStudent ? (
-                <div className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
-                  <p className="font-bold text-[var(--ink)]">
-                    {studentFullName(selectedStudent)}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    {selectedStudent.email}
-                    {selectedStudent.phone ? ` · ${selectedStudent.phone}` : ''}
-                  </p>
-                  <div className="mt-3 grid gap-2">
+            {selectedStudent ? (
+              <section className="rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="font-bold text-[var(--ink)]">
+                      {studentFullName(selectedStudent)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {selectedStudent.email}
+                      {selectedStudent.phone ? ` · ${selectedStudent.phone}` : ''}
+                    </p>
+                  </div>
+                  <div className="grid gap-2 lg:min-w-[420px] lg:max-w-[720px] lg:flex-1">
                     {studentPrograms.length === 0 ? (
-                      <p className="text-xs text-[var(--muted)]">
-                        Sin programas asignados.
+                      <p className="rounded-2xl bg-white px-3 py-2 text-xs text-[var(--muted)]">
+                        Sin programas activos o pagos completos para reservar.
                       </p>
                     ) : (
                       studentPrograms.map((program) => (
@@ -512,14 +519,14 @@ export function AdminAttendancePage() {
                     )}
                   </div>
                 </div>
-              ) : (
-                <div className="rounded-[20px] border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)]">
-                  Selecciona un alumno para ver sus programas y clases.
-                </div>
-              )}
-            </div>
+              </section>
+            ) : (
+              <section className="rounded-[20px] border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)]">
+                Elegi un alumno para ver su calendario.
+              </section>
+            )}
 
-            <div className="min-w-0">
+            <section className="min-w-0 rounded-[20px] border border-[var(--line)] bg-white p-4">
               {bookingLoading ? (
                 <p className="text-sm text-[var(--muted)]">
                   Cargando calendario del alumno...
@@ -548,7 +555,7 @@ export function AdminAttendancePage() {
                   Elegi un alumno del desplegable para ver el calendario.
                 </div>
               )}
-            </div>
+            </section>
           </div>
         </div>
       ) : (

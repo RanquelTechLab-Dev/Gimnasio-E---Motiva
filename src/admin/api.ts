@@ -788,6 +788,58 @@ export async function listAttendanceSessions(fromDate: string, toDate: string) {
   return (data ?? []) as AttendanceSessionRow[]
 }
 
+export async function listCalendarSessionsForStudent(
+  studentId: string,
+  fromDate: string,
+  toDate: string,
+) {
+  const client = getClient()
+  const materializeToDate = toDate <= fromDate ? addDays(fromDate, 1) : toDate
+  const { error: materializeError } = await client.rpc(
+    'materialize_recurring_class_sessions',
+    {
+      from_date: fromDate,
+      to_date: materializeToDate,
+    },
+  )
+
+  if (materializeError) {
+    throw materializeError
+  }
+
+  const { data, error } = await client.rpc(
+    'admin_list_calendar_sessions_for_student',
+    {
+      p_student_id: studentId,
+      from_date: fromDate,
+      to_date: toDate,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return hydrateCalendarSessionColors(client, (data ?? []) as CalendarSession[])
+}
+
+export async function adminBookClassForStudent(
+  studentId: string,
+  sessionId: string,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_book_class_for_student', {
+    p_student_id: studentId,
+    p_session_id: sessionId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
 export async function autoFinalizeAttendance(fromDate: string, toDate: string) {
   const client = getClient()
   const { data, error } = await client.rpc('auto_finalize_attendance', {

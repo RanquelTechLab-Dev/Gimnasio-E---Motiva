@@ -395,6 +395,8 @@ export function AdminStudentsPage() {
     password: '',
     confirmation: '',
   })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
   const [membershipForm, setMembershipForm] = useState<MembershipFormState>(
     buildMembershipForm([]),
   )
@@ -603,6 +605,7 @@ export function AdminStudentsPage() {
     setProgramDeleteTarget(null)
     setProgramDeleteConfirmation('')
     setPasswordForm({ password: '', confirmation: '' })
+    setPasswordMessage(null)
     setDriveStatus(null)
     setUploadInputKey((current) => current + 1)
     void loadSelectedStudentOperations(student.id)
@@ -662,34 +665,36 @@ export function AdminStudentsPage() {
     const nextPassword = passwordForm.password.trim()
     const confirmation = passwordForm.confirmation.trim()
 
+    setPasswordMessage(null)
+    setError(null)
+    setSuccess(null)
+
     if (nextPassword.length < 8) {
-      setError('La nueva contrasena debe tener al menos 8 caracteres.')
+      setPasswordMessage('La nueva contrasena debe tener al menos 8 caracteres.')
       return
     }
 
     if (nextPassword !== confirmation) {
-      setError('La confirmacion de contrasena no coincide.')
+      setPasswordMessage('La confirmacion de contrasena no coincide.')
       return
     }
 
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
+    setPasswordSaving(true)
     try {
       const result = await updateStudentPassword({
         student_id: selectedStudent.id,
         password: nextPassword,
       })
       setPasswordForm({ password: '', confirmation: '' })
-      setSuccess(
+      setPasswordMessage(
         result.warning
           ? `Contrasena del alumno actualizada. ${result.warning}`
           : 'Contrasena del alumno actualizada.',
       )
     } catch (updateError) {
-      setError(formatAdminError(updateError))
+      setPasswordMessage(formatAdminError(updateError))
     } finally {
-      setSaving(false)
+      setPasswordSaving(false)
     }
   }
 
@@ -2088,15 +2093,20 @@ export function AdminStudentsPage() {
                 <button
                   className="rounded-2xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-bold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"
                   disabled={
-                    saving ||
+                    passwordSaving ||
                     passwordForm.password.trim().length === 0 ||
                     passwordForm.confirmation.trim().length === 0
                   }
                   onClick={() => void handleUpdateStudentPassword()}
                   type="button"
                 >
-                  Cambiar contraseña
+                  {passwordSaving ? 'Cambiando...' : 'Cambiar contraseña'}
                 </button>
+                {passwordMessage ? (
+                  <p className="rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-[var(--ink)]">
+                    {passwordMessage}
+                  </p>
+                ) : null}
               </div>
               <button
                 className="w-full rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"

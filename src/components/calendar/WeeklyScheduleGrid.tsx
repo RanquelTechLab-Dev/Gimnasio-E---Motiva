@@ -209,14 +209,10 @@ function getStatus(session: ScheduleSession, mode: 'admin' | 'student') {
 }
 
 function getCancelBlockReason(session: ScheduleSession) {
-  const windowHours = session.requires_24h_cancel ? 24 : 12
-  const cancelLimit =
-    new Date(session.starts_at).getTime() - windowHours * 60 * 60 * 1000
+  const cancelLimit = new Date(session.starts_at).getTime() - 3 * 60 * 60 * 1000
 
   if (Date.now() > cancelLimit) {
-    return session.requires_24h_cancel
-      ? 'La cancelacion debe realizarse al menos 24h antes.'
-      : 'La cancelacion debe realizarse al menos 12h antes.'
+    return 'Ya no podés cancelar esta reserva desde la app porque faltan menos de 3 horas para la clase. Si reservaste por error, escribile a Carolina para que la cancele manualmente.'
   }
 
   return null
@@ -469,7 +465,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                                 {session.spots_left}/{session.capacity} cupos
                               </span>
                               <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">
-                                {session.requires_24h_cancel ? '24h' : '12h'}
+                                Cancela hasta 3h antes
                               </span>
                               {session.trainer_name ? (
                                 <span className="rounded-full bg-white/80 px-2 py-0.5 sm:px-2.5 sm:py-1">

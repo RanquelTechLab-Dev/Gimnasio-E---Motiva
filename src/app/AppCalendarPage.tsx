@@ -109,7 +109,8 @@ export function AppCalendarPage() {
           </h3>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Las reservas se confirman segun tu plan, membresia, cupo disponible
-            y clases disponibles.
+            y clases disponibles. Reservas hasta 3 horas antes; 07:00 y 08:00
+            cierran a las 21:00 del dia anterior.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">

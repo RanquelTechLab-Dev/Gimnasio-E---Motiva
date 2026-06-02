@@ -749,6 +749,20 @@ export async function markAttendance(
   return data
 }
 
+export async function adminCancelBooking(bookingId: string, reason: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_cancel_booking', {
+    p_booking_id: bookingId,
+    p_reason: reason.trim() || null,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
 export async function listStudentTrainingNotes(studentId: string) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_list_student_training_notes', {

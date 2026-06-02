@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  adminCancelBooking,
   autoFinalizeAttendance,
   formatAdminError,
   listAttendanceSessions,
@@ -136,6 +137,32 @@ export function AdminAttendancePage() {
     }
   }
 
+  async function handleAdminCancel(row: AttendanceSessionRow) {
+    const confirmed = window.confirm(
+      `Vas a cancelar manualmente la reserva de ${studentName(row)}. Si tenia una clase de paquete descontada, se devuelve el credito. ¿Continuar?`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setSavingBookingId(row.booking_id)
+    setError(null)
+    setSuccess(null)
+    try {
+      await adminCancelBooking(
+        row.booking_id,
+        'Cancelacion manual desde asistencia.',
+      )
+      setSuccess('Reserva cancelada manualmente.')
+      await loadData()
+    } catch (cancelError) {
+      setError(formatAdminError(cancelError))
+    } finally {
+      setSavingBookingId(null)
+    }
+  }
+
   return (
     <section className="grid gap-5">
       <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
@@ -202,7 +229,7 @@ export function AdminAttendancePage() {
                     </p>
                     <p className="mt-1 text-xs text-[var(--muted)]">
                       Cupo {sessionRows.length}/{session.capacity}
-                      {session.requires_24h_cancel ? ' · regla 24h' : ''}
+                      {' · cancelacion alumnos hasta 3h antes'}
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-[var(--ink)]">
@@ -278,9 +305,19 @@ export function AdminAttendancePage() {
                             />
                           </td>
                           <td className="rounded-r-2xl px-3 py-3">
-                            {row.attendance_status ? (
-                              <div className="flex flex-wrap gap-2">
-                                {(['present', 'absent', 'justified'] as const).map(
+                            <div className="flex flex-wrap gap-2">
+                              {row.booking_status === 'booked' ? (
+                                <button
+                                  className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                                  disabled={savingBookingId === row.booking_id}
+                                  onClick={() => void handleAdminCancel(row)}
+                                  type="button"
+                                >
+                                  Cancelar reserva
+                                </button>
+                              ) : null}
+                              {row.attendance_status ? (
+                                (['present', 'absent', 'justified'] as const).map(
                                   (status) => (
                                     <button
                                       className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"
@@ -292,13 +329,13 @@ export function AdminAttendancePage() {
                                       {correctionLabels[status]}
                                     </button>
                                   ),
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-[var(--muted)]">
-                                Se autogenera al finalizar la clase si no cancela.
-                              </span>
-                            )}
+                                )
+                              ) : (
+                                <span className="text-xs text-[var(--muted)]">
+                                  Se autogenera al finalizar la clase si no cancela.
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}

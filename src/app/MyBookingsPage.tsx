@@ -70,8 +70,8 @@ export function MyBookingsPage() {
             Mis reservas
           </h3>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Las clases comunes cancelan hasta 12h antes. Personalizado 1:1
-            cancela hasta 24h antes.
+            Podes cancelar hasta 3 horas antes de la clase. Si falta menos,
+            escribile a Carolina para que la cancele manualmente.
           </p>
         </div>
         <button

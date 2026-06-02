@@ -29,6 +29,7 @@ import type {
   StudentProfile,
   UpdateClassSessionInput,
   UpdatePaymentInput,
+  UpdateStudentPasswordInput,
   UpdateStudentProgramInput,
   UpdateStudentInput,
   UploadStudentFileInput,
@@ -157,6 +158,22 @@ export async function updateStudent(
   if (error) {
     throw error
   }
+}
+
+export async function updateStudentPassword(input: UpdateStudentPasswordInput) {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke(
+    'update-student-password',
+    {
+      body: input,
+    },
+  )
+
+  if (error) {
+    await throwEdgeFunctionError(error)
+  }
+
+  return data as AdminActionResult
 }
 
 export async function deactivateStudent(studentId: string) {

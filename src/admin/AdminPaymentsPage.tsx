@@ -208,7 +208,7 @@ export function AdminPaymentsPage() {
     setError(null)
     setSuccess(null)
     try {
-      await registerManualPayment({
+      const paymentResult = await registerManualPayment({
         student_id: form.student_id,
         membership_id: form.membership_id,
         amount,
@@ -216,7 +216,11 @@ export function AdminPaymentsPage() {
         payment_date: form.payment_date,
         notes: form.notes,
       })
-      setSuccess('Pago registrado y membresia activada.')
+      setSuccess(
+        paymentResult.is_fully_paid === false
+          ? `Pago registrado, pero el programa todavia no se activa porque falta ${moneyFormatter.format(paymentResult.pending_amount ?? 0)}.`
+          : 'Pago registrado y programa activado.',
+      )
       setForm({ ...form, amount: '', payment_date: todayDate(), notes: '' })
       await loadData(filter)
     } catch (saveError) {

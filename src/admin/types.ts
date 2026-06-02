@@ -72,6 +72,11 @@ export type StudentProgram = {
   plan_id: string
   plan_name: string
   plan_type: PlanType
+  plan_price: number
+  approved_paid_total: number
+  pending_amount: number
+  is_fully_paid: boolean
+  payment_state: 'paid' | 'partial' | 'unpaid'
   status: MembershipStatus
   start_date: string
   end_date: string
@@ -157,6 +162,24 @@ export type RegisterPaymentInput = {
   method: PaymentMethod
   notes: string
   payment_date: string
+}
+
+export type RegisterPaymentResult = {
+  payment_id: string
+  payment_status: PaymentStatus
+  student_id: string
+  membership_id: string
+  membership_status: MembershipStatus
+  membership_start_date: string
+  membership_end_date: string
+  remaining_credits: number | null
+  amount: number
+  method: PaymentMethod
+  paid_at: string
+  payment_date: string
+  approved_paid_total?: number
+  pending_amount?: number
+  is_fully_paid?: boolean
 }
 
 export type UpdatePaymentInput = {

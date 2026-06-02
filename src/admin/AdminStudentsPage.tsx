@@ -129,6 +129,13 @@ const programStatusLabels: Record<MembershipStatus, string> = {
   suspended: 'Suspendido',
 }
 
+const programPaymentStateLabels: Record<StudentProgram['payment_state'], string> =
+  {
+    paid: 'Pagado completo',
+    partial: 'Pago incompleto',
+    unpaid: 'Sin pago',
+  }
+
 const noteTypeLabels: Record<TrainingNoteType, string> = {
   admin_note: 'Nota administrativa',
   follow_up: 'Seguimiento',
@@ -253,8 +260,29 @@ function describeProgramOption(program: StudentProgram, plan?: Plan | null) {
     return `${program.remaining_credits} clases restantes`
   })()
   const price = plan ? ` · ${moneyFormatter.format(plan.price)}` : ''
+  const payment = program.is_fully_paid
+    ? 'Pagado completo'
+    : program.approved_paid_total > 0
+      ? `Pago incompleto: falta ${moneyFormatter.format(program.pending_amount)}`
+      : 'Sin pago'
 
-  return `${program.plan_name ?? plan?.name ?? 'Plan'}${price} · ${classes} · ${program.start_date} a ${program.end_date}`
+  return `${program.plan_name ?? plan?.name ?? 'Plan'}${price} · ${classes} · ${program.start_date} a ${program.end_date} · ${payment}`
+}
+
+function programDisplayStatus(program: StudentProgram) {
+  if (program.status === 'suspended' && !program.is_fully_paid) {
+    return 'Pendiente de pago'
+  }
+
+  return programStatusLabels[program.status]
+}
+
+function programPaymentSummary(program: StudentProgram) {
+  return [
+    `Precio: ${moneyFormatter.format(program.plan_price)}`,
+    `Pagado: ${moneyFormatter.format(program.approved_paid_total)}`,
+    `Saldo: ${moneyFormatter.format(program.pending_amount)}`,
+  ].join(' · ')
 }
 
 function programHasHistory(program: StudentProgram) {
@@ -415,8 +443,8 @@ export function AdminStudentsPage() {
   const selectedStudentPrograms = studentPrograms.filter(
     (program) => program.student_id === selectedStudent?.id,
   )
-  const activeSelectedStudentPrograms = selectedStudentPrograms.filter(
-    (program) => program.status === 'active',
+  const payableSelectedStudentPrograms = selectedStudentPrograms.filter(
+    (program) => program.status !== 'cancelled',
   )
   const selectedPayments = payments.filter(
     (payment) => payment.student_id === selectedStudent?.id,
@@ -469,7 +497,8 @@ export function AdminStudentsPage() {
       setMembershipForm(buildMembershipForm(nextPlans))
       const firstProgram = nextPrograms.find(
         (program) =>
-          program.student_id === nextSelected?.id && program.status === 'active',
+          program.student_id === nextSelected?.id &&
+          program.status !== 'cancelled',
       )
       setPaymentForm((current) => ({
         ...current,
@@ -552,7 +581,8 @@ export function AdminStudentsPage() {
 
   function selectStudent(student: StudentProfile) {
     const firstProgram = studentPrograms.find(
-      (program) => program.student_id === student.id && program.status === 'active',
+      (program) =>
+        program.student_id === student.id && program.status !== 'cancelled',
     )
     setSelectedStudentId(student.id)
     setEditForm(studentToEditForm(student))
@@ -726,7 +756,7 @@ export function AdminStudentsPage() {
           ? Number(membershipForm.remaining_credits)
           : null,
       })
-      setSuccess('Programa asignado.')
+      setSuccess('Programa asignado. Queda pendiente hasta registrar pago completo.')
       await loadData()
     } catch (assignError) {
       setError(formatAdminError(assignError))
@@ -821,7 +851,7 @@ export function AdminStudentsPage() {
     setError(null)
     setSuccess(null)
     try {
-      await registerManualPayment({
+      const paymentResult = await registerManualPayment({
         student_id: selectedStudent.id,
         membership_id: paymentForm.membership_id,
         amount,
@@ -829,7 +859,11 @@ export function AdminStudentsPage() {
         payment_date: paymentForm.payment_date,
         notes: paymentForm.notes,
       })
-      setSuccess('Pago manual registrado como pendiente.')
+      setSuccess(
+        paymentResult.is_fully_paid === false
+          ? `Pago registrado, pero el programa todavia no se activa porque falta ${moneyFormatter.format(paymentResult.pending_amount ?? 0)}.`
+          : 'Pago registrado y programa activado.',
+      )
       setPaymentForm({
         ...paymentForm,
         amount: '',
@@ -1183,8 +1217,20 @@ export function AdminStudentsPage() {
                               {program.plan_name ?? plan?.name ?? 'Plan no disponible'}
                             </p>
                             <p className="text-[var(--muted)]">
-                              {programStatusLabels[program.status]} ·{' '}
+                              {programDisplayStatus(program)} ·{' '}
                               {program.start_date} a {program.end_date}
+                            </p>
+                            <p
+                              className={`mt-2 rounded-xl px-3 py-2 text-xs font-bold ${
+                                program.is_fully_paid
+                                  ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                                  : 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                              }`}
+                            >
+                              {programPaymentStateLabels[program.payment_state]}
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--muted)]">
+                              {programPaymentSummary(program)}
                             </p>
                             <p className="mt-1 text-xs text-[var(--muted)]">
                               {program.remaining_credits === null
@@ -2340,7 +2386,7 @@ export function AdminStudentsPage() {
                 value={paymentForm.membership_id}
               >
                 <option value="">Seleccionar programa</option>
-                {activeSelectedStudentPrograms.map((program) => {
+                {payableSelectedStudentPrograms.map((program) => {
                   const plan = plansById.get(program.plan_id)
                   return (
                     <option key={program.program_id} value={program.program_id}>

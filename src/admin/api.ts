@@ -23,6 +23,7 @@ import type {
   ActivityInput,
   PlanInput,
   RegisterPaymentInput,
+  RegisterPaymentResult,
   StudentProgram,
   StudentFileMetadataInput,
   StudentProfile,
@@ -482,7 +483,7 @@ export async function registerManualPayment(input: RegisterPaymentInput) {
     throw error
   }
 
-  return data
+  return data as RegisterPaymentResult
 }
 
 export async function approveManualPayment(paymentId: string) {

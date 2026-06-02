@@ -65,6 +65,151 @@ begin
 end;
 $$;
 
+create or replace function private.reconcile_membership_payment_state(
+  p_membership_id uuid,
+  p_actor_id uuid default null,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, private
+as $$
+declare
+  v_membership public.memberships%rowtype;
+  v_plan public.plans%rowtype;
+  v_previous_status public.membership_status;
+  v_approved_paid_total numeric(12, 2) := 0;
+  v_pending_amount numeric(12, 2) := 0;
+  v_is_fully_paid boolean := false;
+  v_future_active_bookings_count integer := 0;
+  v_returned_credits integer := 0;
+  v_action text := 'unchanged';
+begin
+  if p_membership_id is null then
+    return jsonb_build_object('action', 'skipped', 'reason', 'no_membership');
+  end if;
+
+  select *
+  into v_membership
+  from public.memberships m
+  where m.id = p_membership_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('action', 'skipped', 'reason', 'membership_not_found');
+  end if;
+
+  v_previous_status := v_membership.status;
+
+  select *
+  into v_plan
+  from public.plans p
+  where p.id = v_membership.plan_id;
+
+  if not found then
+    return jsonb_build_object('action', 'skipped', 'reason', 'plan_not_found');
+  end if;
+
+  v_approved_paid_total := private.membership_approved_paid_total(v_membership.id);
+  v_pending_amount := greatest(v_plan.price - v_approved_paid_total, 0)::numeric(12, 2);
+  v_is_fully_paid := v_approved_paid_total >= v_plan.price;
+
+  if v_is_fully_paid and v_membership.status = 'suspended'::public.membership_status then
+    update public.memberships
+    set
+      status = 'active'::public.membership_status,
+      updated_at = now()
+    where id = v_membership.id
+    returning * into v_membership;
+
+    v_action := 'activated';
+  elsif v_is_fully_paid is false and v_membership.status = 'active'::public.membership_status then
+    select
+      count(*)::int,
+      coalesce(sum(b.credits_charged) filter (
+        where b.credits_charged > 0 and b.credit_returned_at is null
+      ), 0)::int
+    into v_future_active_bookings_count, v_returned_credits
+    from public.bookings b
+    join public.class_sessions s on s.id = b.session_id
+    where b.membership_id = v_membership.id
+      and b.status = 'booked'::public.booking_status
+      and s.starts_at >= now();
+
+    if v_future_active_bookings_count > 0 then
+      update public.bookings b
+      set
+        status = 'cancelled'::public.booking_status,
+        cancelled_at = now(),
+        cancelled_by = p_actor_id,
+        cancel_reason = coalesce(
+          nullif(btrim(p_reason), ''),
+          'Programa sin pago completo.'
+        ),
+        charged_as_attended = false,
+        credit_returned_at = case
+          when b.credits_charged > 0 and b.credit_returned_at is null then now()
+          else b.credit_returned_at
+        end,
+        updated_at = now()
+      from public.class_sessions s
+      where s.id = b.session_id
+        and b.membership_id = v_membership.id
+        and b.status = 'booked'::public.booking_status
+        and s.starts_at >= now();
+    end if;
+
+    update public.memberships
+    set
+      status = 'suspended'::public.membership_status,
+      remaining_credits = case
+        when remaining_credits is not null then remaining_credits + v_returned_credits
+        else remaining_credits
+      end,
+      updated_at = now()
+    where id = v_membership.id
+    returning * into v_membership;
+
+    v_action := 'suspended_unpaid';
+  end if;
+
+  if v_action <> 'unchanged' then
+    insert into public.audit_logs (actor_id, entity_type, entity_id, action, metadata)
+    values (
+      p_actor_id,
+      'membership',
+      v_membership.id,
+      'membership.payment_state_reconciled',
+      jsonb_build_object(
+        'reason', p_reason,
+        'previous_status', v_previous_status,
+        'current_status', v_membership.status,
+        'approved_paid_total', v_approved_paid_total,
+        'plan_price', v_plan.price,
+        'pending_amount', v_pending_amount,
+        'is_fully_paid', v_is_fully_paid,
+        'future_active_bookings_cancelled', v_future_active_bookings_count,
+        'credits_returned', v_returned_credits
+      )
+    );
+  end if;
+
+  return jsonb_build_object(
+    'action', v_action,
+    'membership_id', v_membership.id,
+    'previous_status', v_previous_status,
+    'current_status', v_membership.status,
+    'approved_paid_total', v_approved_paid_total,
+    'plan_price', v_plan.price,
+    'pending_amount', v_pending_amount,
+    'is_fully_paid', v_is_fully_paid,
+    'future_active_bookings_cancelled', v_future_active_bookings_count,
+    'credits_returned', v_returned_credits
+  );
+end;
+$$;
+
 create or replace function public.assign_membership(
   student_id uuid,
   plan_id uuid,
@@ -918,6 +1063,255 @@ begin
 end;
 $$;
 
+create or replace function public.admin_update_payment(
+  p_payment_id uuid,
+  p_amount numeric,
+  p_method public.payment_method,
+  p_paid_at date,
+  p_notes text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, private
+as $$
+declare
+  v_actor_id uuid := (select auth.uid());
+  v_previous public.payments%rowtype;
+  v_payment public.payments%rowtype;
+  v_paid_at timestamptz;
+  v_membership_reconciliation jsonb := '{}'::jsonb;
+begin
+  if not coalesce(private.is_admin(), false) then
+    raise exception 'Solo un admin activo puede editar pagos.';
+  end if;
+
+  if v_actor_id is null then
+    raise exception 'Sesion requerida.';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'El monto debe ser mayor a cero.';
+  end if;
+
+  if p_method is null then
+    raise exception 'Metodo de pago requerido.';
+  end if;
+
+  if p_paid_at is null then
+    raise exception 'Fecha de pago requerida.';
+  end if;
+
+  v_paid_at := (p_paid_at::timestamp + time '12:00') at time zone 'UTC';
+
+  select *
+  into v_previous
+  from public.payments p
+  where p.id = p_payment_id
+  for update;
+
+  if not found then
+    raise exception 'Pago no encontrado.';
+  end if;
+
+  if v_previous.status::text = 'voided' then
+    raise exception 'No se pueden editar pagos anulados.';
+  end if;
+
+  update public.payments
+  set
+    amount = p_amount,
+    method = p_method,
+    paid_at = v_paid_at,
+    notes = nullif(btrim(p_notes), ''),
+    updated_at = now()
+  where id = v_previous.id
+  returning * into v_payment;
+
+  if v_payment.membership_id is not null
+     and v_payment.status = 'approved'::public.payment_status then
+    v_membership_reconciliation := private.reconcile_membership_payment_state(
+      v_payment.membership_id,
+      v_actor_id,
+      'Pago aprobado editado.'
+    );
+  end if;
+
+  insert into public.audit_logs (
+    actor_id,
+    entity_type,
+    entity_id,
+    action,
+    metadata
+  )
+  values (
+    v_actor_id,
+    'payment',
+    v_payment.id,
+    'payment.updated',
+    jsonb_build_object(
+      'student_id', v_payment.student_id,
+      'membership_id', v_payment.membership_id,
+      'old', jsonb_build_object(
+        'amount', v_previous.amount,
+        'method', v_previous.method,
+        'paid_at', v_previous.paid_at,
+        'notes', v_previous.notes,
+        'status', v_previous.status
+      ),
+      'new', jsonb_build_object(
+        'amount', v_payment.amount,
+        'method', v_payment.method,
+        'paid_at', v_payment.paid_at,
+        'notes', v_payment.notes,
+        'status', v_payment.status
+      ),
+      'membership_reconciliation', v_membership_reconciliation
+    )
+  );
+
+  return jsonb_build_object(
+    'action', 'updated',
+    'payment_id', v_payment.id,
+    'status', v_payment.status,
+    'membership_id', v_payment.membership_id,
+    'membership_reconciliation', v_membership_reconciliation
+  );
+end;
+$$;
+
+create or replace function public.admin_void_payment(
+  p_payment_id uuid,
+  p_reason text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, private
+as $$
+declare
+  v_actor_id uuid := (select auth.uid());
+  v_previous public.payments%rowtype;
+  v_payment public.payments%rowtype;
+  v_reason text := nullif(btrim(p_reason), '');
+  v_last_attendance_at timestamptz;
+  v_last_payment_at timestamptz;
+  v_last_real_activity_at timestamptz;
+  v_membership_reconciliation jsonb := '{}'::jsonb;
+begin
+  if not coalesce(private.is_admin(), false) then
+    raise exception 'Solo un admin activo puede anular pagos.';
+  end if;
+
+  if v_actor_id is null then
+    raise exception 'Sesion requerida.';
+  end if;
+
+  if v_reason is null then
+    raise exception 'El motivo de anulacion es obligatorio.';
+  end if;
+
+  select *
+  into v_previous
+  from public.payments p
+  where p.id = p_payment_id
+  for update;
+
+  if not found then
+    raise exception 'Pago no encontrado.';
+  end if;
+
+  if v_previous.status::text = 'voided' then
+    raise exception 'El pago ya esta anulado.';
+  end if;
+
+  update public.payments
+  set
+    status = 'voided'::public.payment_status,
+    voided_at = now(),
+    voided_by = v_actor_id,
+    void_reason = v_reason,
+    updated_at = now()
+  where id = v_previous.id
+  returning * into v_payment;
+
+  if v_previous.status = 'approved'::public.payment_status
+     and v_payment.membership_id is not null then
+    v_membership_reconciliation := private.reconcile_membership_payment_state(
+      v_payment.membership_id,
+      v_actor_id,
+      'Pago aprobado anulado: ' || v_reason
+    );
+  end if;
+
+  if v_previous.status::text = 'approved' then
+    select max(att.recorded_at) into v_last_attendance_at
+    from public.attendance att
+    where att.student_id = v_previous.student_id
+      and att.status = 'present'::public.attendance_status;
+
+    select max(payment_activity.activity_at) into v_last_payment_at
+    from (
+      select coalesce(pay.approved_at, pay.paid_at) as activity_at
+      from public.payments pay
+      where pay.student_id = v_previous.student_id
+        and pay.status = 'approved'::public.payment_status
+    ) payment_activity
+    where payment_activity.activity_at is not null;
+
+    select max(real_activity.activity_at) into v_last_real_activity_at
+    from (
+      values (v_last_attendance_at), (v_last_payment_at)
+    ) real_activity(activity_at)
+    where real_activity.activity_at is not null;
+
+    update public.profiles
+    set
+      last_payment_at = v_last_payment_at,
+      last_attendance_at = v_last_attendance_at,
+      last_real_activity_at = v_last_real_activity_at,
+      updated_at = now()
+    where id = v_previous.student_id;
+  end if;
+
+  insert into public.audit_logs (
+    actor_id,
+    entity_type,
+    entity_id,
+    action,
+    metadata
+  )
+  values (
+    v_actor_id,
+    'payment',
+    v_payment.id,
+    'payment.voided',
+    jsonb_build_object(
+      'student_id', v_payment.student_id,
+      'membership_id', v_payment.membership_id,
+      'reason', v_reason,
+      'previous_status', v_previous.status,
+      'amount', v_previous.amount,
+      'method', v_previous.method,
+      'paid_at', v_previous.paid_at,
+      'recalculated_profile', v_previous.status::text = 'approved',
+      'last_payment_at', v_last_payment_at,
+      'last_attendance_at', v_last_attendance_at,
+      'last_real_activity_at', v_last_real_activity_at,
+      'membership_reconciliation', v_membership_reconciliation
+    )
+  );
+
+  return jsonb_build_object(
+    'action', 'voided',
+    'payment_id', v_payment.id,
+    'status', v_payment.status,
+    'membership_id', v_payment.membership_id,
+    'membership_reconciliation', v_membership_reconciliation
+  );
+end;
+$$;
+
 with unpaid_active_programs as (
   select
     m.id,
@@ -970,6 +1364,8 @@ execute function private.enforce_paid_active_membership();
 revoke all on function public.assign_membership(uuid, uuid, date, date, integer) from public, anon;
 revoke all on function public.register_manual_payment(uuid, uuid, numeric, public.payment_method, text, date) from public, anon;
 revoke all on function public.register_manual_payment(uuid, uuid, numeric, public.payment_method, text) from public, anon;
+revoke all on function public.admin_update_payment(uuid, numeric, public.payment_method, date, text) from public, anon;
+revoke all on function public.admin_void_payment(uuid, text) from public, anon;
 revoke all on function public.admin_list_student_programs(uuid) from public, anon;
 revoke all on function public.admin_update_student_program(uuid, uuid, public.membership_status, date, date, integer, text) from public, anon;
 revoke all on function public.admin_delete_student_program(uuid, text) from public, anon;
@@ -977,6 +1373,8 @@ revoke all on function public.admin_delete_student_program(uuid, text) from publ
 grant execute on function public.assign_membership(uuid, uuid, date, date, integer) to authenticated;
 grant execute on function public.register_manual_payment(uuid, uuid, numeric, public.payment_method, text, date) to authenticated;
 grant execute on function public.register_manual_payment(uuid, uuid, numeric, public.payment_method, text) to authenticated;
+grant execute on function public.admin_update_payment(uuid, numeric, public.payment_method, date, text) to authenticated;
+grant execute on function public.admin_void_payment(uuid, text) to authenticated;
 grant execute on function public.admin_list_student_programs(uuid) to authenticated;
 grant execute on function public.admin_update_student_program(uuid, uuid, public.membership_status, date, date, integer, text) to authenticated;
 grant execute on function public.admin_delete_student_program(uuid, text) to authenticated;

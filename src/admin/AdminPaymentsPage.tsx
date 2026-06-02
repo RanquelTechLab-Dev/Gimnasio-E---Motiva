@@ -293,7 +293,7 @@ export function AdminPaymentsPage() {
 
     const confirmed = window.confirm(
       payment.membership_id
-        ? 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. Este pago esta vinculado a una membresia: la anulacion no elimina automaticamente la membresia. ¿Continuar?'
+        ? 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. Si el programa vinculado deja de estar pago completo, se suspendera y se cancelaran sus reservas futuras activas. ¿Continuar?'
         : 'Anular conserva el pago para historial, pero lo deja sin validez administrativa. ¿Continuar?',
     )
 

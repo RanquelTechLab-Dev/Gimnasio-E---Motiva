@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  createActivity,
   createPlan,
+  deleteActivity,
   deletePlan,
   formatAdminError,
   listActivities,
@@ -10,6 +12,7 @@ import {
 } from './api'
 import type {
   Activity,
+  ActivityInput,
   Plan,
   PlanActivityInput,
   PlanInput,
@@ -45,6 +48,15 @@ type PendingPlanEdit = {
   input: PlanInput
 }
 
+type ActivityFormState = {
+  name: string
+  description: string
+  color_hex: string
+  default_capacity: string
+  max_capacity: string
+  active: boolean
+}
+
 const emptyPlanForm: PlanFormState = {
   id: null,
   name: '',
@@ -57,6 +69,15 @@ const emptyPlanForm: PlanFormState = {
   visible_to_students: true,
   max_active_memberships: '',
   activities: [],
+}
+
+const emptyActivityForm: ActivityFormState = {
+  name: '',
+  description: '',
+  color_hex: '#75cfc2',
+  default_capacity: '10',
+  max_capacity: '',
+  active: true,
 }
 
 function planToForm(plan: Plan): PlanFormState {
@@ -110,6 +131,16 @@ function parseNonNegativeNumber(value: string, label: string) {
   }
 
   return parsed
+}
+
+function normalizeActivityName(value: string) {
+  return value
+    .trim()
+    .toLocaleLowerCase('es-AR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 function planAccessLabel(plan: Plan) {
@@ -266,6 +297,31 @@ function toPlanInput(form: PlanFormState): PlanInput {
   }
 }
 
+function toActivityInput(form: ActivityFormState): ActivityInput {
+  if (!form.name.trim()) {
+    throw new Error('El nombre de la actividad principal es obligatorio.')
+  }
+
+  return {
+    name: form.name.trim(),
+    description: form.description.trim(),
+    requires_24h_cancel: false,
+    flexible_schedule: false,
+    active: form.active,
+    color_hex: form.color_hex.trim() || '#75cfc2',
+    default_capacity: parsePositiveInteger(
+      form.default_capacity,
+      'El cupo predeterminado',
+      false,
+    ),
+    max_capacity: parsePositiveInteger(
+      form.max_capacity,
+      'El cupo maximo',
+      false,
+    ),
+  }
+}
+
 export function AdminPlansPage() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [activities, setActivities] = useState<Activity[]>([])
@@ -280,6 +336,13 @@ export function AdminPlansPage() {
     null,
   )
   const [planEditConfirmation, setPlanEditConfirmation] = useState('')
+  const [activityFormOpen, setActivityFormOpen] = useState(false)
+  const [activityForm, setActivityForm] =
+    useState<ActivityFormState>(emptyActivityForm)
+  const [activityDeleteTarget, setActivityDeleteTarget] =
+    useState<Activity | null>(null)
+  const [activityDeleteConfirmation, setActivityDeleteConfirmation] =
+    useState('')
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === planForm.id) ?? null,
@@ -370,6 +433,111 @@ export function AdminPlansPage() {
       ...planForm,
       activities: planForm.activities.filter((_, itemIndex) => itemIndex !== index),
     })
+  }
+
+  async function handleCreateActivity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const input = toActivityInput(activityForm)
+      const nextNameKey = normalizeActivityName(input.name)
+      const duplicate = activities.find(
+        (activity) => normalizeActivityName(activity.name) === nextNameKey,
+      )
+
+      if (duplicate) {
+        throw new Error(
+          duplicate.active
+            ? 'Ya existe una actividad principal activa con ese nombre.'
+            : 'Ya existe una actividad principal inactiva con ese nombre. Revisala antes de crear otra.',
+        )
+      }
+
+      const result = await createActivity(input)
+      const nextActivities = await listActivities(true)
+      setActivities(nextActivities)
+
+      const resultActivityId =
+        result && typeof result === 'object' && 'activity_id' in result
+          ? String((result as { activity_id?: unknown }).activity_id ?? '')
+          : ''
+      const createdActivity =
+        nextActivities.find((activity) => activity.id === resultActivityId) ??
+        nextActivities.find(
+          (activity) => normalizeActivityName(activity.name) === nextNameKey,
+        )
+
+      if (createdActivity) {
+        setPlanForm((current) =>
+          current.activities.some(
+            (item) => item.activity_id === createdActivity.id,
+          )
+            ? current
+            : {
+                ...current,
+                activities: [
+                  ...current.activities,
+                  {
+                    activity_id: createdActivity.id,
+                    weekly_class_limit:
+                      current.plan_type === 'weekly' ? '1' : '',
+                    monthly_credits: '',
+                  },
+                ],
+              },
+        )
+      }
+
+      setActivityForm(emptyActivityForm)
+      setActivityFormOpen(false)
+      setSuccess(
+        'Actividad principal creada. Ya podes asociarla a un plan.',
+      )
+    } catch (createError) {
+      setError(formatAdminError(createError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function requestDeleteActivity(activity: Activity | null) {
+    if (!activity) {
+      return
+    }
+
+    setError(null)
+    setSuccess(null)
+    setActivityDeleteTarget(activity)
+    setActivityDeleteConfirmation('')
+  }
+
+  async function handleDeleteActivity() {
+    if (!activityDeleteTarget || activityDeleteConfirmation !== 'ELIMINAR') {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deleteActivity(activityDeleteTarget.id)
+      setPlanForm((current) => ({
+        ...current,
+        activities: current.activities.filter(
+          (item) => item.activity_id !== activityDeleteTarget.id,
+        ),
+      }))
+      setActivityDeleteTarget(null)
+      setActivityDeleteConfirmation('')
+      setSuccess('Actividad principal eliminada definitivamente.')
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function savePlan(input: PlanInput, planId: string | null) {
@@ -688,26 +856,42 @@ export function AdminPlansPage() {
             ) : null}
 
             <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-sm font-bold text-[var(--ink)]">
                     Actividades incluidas
                   </p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     Los planes solo indican que actividades incluye el alumno.
+                    Crear una actividad principal no crea horarios ni planes.
                   </p>
                 </div>
-                <button
-                  className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
-                  onClick={addPlanActivity}
-                  type="button"
-                >
-                  Agregar
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold"
+                    onClick={addPlanActivity}
+                    type="button"
+                  >
+                    Agregar actividad al plan
+                  </button>
+                  <button
+                    className="rounded-2xl bg-[var(--brand)] px-3 py-2 text-xs font-bold text-white transition hover:brightness-95"
+                    onClick={() => {
+                      setActivityForm(emptyActivityForm)
+                      setActivityFormOpen(true)
+                      setError(null)
+                      setSuccess(null)
+                    }}
+                    type="button"
+                  >
+                    Crear nueva actividad principal
+                  </button>
+                </div>
               </div>
               {planForm.activities.length === 0 ? (
                 <p className="text-xs text-[var(--muted)]">
-                  Agrega actividades para planes por periodo o paquetes.
+                  Este plan no tiene actividades incluidas. No habilitara
+                  reservas hasta que agregues al menos una actividad.
                 </p>
               ) : null}
               {planForm.activities.map((item, index) => (
@@ -772,13 +956,25 @@ export function AdminPlansPage() {
                             />
                           </label>
                         )}
-                        <button
-                          className="justify-self-start rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
-                          onClick={() => removePlanActivity(index)}
-                          type="button"
-                        >
-                          Quitar actividad
-                        </button>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold text-[var(--ink)]"
+                            onClick={() => removePlanActivity(index)}
+                            type="button"
+                          >
+                            Quitar actividad del plan
+                          </button>
+                          <button
+                            className="rounded-2xl border border-[var(--accent)] px-3 py-2 text-xs font-bold text-[var(--accent)]"
+                            disabled={!selectedPlanActivity}
+                            onClick={() =>
+                              requestDeleteActivity(selectedPlanActivity)
+                            }
+                            type="button"
+                          >
+                            Eliminar actividad principal
+                          </button>
+                        </div>
                       </>
                     )
                   })()}
@@ -874,6 +1070,187 @@ export function AdminPlansPage() {
           </p>
         ) : null}
       </aside>
+      {activityFormOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <form
+            className="w-full max-w-xl rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl"
+            onSubmit={handleCreateActivity}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--brand)]">
+              Actividad principal
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Crear nueva actividad principal
+            </h3>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Usá esto cuando el plan necesita un tipo de clase nuevo, por
+              ejemplo Programa Kids. Esto no crea horarios, clases recurrentes
+              ni planes.
+            </p>
+            <div className="mt-5 grid gap-3">
+              <label className="text-sm font-semibold">
+                Nombre
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      name: event.target.value,
+                    })
+                  }
+                  placeholder="Programa Kids"
+                  value={activityForm.name}
+                />
+              </label>
+              <label className="text-sm font-semibold">
+                Descripcion
+                <textarea
+                  className="mt-2 min-h-20 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      description: event.target.value,
+                    })
+                  }
+                  value={activityForm.description}
+                />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="text-sm font-semibold">
+                  Color
+                  <input
+                    className="mt-2 h-12 w-full rounded-2xl border border-[var(--line)] bg-white px-2 py-1"
+                    onChange={(event) =>
+                      setActivityForm({
+                        ...activityForm,
+                        color_hex: event.target.value,
+                      })
+                    }
+                    type="color"
+                    value={activityForm.color_hex}
+                  />
+                </label>
+                <label className="text-sm font-semibold">
+                  Cupo predeterminado
+                  <input
+                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    min="1"
+                    onChange={(event) =>
+                      setActivityForm({
+                        ...activityForm,
+                        default_capacity: event.target.value,
+                      })
+                    }
+                    type="number"
+                    value={activityForm.default_capacity}
+                  />
+                </label>
+                <label className="text-sm font-semibold">
+                  Cupo maximo
+                  <input
+                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                    min="1"
+                    onChange={(event) =>
+                      setActivityForm({
+                        ...activityForm,
+                        max_capacity: event.target.value,
+                      })
+                    }
+                    placeholder="Opcional"
+                    type="number"
+                    value={activityForm.max_capacity}
+                  />
+                </label>
+              </div>
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={activityForm.active}
+                  onChange={(event) =>
+                    setActivityForm({
+                      ...activityForm,
+                      active: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Actividad activa
+              </label>
+            </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
+                disabled={saving}
+                onClick={() => {
+                  setActivityFormOpen(false)
+                  setActivityForm(emptyActivityForm)
+                }}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-2xl bg-[var(--brand)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                disabled={saving}
+                type="submit"
+              >
+                {saving ? 'Creando...' : 'Crear actividad'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+      {activityDeleteTarget ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
+              Eliminacion definitiva
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Eliminar actividad principal
+            </h3>
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              Esta accion eliminara definitivamente esta actividad principal y
+              sus datos operativos relacionados. Se quitara de los planes que la
+              usen y no se podra deshacer. No se borraran alumnos, pagos,
+              membresias ni planes. Para confirmar, escribi ELIMINAR.
+            </p>
+            <p className="mt-3 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm font-semibold text-[var(--accent)]">
+              {activityDeleteTarget.name}
+            </p>
+            <label className="mt-4 block text-sm font-semibold">
+              Escribi ELIMINAR para confirmar
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                onChange={(event) =>
+                  setActivityDeleteConfirmation(event.target.value)
+                }
+                value={activityDeleteConfirmation}
+              />
+            </label>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
+                disabled={saving}
+                onClick={() => {
+                  setActivityDeleteTarget(null)
+                  setActivityDeleteConfirmation('')
+                }}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                disabled={saving || activityDeleteConfirmation !== 'ELIMINAR'}
+                onClick={() => void handleDeleteActivity()}
+                type="button"
+              >
+                {saving ? 'Eliminando...' : 'Eliminar actividad'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {planDeleteTarget ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">

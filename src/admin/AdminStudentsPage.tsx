@@ -80,6 +80,9 @@ type PaymentFormState = {
   amount: string
   method: PaymentMethod
   payment_date: string
+  membership_start_date: string
+  validity_days: string
+  membership_end_date: string
   notes: string
 }
 
@@ -163,6 +166,15 @@ function addDays(dateValue: string, days: number) {
   const date = new Date(`${dateValue}T00:00:00`)
   date.setDate(date.getDate() + days)
   return formatLocalDate(date)
+}
+
+function paymentValidityFields(startDate: string, plan?: Plan | null) {
+  const days = plan?.billing_period_days ?? 30
+  return {
+    membership_start_date: startDate,
+    validity_days: String(days),
+    membership_end_date: addDays(startDate, days),
+  }
 }
 
 function formatLocalDate(date: Date) {
@@ -410,6 +422,7 @@ export function AdminStudentsPage() {
     amount: '',
     method: 'cash',
     payment_date: todayDate(),
+    ...paymentValidityFields(todayDate()),
     notes: '',
   })
   const [trainingNoteForm, setTrainingNoteForm] =
@@ -506,11 +519,19 @@ export function AdminStudentsPage() {
           program.student_id === nextSelected?.id &&
           program.status !== 'cancelled',
       )
-      setPaymentForm((current) => ({
-        ...current,
-        membership_id: firstProgram?.program_id ?? '',
-        payment_date: current.payment_date || todayDate(),
-      }))
+      const firstProgramPlan = firstProgram
+        ? nextPlans.find((plan) => plan.id === firstProgram.plan_id)
+        : null
+      setPaymentForm((current) => {
+        const nextPaymentDate = current.payment_date || todayDate()
+
+        return {
+          ...current,
+          membership_id: firstProgram?.program_id ?? '',
+          payment_date: nextPaymentDate,
+          ...paymentValidityFields(nextPaymentDate, firstProgramPlan),
+        }
+      })
       if (nextSelected) {
         const [nextNotes, nextFiles] = await Promise.all([
           listStudentTrainingNotes(nextSelected.id),
@@ -565,6 +586,7 @@ export function AdminStudentsPage() {
       membership_id: '',
       amount: '',
       payment_date: current.payment_date || todayDate(),
+      ...paymentValidityFields(current.payment_date || todayDate()),
       notes: '',
     }))
   }
@@ -590,11 +612,15 @@ export function AdminStudentsPage() {
       (program) =>
         program.student_id === student.id && program.status !== 'cancelled',
     )
+    const firstProgramPlan = firstProgram
+      ? plansById.get(firstProgram.plan_id)
+      : null
     setSelectedStudentId(student.id)
     setEditForm(studentToEditForm(student))
     setPaymentForm((current) => ({
       ...current,
       membership_id: firstProgram?.program_id ?? '',
+      ...paymentValidityFields(current.payment_date || todayDate(), firstProgramPlan),
     }))
     setError(null)
     setSuccess(null)
@@ -896,6 +922,15 @@ export function AdminStudentsPage() {
       return
     }
 
+    if (
+      !paymentForm.membership_start_date ||
+      !paymentForm.membership_end_date ||
+      paymentForm.membership_end_date < paymentForm.membership_start_date
+    ) {
+      setError('La vigencia del programa no es valida.')
+      return
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -906,6 +941,8 @@ export function AdminStudentsPage() {
         amount,
         method: paymentForm.method,
         payment_date: paymentForm.payment_date,
+        membership_start_date: paymentForm.membership_start_date,
+        membership_end_date: paymentForm.membership_end_date,
         notes: paymentForm.notes,
       })
       setSuccess(
@@ -913,10 +950,18 @@ export function AdminStudentsPage() {
           ? `Pago registrado, pero el programa todavia no se activa porque falta ${moneyFormatter.format(paymentResult.pending_amount ?? 0)}.`
           : 'Pago registrado y programa activado.',
       )
+      const selectedPaymentPlanId = selectedStudentPrograms.find(
+        (program) => program.program_id === paymentForm.membership_id,
+      )?.plan_id
+      const nextPaymentDate = todayDate()
       setPaymentForm({
         ...paymentForm,
         amount: '',
-        payment_date: todayDate(),
+        payment_date: nextPaymentDate,
+        ...paymentValidityFields(
+          nextPaymentDate,
+          plansById.get(selectedPaymentPlanId ?? ''),
+        ),
         notes: '',
       })
       await loadData()
@@ -2527,12 +2572,19 @@ export function AdminStudentsPage() {
               <select
                 aria-label="Programa para pago manual"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextProgram = payableSelectedStudentPrograms.find(
+                    (program) => program.program_id === event.target.value,
+                  )
                   setPaymentForm({
                     ...paymentForm,
                     membership_id: event.target.value,
+                    ...paymentValidityFields(
+                      paymentForm.payment_date || todayDate(),
+                      plansById.get(nextProgram?.plan_id ?? ''),
+                    ),
                   })
-                }
+                }}
                 value={paymentForm.membership_id}
               >
                 <option value="">Seleccionar programa</option>
@@ -2560,15 +2612,72 @@ export function AdminStudentsPage() {
               <input
                 aria-label="Fecha del pago manual"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextDate = event.target.value
+                  const nextProgram = payableSelectedStudentPrograms.find(
+                    (program) => program.program_id === paymentForm.membership_id,
+                  )
                   setPaymentForm({
                     ...paymentForm,
-                    payment_date: event.target.value,
+                    payment_date: nextDate,
+                    ...paymentValidityFields(
+                      nextDate,
+                      plansById.get(nextProgram?.plan_id ?? ''),
+                    ),
                   })
-                }
+                }}
                 type="date"
                 value={paymentForm.payment_date}
               />
+              <div className="grid gap-3 md:grid-cols-3">
+                <input
+                  aria-label="Inicio de vigencia del programa"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) => {
+                    const nextStart = event.target.value
+                    setPaymentForm({
+                      ...paymentForm,
+                      membership_start_date: nextStart,
+                      membership_end_date: addDays(
+                        nextStart,
+                        Number(paymentForm.validity_days) || 0,
+                      ),
+                    })
+                  }}
+                  type="date"
+                  value={paymentForm.membership_start_date}
+                />
+                <input
+                  aria-label="Duracion de vigencia en dias"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  min="0"
+                  onChange={(event) => {
+                    const nextDays = event.target.value
+                    setPaymentForm({
+                      ...paymentForm,
+                      validity_days: nextDays,
+                      membership_end_date: addDays(
+                        paymentForm.membership_start_date,
+                        Number(nextDays) || 0,
+                      ),
+                    })
+                  }}
+                  type="number"
+                  value={paymentForm.validity_days}
+                />
+                <input
+                  aria-label="Fin de vigencia del programa"
+                  className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  onChange={(event) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      membership_end_date: event.target.value,
+                    })
+                  }
+                  type="date"
+                  value={paymentForm.membership_end_date}
+                />
+              </div>
               <select
                 aria-label="Metodo del pago manual"
                 className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"

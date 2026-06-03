@@ -40,6 +40,9 @@ type PaymentFormState = {
   amount: string
   method: PaymentMethod
   payment_date: string
+  membership_start_date: string
+  validity_days: string
+  membership_end_date: string
   notes: string
 }
 
@@ -48,6 +51,9 @@ type EditPaymentState = {
   amount: string
   method: PaymentMethod
   payment_date: string
+  membership_start_date: string
+  validity_days: string
+  membership_end_date: string
   notes: string
 }
 
@@ -68,6 +74,29 @@ function dateInputValue(value: string) {
   return value.slice(0, 10)
 }
 
+function addDays(dateValue: string, days: number) {
+  const date = new Date(`${dateValue}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function daysBetween(startDate: string, endDate: string) {
+  if (!startDate || !endDate || endDate < startDate) {
+    return ''
+  }
+
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+  return String(Math.round((end.getTime() - start.getTime()) / 86400000))
+}
+
+function defaultValidityEnd(startDate: string, plan?: Plan | null) {
+  return addDays(startDate, plan?.billing_period_days ?? 30)
+}
+
 function describeMembership(membership: Membership, plan?: Plan | null) {
   const classes = (() => {
     if (plan?.plan_type === 'weekly') {
@@ -76,8 +105,8 @@ function describeMembership(membership: Membership, plan?: Plan | null) {
       }, 0)
 
       return weeklyTotal > 0
-        ? `${weeklyTotal} clases por periodo`
-        : 'limite del periodo pendiente'
+        ? `${weeklyTotal} clases por semana`
+        : 'limite semanal pendiente'
     }
 
     if (membership.remaining_credits === null) {
@@ -88,7 +117,7 @@ function describeMembership(membership: Membership, plan?: Plan | null) {
   })()
   const price = plan ? ` · ${moneyFormatter.format(plan.price)}` : ''
 
-  return `${plan?.name ?? 'Plan'}${price} · ${classes} · ${membership.start_date} a ${membership.end_date}`
+  return `${plan?.name ?? 'Plan'}${price} · ${classes} · Vigencia ${membership.start_date} a ${membership.end_date}`
 }
 
 export function AdminPaymentsPage() {
@@ -103,6 +132,9 @@ export function AdminPaymentsPage() {
     amount: '',
     method: 'cash',
     payment_date: todayDate(),
+    membership_start_date: todayDate(),
+    validity_days: '30',
+    membership_end_date: addDays(todayDate(), 30),
     notes: '',
   })
   const [voidReason, setVoidReason] = useState<Record<string, string>>({})
@@ -137,6 +169,34 @@ export function AdminPaymentsPage() {
   const studentMemberships = memberships.filter(
     (membership) => membership.student_id === form.student_id,
   )
+  const selectedFormMembership = form.membership_id
+    ? membershipsById.get(form.membership_id)
+    : null
+  const selectedFormPlan = selectedFormMembership
+    ? plansById.get(selectedFormMembership.plan_id)
+    : null
+
+  function nextValidityFromStart(
+    startDate: string,
+    plan?: Plan | null,
+    validityDays = String(plan?.billing_period_days ?? 30),
+  ) {
+    const days = Number(validityDays)
+    const safeDays =
+      Number.isFinite(days) && days >= 0 ? days : plan?.billing_period_days ?? 30
+    return {
+      membership_start_date: startDate,
+      validity_days: String(safeDays),
+      membership_end_date: addDays(startDate, safeDays),
+    }
+  }
+
+  function paymentValidityLabel(payment: Payment, membership?: Membership | null) {
+    const start = payment.membership_start_date ?? membership?.start_date ?? null
+    const end = payment.membership_end_date ?? membership?.end_date ?? null
+
+    return start && end ? `${start} a ${end}` : 'Sin vigencia cargada'
+  }
 
   async function loadData(nextFilter = filter) {
     setLoading(true)
@@ -158,10 +218,15 @@ export function AdminPaymentsPage() {
         const firstMembership = nextMemberships.find(
           (membership) => membership.student_id === nextStudents[0].id,
         )
+        const firstPlan = firstMembership
+          ? nextPlans.find((plan) => plan.id === firstMembership.plan_id)
+          : null
+        const nextStart = todayDate()
         setForm((current) => ({
           ...current,
           student_id: nextStudents[0].id,
           membership_id: firstMembership?.id ?? '',
+          ...nextValidityFromStart(nextStart, firstPlan),
         }))
       }
     } catch (loadError) {
@@ -183,10 +248,22 @@ export function AdminPaymentsPage() {
     const firstMembership = memberships.find(
       (membership) => membership.student_id === studentId,
     )
+    const plan = firstMembership ? plansById.get(firstMembership.plan_id) : null
     setForm({
       ...form,
       student_id: studentId,
       membership_id: firstMembership?.id ?? '',
+      ...nextValidityFromStart(form.payment_date || todayDate(), plan),
+    })
+  }
+
+  function handleMembershipChange(membershipId: string) {
+    const membership = membershipsById.get(membershipId)
+    const plan = membership ? plansById.get(membership.plan_id) : null
+    setForm({
+      ...form,
+      membership_id: membershipId,
+      ...nextValidityFromStart(form.payment_date || todayDate(), plan),
     })
   }
 
@@ -204,6 +281,15 @@ export function AdminPaymentsPage() {
       return
     }
 
+    if (
+      !form.membership_start_date ||
+      !form.membership_end_date ||
+      form.membership_end_date < form.membership_start_date
+    ) {
+      setError('La vigencia del programa no es valida.')
+      return
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -214,6 +300,8 @@ export function AdminPaymentsPage() {
         amount,
         method: form.method,
         payment_date: form.payment_date,
+        membership_start_date: form.membership_start_date,
+        membership_end_date: form.membership_end_date,
         notes: form.notes,
       })
       setSuccess(
@@ -221,7 +309,14 @@ export function AdminPaymentsPage() {
           ? `Pago registrado, pero el programa todavia no se activa porque falta ${moneyFormatter.format(paymentResult.pending_amount ?? 0)}.`
           : 'Pago registrado y programa activado.',
       )
-      setForm({ ...form, amount: '', payment_date: todayDate(), notes: '' })
+      const nextStart = todayDate()
+      setForm({
+        ...form,
+        amount: '',
+        payment_date: nextStart,
+        notes: '',
+        ...nextValidityFromStart(nextStart, selectedFormPlan),
+      })
       await loadData(filter)
     } catch (saveError) {
       setError(formatAdminError(saveError))
@@ -231,11 +326,26 @@ export function AdminPaymentsPage() {
   }
 
   function startEditPayment(payment: Payment) {
+    const membership = payment.membership_id
+      ? membershipsById.get(payment.membership_id)
+      : null
+    const startDate =
+      payment.membership_start_date ??
+      membership?.start_date ??
+      dateInputValue(payment.paid_at)
+    const endDate =
+      payment.membership_end_date ??
+      membership?.end_date ??
+      defaultValidityEnd(startDate, membership ? plansById.get(membership.plan_id) : null)
+
     setEditingPayment({
       payment_id: payment.id,
       amount: String(payment.amount),
       method: payment.method,
       payment_date: dateInputValue(payment.paid_at),
+      membership_start_date: startDate,
+      validity_days: daysBetween(startDate, endDate),
+      membership_end_date: endDate,
       notes: payment.notes ?? '',
     })
   }
@@ -257,6 +367,15 @@ export function AdminPaymentsPage() {
       return
     }
 
+    if (
+      !editingPayment.membership_start_date ||
+      !editingPayment.membership_end_date ||
+      editingPayment.membership_end_date < editingPayment.membership_start_date
+    ) {
+      setError('La vigencia del programa no es valida.')
+      return
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -266,6 +385,8 @@ export function AdminPaymentsPage() {
         amount,
         method: editingPayment.method,
         payment_date: editingPayment.payment_date,
+        membership_start_date: editingPayment.membership_start_date,
+        membership_end_date: editingPayment.membership_end_date,
         notes: editingPayment.notes,
       })
       setSuccess('Pago actualizado con auditoria.')
@@ -416,9 +537,14 @@ export function AdminPaymentsPage() {
                           : 'Transferencia'}
                       </p>
                       {membership ? (
-                        <p className="mt-1 text-xs text-[var(--muted)]">
-                          {describeMembership(membership, plan)}
-                        </p>
+                        <div className="mt-1 grid gap-1 text-xs text-[var(--muted)]">
+                          <p>{describeMembership(membership, plan)}</p>
+                          <p>
+                            Pago: {dateInputValue(payment.paid_at)} · Vigencia
+                            del programa:{' '}
+                            {paymentValidityLabel(payment, membership)}
+                          </p>
+                        </div>
                       ) : null}
                       <p className="mt-2 text-xs text-[var(--muted)]">
                         Nota/comprobante:{' '}
@@ -430,8 +556,9 @@ export function AdminPaymentsPage() {
                         </p>
                       ) : payment.status === 'approved' && payment.membership_id ? (
                         <p className="mt-2 text-xs text-[var(--muted)]">
-                          Si este pago se anula, la membresia vinculada no se
-                          elimina automaticamente.
+                          Si este pago se anula, el programa vinculado se
+                          recalcula. Si queda sin pago completo, se suspende y
+                          cancela reservas futuras activas.
                         </p>
                       ) : null}
                     </div>
@@ -451,8 +578,8 @@ export function AdminPaymentsPage() {
                       onSubmit={handleUpdatePayment}
                     >
                       <p className="text-sm font-bold text-[var(--ink)]">
-                        Editar corrige los datos administrativos del pago y deja
-                        auditoria.
+                        Editar estos datos recalcula la vigencia y el estado de
+                        la membresia vinculada.
                       </p>
                       <div className="grid gap-3 md:grid-cols-3">
                         <label className="text-sm font-semibold">
@@ -500,6 +627,66 @@ export function AdminPaymentsPage() {
                             <option value="cash">Efectivo</option>
                             <option value="transfer">Transferencia</option>
                           </select>
+                        </label>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <label className="text-sm font-semibold">
+                          Inicio de vigencia
+                          <input
+                            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                            onChange={(event) => {
+                              const nextStart = event.target.value
+                              setEditingPayment({
+                                ...editingPayment,
+                                membership_start_date: nextStart,
+                                membership_end_date: addDays(
+                                  nextStart,
+                                  Number(editingPayment.validity_days) || 0,
+                                ),
+                              })
+                            }}
+                            type="date"
+                            value={editingPayment.membership_start_date}
+                          />
+                        </label>
+                        <label className="text-sm font-semibold">
+                          Duracion en dias
+                          <input
+                            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                            min="0"
+                            onChange={(event) => {
+                              const nextDays = event.target.value
+                              setEditingPayment({
+                                ...editingPayment,
+                                validity_days: nextDays,
+                                membership_end_date: addDays(
+                                  editingPayment.membership_start_date,
+                                  Number(nextDays) || 0,
+                                ),
+                              })
+                            }}
+                            type="number"
+                            value={editingPayment.validity_days}
+                          />
+                        </label>
+                        <label className="text-sm font-semibold">
+                          Fin de vigencia
+                          <input
+                            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                            onChange={(event) => {
+                              const nextEnd = event.target.value
+                              setEditingPayment({
+                                ...editingPayment,
+                                membership_end_date: nextEnd,
+                                validity_days: daysBetween(
+                                  editingPayment.membership_start_date,
+                                  nextEnd,
+                                ),
+                              })
+                            }}
+                            type="date"
+                            value={editingPayment.membership_end_date}
+                          />
                         </label>
                       </div>
                       <label className="text-sm font-semibold">
@@ -611,6 +798,10 @@ export function AdminPaymentsPage() {
           Solo efectivo o transferencia. El comprobante por WhatsApp o en
           persona queda registrado como nota.
         </p>
+        <p className="mt-2 rounded-2xl bg-[var(--brand-soft)] px-3 py-2 text-xs font-semibold text-[var(--brand)]">
+          El pago habilita el programa desde la fecha de inicio hasta la fecha
+          de fin indicada.
+        </p>
 
         <form className="mt-5 grid gap-4" onSubmit={handleCreatePayment}>
           <div>
@@ -641,9 +832,7 @@ export function AdminPaymentsPage() {
             <select
               className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
               id="payment-membership"
-              onChange={(event) =>
-                setForm({ ...form, membership_id: event.target.value })
-              }
+              onChange={(event) => handleMembershipChange(event.target.value)}
               value={form.membership_id}
             >
               <option value="">Seleccionar membresia</option>
@@ -684,9 +873,14 @@ export function AdminPaymentsPage() {
               <input
                 className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 id="payment-date"
-                onChange={(event) =>
-                  setForm({ ...form, payment_date: event.target.value })
-                }
+                onChange={(event) => {
+                  const nextDate = event.target.value
+                  setForm({
+                    ...form,
+                    payment_date: nextDate,
+                    ...nextValidityFromStart(nextDate, selectedFormPlan),
+                  })
+                }}
                 type="date"
                 value={form.payment_date}
               />
@@ -709,6 +903,84 @@ export function AdminPaymentsPage() {
                 <option value="cash">Efectivo</option>
                 <option value="transfer">Transferencia</option>
               </select>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label
+                className="text-sm font-semibold"
+                htmlFor="payment-validity-start"
+              >
+                Inicio de vigencia
+              </label>
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                id="payment-validity-start"
+                onChange={(event) => {
+                  const nextStart = event.target.value
+                  setForm({
+                    ...form,
+                    membership_start_date: nextStart,
+                    membership_end_date: addDays(
+                      nextStart,
+                      Number(form.validity_days) || 0,
+                    ),
+                  })
+                }}
+                type="date"
+                value={form.membership_start_date}
+              />
+            </div>
+            <div>
+              <label
+                className="text-sm font-semibold"
+                htmlFor="payment-validity-days"
+              >
+                Duracion en dias
+              </label>
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                id="payment-validity-days"
+                min="0"
+                onChange={(event) => {
+                  const nextDays = event.target.value
+                  setForm({
+                    ...form,
+                    validity_days: nextDays,
+                    membership_end_date: addDays(
+                      form.membership_start_date,
+                      Number(nextDays) || 0,
+                    ),
+                  })
+                }}
+                type="number"
+                value={form.validity_days}
+              />
+            </div>
+            <div>
+              <label
+                className="text-sm font-semibold"
+                htmlFor="payment-validity-end"
+              >
+                Fin de vigencia
+              </label>
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                id="payment-validity-end"
+                onChange={(event) => {
+                  const nextEnd = event.target.value
+                  setForm({
+                    ...form,
+                    membership_end_date: nextEnd,
+                    validity_days: daysBetween(
+                      form.membership_start_date,
+                      nextEnd,
+                    ),
+                  })
+                }}
+                type="date"
+                value={form.membership_end_date}
+              />
             </div>
           </div>
           <div>

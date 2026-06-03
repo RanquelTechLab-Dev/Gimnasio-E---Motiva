@@ -50,9 +50,8 @@ stable
 security definer
 set search_path = public, private
 as $$
-  select coalesce(m.required_amount, p.price, 0)::numeric(12, 2)
+  select m.required_amount::numeric(12, 2)
   from public.memberships m
-  join public.plans p on p.id = m.plan_id
   where m.id = p_membership_id;
 $$;
 
@@ -100,8 +99,8 @@ set search_path = public, private
 as $$
   select coalesce(
     p_payment.membership_end_date,
-    private.payment_validity_start(p_payment, p_default_date)
-      + greatest(coalesce(p_plan.billing_period_days, 30), 0),
+    (private.payment_validity_start(p_payment, p_default_date)
+      + interval '1 month')::date,
     p_default_date
   );
 $$;
@@ -157,6 +156,10 @@ begin
   end if;
 
   v_required_amount := private.membership_required_amount(v_membership.id);
+  if v_required_amount is null then
+    raise exception 'El programa no tiene monto congelado requerido.';
+  end if;
+
   v_approved_paid_total := private.membership_approved_paid_total(v_membership.id);
   v_pending_amount := greatest(v_required_amount - v_approved_paid_total, 0)::numeric(12, 2);
   v_is_fully_paid := v_approved_paid_total >= v_required_amount;
@@ -422,7 +425,7 @@ begin
   v_period_start := coalesce(register_manual_payment.membership_start_date, register_manual_payment.payment_date);
   v_period_end := coalesce(
     register_manual_payment.membership_end_date,
-    v_period_start + greatest(coalesce(v_plan.billing_period_days, 30), 0)
+    (v_period_start + interval '1 month')::date
   );
 
   if v_period_end < v_period_start then
@@ -431,6 +434,10 @@ begin
 
   v_paid_at := (payment_date::timestamp + time '12:00') at time zone 'UTC';
   v_required_amount := private.membership_required_amount(v_membership.id);
+  if v_required_amount is null then
+    raise exception 'El programa no tiene monto congelado requerido.';
+  end if;
+
   v_previous_approved_total := private.membership_approved_paid_total(v_membership.id);
   v_was_fully_paid := v_previous_approved_total >= v_required_amount;
   v_approved_paid_total := (v_previous_approved_total + register_manual_payment.amount)::numeric(12, 2);

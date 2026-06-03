@@ -33,6 +33,7 @@ const statusLabels: Record<PaymentStatus, string> = {
 }
 
 type PaymentFilter = PaymentStatus | 'all'
+type PaymentValidityMode = 'monthly' | 'manual'
 
 type PaymentFormState = {
   student_id: string
@@ -41,6 +42,7 @@ type PaymentFormState = {
   method: PaymentMethod
   payment_date: string
   membership_start_date: string
+  validity_mode: PaymentValidityMode
   validity_days: string
   membership_end_date: string
   notes: string
@@ -52,6 +54,7 @@ type EditPaymentState = {
   method: PaymentMethod
   payment_date: string
   membership_start_date: string
+  validity_mode: PaymentValidityMode
   validity_days: string
   membership_end_date: string
   notes: string
@@ -74,27 +77,93 @@ function dateInputValue(value: string) {
   return value.slice(0, 10)
 }
 
-function addDays(dateValue: string, days: number) {
-  const date = new Date(`${dateValue}T00:00:00`)
-  date.setDate(date.getDate() + days)
+function formatDateValue(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
-function daysBetween(startDate: string, endDate: string) {
+function parseDateValue(dateValue: string) {
+  const [year, month, day] = dateValue.split('-').map(Number)
+
+  if (!year || !month || !day) {
+    return null
+  }
+
+  return new Date(year, month - 1, day)
+}
+
+function addMonthsSameDayInclusive(startDate: string, months = 1) {
+  const start = parseDateValue(startDate)
+
+  if (!start) {
+    return startDate
+  }
+
+  const targetMonthIndex = start.getMonth() + months
+  const lastTargetDay = new Date(
+    start.getFullYear(),
+    targetMonthIndex + 1,
+    0,
+  ).getDate()
+  const targetDay = Math.min(start.getDate(), lastTargetDay)
+
+  return formatDateValue(
+    new Date(start.getFullYear(), targetMonthIndex, targetDay),
+  )
+}
+
+function addIncludedDays(startDate: string, includedDays: number) {
+  const start = parseDateValue(startDate)
+
+  if (!start) {
+    return startDate
+  }
+
+  const safeDays = Math.max(1, Math.floor(includedDays))
+  start.setDate(start.getDate() + safeDays - 1)
+  return formatDateValue(start)
+}
+
+function includedDaysBetween(startDate: string, endDate: string) {
   if (!startDate || !endDate || endDate < startDate) {
     return ''
   }
 
-  const start = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T00:00:00`)
-  return String(Math.round((end.getTime() - start.getTime()) / 86400000))
+  const start = parseDateValue(startDate)
+  const end = parseDateValue(endDate)
+
+  if (!start || !end) {
+    return ''
+  }
+
+  return String(Math.round((end.getTime() - start.getTime()) / 86400000) + 1)
 }
 
 function defaultValidityEnd(startDate: string, plan?: Plan | null) {
-  return addDays(startDate, plan?.billing_period_days ?? 30)
+  return plan?.billing_period_days
+    ? addIncludedDays(startDate, plan.billing_period_days)
+    : addMonthsSameDayInclusive(startDate)
+}
+
+function endForValidityMode(
+  startDate: string,
+  mode: PaymentValidityMode,
+  includedDays: string,
+) {
+  return mode === 'monthly'
+    ? addMonthsSameDayInclusive(startDate)
+    : addIncludedDays(startDate, Number(includedDays) || 1)
+}
+
+function validityCopy(startDate: string, endDate: string, mode: PaymentValidityMode) {
+  if (mode === 'monthly') {
+    return `Vigencia mensual: incluye desde ${startDate} hasta ${endDate} inclusive.`
+  }
+
+  const days = includedDaysBetween(startDate, endDate)
+  return `Vigencia manual: ${days || '0'} dias incluidos.`
 }
 
 function describeMembership(membership: Membership, plan?: Plan | null) {
@@ -133,8 +202,9 @@ export function AdminPaymentsPage() {
     method: 'cash',
     payment_date: todayDate(),
     membership_start_date: todayDate(),
+    validity_mode: 'monthly',
     validity_days: '30',
-    membership_end_date: addDays(todayDate(), 30),
+    membership_end_date: addMonthsSameDayInclusive(todayDate()),
     notes: '',
   })
   const [voidReason, setVoidReason] = useState<Record<string, string>>({})
@@ -179,15 +249,21 @@ export function AdminPaymentsPage() {
   function nextValidityFromStart(
     startDate: string,
     plan?: Plan | null,
+    mode: PaymentValidityMode = 'monthly',
     validityDays = String(plan?.billing_period_days ?? 30),
   ) {
     const days = Number(validityDays)
-    const safeDays =
-      Number.isFinite(days) && days >= 0 ? days : plan?.billing_period_days ?? 30
+    const safeDays = Number.isFinite(days) && days > 0
+      ? Math.floor(days)
+      : plan?.billing_period_days ?? 30
     return {
       membership_start_date: startDate,
+      validity_mode: mode,
       validity_days: String(safeDays),
-      membership_end_date: addDays(startDate, safeDays),
+      membership_end_date:
+        mode === 'monthly'
+          ? addMonthsSameDayInclusive(startDate)
+          : addIncludedDays(startDate, safeDays),
     }
   }
 
@@ -195,7 +271,9 @@ export function AdminPaymentsPage() {
     const start = payment.membership_start_date ?? membership?.start_date ?? null
     const end = payment.membership_end_date ?? membership?.end_date ?? null
 
-    return start && end ? `${start} a ${end}` : 'Sin vigencia cargada'
+    return start && end
+      ? `${start} a ${end} inclusive`
+      : 'Sin vigencia cargada'
   }
 
   async function loadData(nextFilter = filter) {
@@ -337,6 +415,8 @@ export function AdminPaymentsPage() {
       payment.membership_end_date ??
       membership?.end_date ??
       defaultValidityEnd(startDate, membership ? plansById.get(membership.plan_id) : null)
+    const inferredValidityMode: PaymentValidityMode =
+      endDate === addMonthsSameDayInclusive(startDate) ? 'monthly' : 'manual'
 
     setEditingPayment({
       payment_id: payment.id,
@@ -344,7 +424,8 @@ export function AdminPaymentsPage() {
       method: payment.method,
       payment_date: dateInputValue(payment.paid_at),
       membership_start_date: startDate,
-      validity_days: daysBetween(startDate, endDate),
+      validity_mode: inferredValidityMode,
+      validity_days: includedDaysBetween(startDate, endDate),
       membership_end_date: endDate,
       notes: payment.notes ?? '',
     })
@@ -578,8 +659,8 @@ export function AdminPaymentsPage() {
                       onSubmit={handleUpdatePayment}
                     >
                       <p className="text-sm font-bold text-[var(--ink)]">
-                        Editar estos datos recalcula la vigencia y el estado de
-                        la membresia vinculada.
+                        Editar estos datos recalcula el estado y la vigencia
+                        del programa vinculado.
                       </p>
                       <div className="grid gap-3 md:grid-cols-3">
                         <label className="text-sm font-semibold">
@@ -629,7 +710,7 @@ export function AdminPaymentsPage() {
                           </select>
                         </label>
                       </div>
-                      <div className="grid gap-3 md:grid-cols-3">
+                      <div className="grid gap-3 md:grid-cols-4">
                         <label className="text-sm font-semibold">
                           Inicio de vigencia
                           <input
@@ -639,9 +720,10 @@ export function AdminPaymentsPage() {
                               setEditingPayment({
                                 ...editingPayment,
                                 membership_start_date: nextStart,
-                                membership_end_date: addDays(
+                                membership_end_date: endForValidityMode(
                                   nextStart,
-                                  Number(editingPayment.validity_days) || 0,
+                                  editingPayment.validity_mode,
+                                  editingPayment.validity_days,
                                 ),
                               })
                             }}
@@ -650,35 +732,65 @@ export function AdminPaymentsPage() {
                           />
                         </label>
                         <label className="text-sm font-semibold">
-                          Duracion en dias
-                          <input
+                          Tipo de vigencia
+                          <select
                             className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
-                            min="0"
                             onChange={(event) => {
-                              const nextDays = event.target.value
+                              const nextMode = event.target
+                                .value as PaymentValidityMode
                               setEditingPayment({
                                 ...editingPayment,
-                                validity_days: nextDays,
-                                membership_end_date: addDays(
+                                validity_mode: nextMode,
+                                membership_end_date: endForValidityMode(
                                   editingPayment.membership_start_date,
-                                  Number(nextDays) || 0,
+                                  nextMode,
+                                  editingPayment.validity_days,
                                 ),
                               })
                             }}
-                            type="number"
-                            value={editingPayment.validity_days}
-                          />
+                            value={editingPayment.validity_mode}
+                          >
+                            <option value="monthly">
+                              Mensual: mismo dia siguiente inclusive
+                            </option>
+                            <option value="manual">
+                              Manual: dias incluidos exactos
+                            </option>
+                          </select>
                         </label>
+                        {editingPayment.validity_mode === 'manual' ? (
+                          <label className="text-sm font-semibold">
+                            Dias incluidos
+                            <input
+                              className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
+                              min="1"
+                              onChange={(event) => {
+                                const nextDays = event.target.value
+                                setEditingPayment({
+                                  ...editingPayment,
+                                  validity_days: nextDays,
+                                  membership_end_date: addIncludedDays(
+                                    editingPayment.membership_start_date,
+                                    Number(nextDays) || 1,
+                                  ),
+                                })
+                              }}
+                              type="number"
+                              value={editingPayment.validity_days}
+                            />
+                          </label>
+                        ) : null}
                         <label className="text-sm font-semibold">
-                          Fin de vigencia
+                          Fin de vigencia inclusive
                           <input
                             className="mt-2 w-full rounded-2xl border border-[var(--line)] px-4 py-2 text-sm"
                             onChange={(event) => {
                               const nextEnd = event.target.value
                               setEditingPayment({
                                 ...editingPayment,
+                                validity_mode: 'manual',
                                 membership_end_date: nextEnd,
-                                validity_days: daysBetween(
+                                validity_days: includedDaysBetween(
                                   editingPayment.membership_start_date,
                                   nextEnd,
                                 ),
@@ -689,6 +801,13 @@ export function AdminPaymentsPage() {
                           />
                         </label>
                       </div>
+                      <p className="rounded-2xl bg-[var(--brand-soft)] px-3 py-2 text-xs font-semibold text-[var(--brand)]">
+                        {validityCopy(
+                          editingPayment.membership_start_date,
+                          editingPayment.membership_end_date,
+                          editingPayment.validity_mode,
+                        )}
+                      </p>
                       <label className="text-sm font-semibold">
                         Nota / comprobante
                         <textarea
@@ -800,7 +919,7 @@ export function AdminPaymentsPage() {
         </p>
         <p className="mt-2 rounded-2xl bg-[var(--brand-soft)] px-3 py-2 text-xs font-semibold text-[var(--brand)]">
           El pago habilita el programa desde la fecha de inicio hasta la fecha
-          de fin indicada.
+          de fin indicada, con el dia final incluido.
         </p>
 
         <form className="mt-5 grid gap-4" onSubmit={handleCreatePayment}>
@@ -878,7 +997,12 @@ export function AdminPaymentsPage() {
                   setForm({
                     ...form,
                     payment_date: nextDate,
-                    ...nextValidityFromStart(nextDate, selectedFormPlan),
+                    ...nextValidityFromStart(
+                      nextDate,
+                      selectedFormPlan,
+                      form.validity_mode,
+                      form.validity_days,
+                    ),
                   })
                 }}
                 type="date"
@@ -905,7 +1029,7 @@ export function AdminPaymentsPage() {
               </select>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label
                 className="text-sm font-semibold"
@@ -921,9 +1045,10 @@ export function AdminPaymentsPage() {
                   setForm({
                     ...form,
                     membership_start_date: nextStart,
-                    membership_end_date: addDays(
+                    membership_end_date: endForValidityMode(
                       nextStart,
-                      Number(form.validity_days) || 0,
+                      form.validity_mode,
+                      form.validity_days,
                     ),
                   })
                 }}
@@ -934,35 +1059,71 @@ export function AdminPaymentsPage() {
             <div>
               <label
                 className="text-sm font-semibold"
-                htmlFor="payment-validity-days"
+                htmlFor="payment-validity-mode"
               >
-                Duracion en dias
+                Tipo de vigencia
               </label>
-              <input
+              <select
                 className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                id="payment-validity-days"
-                min="0"
+                id="payment-validity-mode"
                 onChange={(event) => {
-                  const nextDays = event.target.value
+                  const nextMode = event.target.value as PaymentValidityMode
                   setForm({
                     ...form,
-                    validity_days: nextDays,
-                    membership_end_date: addDays(
+                    validity_mode: nextMode,
+                    membership_end_date: endForValidityMode(
                       form.membership_start_date,
-                      Number(nextDays) || 0,
+                      nextMode,
+                      form.validity_days,
                     ),
                   })
                 }}
-                type="number"
-                value={form.validity_days}
-              />
+                value={form.validity_mode}
+              >
+                <option value="monthly">
+                  Mensual: mismo dia siguiente inclusive
+                </option>
+                <option value="manual">
+                  Manual: dias incluidos exactos
+                </option>
+              </select>
             </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {form.validity_mode === 'manual' ? (
+              <div>
+                <label
+                  className="text-sm font-semibold"
+                  htmlFor="payment-validity-days"
+                >
+                  Dias incluidos
+                </label>
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                  id="payment-validity-days"
+                  min="1"
+                  onChange={(event) => {
+                    const nextDays = event.target.value
+                    setForm({
+                      ...form,
+                      validity_days: nextDays,
+                      membership_end_date: addIncludedDays(
+                        form.membership_start_date,
+                        Number(nextDays) || 1,
+                      ),
+                    })
+                  }}
+                  type="number"
+                  value={form.validity_days}
+                />
+              </div>
+            ) : null}
             <div>
               <label
                 className="text-sm font-semibold"
                 htmlFor="payment-validity-end"
               >
-                Fin de vigencia
+                Fin de vigencia inclusive
               </label>
               <input
                 className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
@@ -971,8 +1132,9 @@ export function AdminPaymentsPage() {
                   const nextEnd = event.target.value
                   setForm({
                     ...form,
+                    validity_mode: 'manual',
                     membership_end_date: nextEnd,
-                    validity_days: daysBetween(
+                    validity_days: includedDaysBetween(
                       form.membership_start_date,
                       nextEnd,
                     ),
@@ -983,6 +1145,13 @@ export function AdminPaymentsPage() {
               />
             </div>
           </div>
+          <p className="rounded-2xl bg-[var(--brand-soft)] px-3 py-2 text-xs font-semibold text-[var(--brand)]">
+            {validityCopy(
+              form.membership_start_date,
+              form.membership_end_date,
+              form.validity_mode,
+            )}
+          </p>
           <div>
             <label className="text-sm font-semibold" htmlFor="payment-notes">
               Nota / comprobante

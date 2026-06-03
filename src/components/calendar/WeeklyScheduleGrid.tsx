@@ -43,6 +43,7 @@ type WeeklyScheduleGridProps<TSession extends ScheduleSession> = {
   onSelectSession?: (session: TSession) => void
   onBookSession?: (session: TSession) => void
   onCancelBooking?: (session: TSession) => void
+  ignoreCancellationDeadline?: boolean
 }
 
 const activityTones = [
@@ -305,6 +306,7 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
   onSelectSession,
   onBookSession,
   onCancelBooking,
+  ignoreCancellationDeadline = false,
 }: WeeklyScheduleGridProps<TSession>) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const days = buildDays(fromDate, toDate)
@@ -461,7 +463,9 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
                         const status = getStatus(session, mode)
                         const selected = selectedSessionId === session.session_id
                         const busy = savingSessionId === session.session_id
-                        const cancelBlockReason = getCancelBlockReason(session)
+                        const cancelBlockReason = ignoreCancellationDeadline
+                          ? null
+                          : getCancelBlockReason(session)
                         const sessionDetail = getSessionDetail(session)
                         const sessionColorStyle = colorStyleForSession(session)
                         const planUsageLabel =

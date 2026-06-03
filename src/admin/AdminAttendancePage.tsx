@@ -18,6 +18,11 @@ import type {
   StudentProfile,
   StudentProgram,
 } from './types'
+import {
+  addLocalDays,
+  calendarDateRange,
+  formatLocalDate,
+} from '../lib/calendarRange'
 
 type AttendanceGroup = {
   session: AttendanceSessionRow
@@ -43,13 +48,6 @@ const correctionLabels: Record<AttendanceStatus, string> = {
   justified: 'Justificado historico',
 }
 
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 function validateDateRange(fromDate: string, toDate: string) {
   if (toDate < fromDate) {
     throw new Error('La fecha hasta no puede ser anterior a la fecha desde.')
@@ -61,12 +59,6 @@ function formatDateTime(value: string) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value))
-}
-
-function addDays(dateValue: string, days: number) {
-  const date = new Date(`${dateValue}T00:00:00`)
-  date.setDate(date.getDate() + days)
-  return formatLocalDate(date)
 }
 
 function studentFullName(student: StudentProfile) {
@@ -127,7 +119,7 @@ function groupRows(rows: AttendanceSessionRow[]) {
 
 export function AdminAttendancePage() {
   const today = useMemo(() => formatLocalDate(new Date()), [])
-  const weekEnd = useMemo(() => addDays(today, 6), [today])
+  const weekEnd = useMemo(() => addLocalDays(today, 6), [today])
   const [activeTab, setActiveTab] = useState<'attendance' | 'booking'>(
     'attendance',
   )
@@ -209,9 +201,10 @@ export function AdminAttendancePage() {
     setError(null)
     setSuccess(null)
     try {
+      const range = calendarDateRange(bookingFromDate, bookingToDate)
       const [programs, sessions] = await Promise.all([
         listStudentPrograms(studentId),
-        listCalendarSessionsForStudent(studentId, bookingFromDate, bookingToDate),
+        listCalendarSessionsForStudent(studentId, range.from, range.to),
       ])
       setStudentPrograms(programs)
       setStudentSessions(sessions)
@@ -397,6 +390,8 @@ export function AdminAttendancePage() {
               <p className="mt-2 text-sm text-[var(--muted)]">
                 Elegi un alumno para ver sus clases disponibles, reservar por el
                 y cancelar reservas activas sin iniciar sesion como alumno.
+                Admin respeta programa, pago, cupo y limite semanal, pero puede
+                operar clases pasadas cuando Carolina lo necesita.
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
@@ -537,6 +532,7 @@ export function AdminAttendancePage() {
                     Reservas para {studentFullName(selectedStudent)}
                   </p>
                   <WeeklyScheduleGrid
+                    ignoreCancellationDeadline
                     fromDate={bookingFromDate}
                     mode="student"
                     onBookSession={(session) =>

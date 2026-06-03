@@ -23,6 +23,11 @@ import type {
   UpdateClassSessionInput,
 } from './types'
 import { WeeklyScheduleGrid } from '../components/calendar/WeeklyScheduleGrid'
+import {
+  addLocalDays,
+  calendarDateRange,
+  formatLocalDate,
+} from '../lib/calendarRange'
 
 type ClassFormState = {
   activity_id: string
@@ -87,13 +92,6 @@ const emptyActivityForm: ActivityFormState = {
   cancellation_cutoff_hours: '3',
 }
 
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 function formatDateTimeLocal(date: Date) {
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
@@ -104,20 +102,6 @@ function formatLocalTime(date: Date) {
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${hours}:${minutes}`
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function dateInputToRangeStart(value: string) {
-  return new Date(`${value}T00:00:00`).toISOString()
-}
-
-function dateInputToRangeEnd(value: string) {
-  return new Date(`${value}T23:59:59.999`).toISOString()
 }
 
 function dateTimeLocalToIso(value: string) {
@@ -301,7 +285,9 @@ export function AdminCalendarPage() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [sessions, setSessions] = useState<CalendarSession[]>([])
   const [fromDate, setFromDate] = useState(formatLocalDate(today))
-  const [toDate, setToDate] = useState(formatLocalDate(addDays(today, 6)))
+  const [toDate, setToDate] = useState(
+    addLocalDays(formatLocalDate(today), 6),
+  )
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [form, setForm] = useState<ClassFormState>(buildEmptyForm([]))
   const [recurrence, setRecurrence] = useState<RecurrenceFormState>(
@@ -365,12 +351,10 @@ export function AdminCalendarPage() {
     setLoading(true)
     setError(null)
     try {
+      const range = calendarDateRange(fromDate, toDate)
       const [nextActivities, nextSessions] = await Promise.all([
         listActivities(true),
-        listCalendarSessions(
-          dateInputToRangeStart(fromDate),
-          dateInputToRangeEnd(toDate),
-        ),
+        listCalendarSessions(range.from, range.to),
       ])
       setActivities(nextActivities)
       setSessions(nextSessions)

@@ -471,7 +471,7 @@ export async function listPayments(status?: PaymentStatus | 'all') {
   let query = client
     .from('payments')
     .select(
-      'id, student_id, membership_id, amount, method, status, paid_at, approved_at, rejected_at, voided_at, voided_by, void_reason, notes, created_at, updated_at',
+      'id, student_id, membership_id, amount, method, status, paid_at, approved_at, rejected_at, voided_at, voided_by, void_reason, membership_start_date, membership_end_date, notes, created_at, updated_at',
     )
     .order('created_at', { ascending: false })
 
@@ -497,6 +497,8 @@ export async function registerManualPayment(input: RegisterPaymentInput) {
     method: input.method,
     notes: input.notes.trim() || null,
     payment_date: input.payment_date,
+    membership_start_date: input.membership_start_date,
+    membership_end_date: input.membership_end_date,
   })
 
   if (error) {
@@ -541,6 +543,8 @@ export async function updatePayment(input: UpdatePaymentInput) {
     p_method: input.method,
     p_paid_at: input.payment_date,
     p_notes: input.notes.trim() || null,
+    p_membership_start_date: input.membership_start_date,
+    p_membership_end_date: input.membership_end_date,
   })
 
   if (error) {

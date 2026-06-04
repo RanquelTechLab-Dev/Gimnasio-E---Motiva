@@ -117,6 +117,8 @@ export type Payment = {
   voided_at: string | null
   voided_by: string | null
   void_reason: string | null
+  membership_start_date: string | null
+  membership_end_date: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -169,6 +171,8 @@ export type RegisterPaymentInput = {
   method: PaymentMethod
   notes: string
   payment_date: string
+  membership_start_date: string
+  membership_end_date: string
 }
 
 export type RegisterPaymentResult = {
@@ -184,6 +188,8 @@ export type RegisterPaymentResult = {
   method: PaymentMethod
   paid_at: string
   payment_date: string
+  payment_membership_start_date?: string | null
+  payment_membership_end_date?: string | null
   approved_paid_total?: number
   pending_amount?: number
   is_fully_paid?: boolean
@@ -194,6 +200,8 @@ export type UpdatePaymentInput = {
   amount: number
   method: PaymentMethod
   payment_date: string
+  membership_start_date: string
+  membership_end_date: string
   notes: string
 }
 

@@ -26,6 +26,7 @@ import type {
   PlanInput,
   RegisterPaymentInput,
   RegisterPaymentResult,
+  StudentFixedSchedule,
   StudentProgram,
   StudentFileMetadataInput,
   StudentProfile,
@@ -534,6 +535,35 @@ export async function bulkBookFixedScheduleForStudent(input: {
   }
 
   return data as FixedScheduleResult
+}
+
+export async function listStudentFixedSchedules(studentId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_list_student_fixed_schedules', {
+    p_student_id: studentId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as StudentFixedSchedule[]
+}
+
+export async function deactivateStudentFixedSchedule(scheduleId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_deactivate_student_fixed_schedule',
+    {
+      p_schedule_id: scheduleId,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
 }
 
 export async function listPayments(status?: PaymentStatus | 'all') {

@@ -215,6 +215,24 @@ export type FixedScheduleResult = {
   details: FixedScheduleDetail[]
 }
 
+export type StudentFixedSchedule = {
+  schedule_id: string
+  student_id: string
+  membership_id: string
+  plan_name: string
+  activity_name: string
+  weekdays: number[]
+  weekday_labels: string
+  start_time: string
+  active: boolean
+  membership_start_date: string
+  membership_end_date: string
+  membership_status: MembershipStatus
+  last_applied_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type RegisterPaymentInput = {
   student_id: string
   membership_id: string

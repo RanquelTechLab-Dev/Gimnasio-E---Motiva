@@ -9,10 +9,12 @@ import {
   createStudentFileMetadata,
   createStudent,
   deactivateStudent,
+  deactivateStudentFixedSchedule,
   deleteStudentProgram,
   deleteStudent,
   formatAdminError,
   listStudentFiles,
+  listStudentFixedSchedules,
   listStudentPrograms,
   listStudentTrainingNotes,
   listPayments,
@@ -39,6 +41,7 @@ import type {
   PaymentMethod,
   Payment,
   Plan,
+  StudentFixedSchedule,
   StudentProgram,
   StudentProfile,
   StudentFileMetadataInput,
@@ -505,6 +508,9 @@ export function AdminStudentsPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [trainingNotes, setTrainingNotes] = useState<AdminTrainingNote[]>([])
   const [studentFiles, setStudentFiles] = useState<AdminStudentFile[]>([])
+  const [studentFixedSchedules, setStudentFixedSchedules] = useState<
+    StudentFixedSchedule[]
+  >([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [studentSearch, setStudentSearch] = useState('')
   const [studentForm, setStudentForm] = useState<StudentFormState>({
@@ -616,6 +622,9 @@ export function AdminStudentsPage() {
   const selectedStudentFiles = studentFiles.filter(
     (file) => file.student_id === selectedStudent?.id,
   )
+  const selectedStudentFixedSchedules = studentFixedSchedules.filter(
+    (schedule) => schedule.student_id === selectedStudent?.id,
+  )
   const activePlans = plans.filter((plan) => plan.active)
   const selectedMembershipPlan = plansById.get(membershipForm.plan_id) ?? null
   const selectedProgramEditPlan = programEditForm
@@ -681,15 +690,18 @@ export function AdminStudentsPage() {
         }
       })
       if (nextSelected) {
-        const [nextNotes, nextFiles] = await Promise.all([
+        const [nextNotes, nextFiles, nextFixedSchedules] = await Promise.all([
           listStudentTrainingNotes(nextSelected.id),
           listStudentFiles(nextSelected.id),
+          listStudentFixedSchedules(nextSelected.id),
         ])
         setTrainingNotes(nextNotes)
         setStudentFiles(nextFiles)
+        setStudentFixedSchedules(nextFixedSchedules)
       } else {
         setTrainingNotes([])
         setStudentFiles([])
+        setStudentFixedSchedules([])
       }
     } catch (loadError) {
       setError(formatAdminError(loadError))
@@ -699,12 +711,14 @@ export function AdminStudentsPage() {
   }
 
   async function loadSelectedStudentOperations(studentId: string) {
-    const [nextNotes, nextFiles] = await Promise.all([
+    const [nextNotes, nextFiles, nextFixedSchedules] = await Promise.all([
       listStudentTrainingNotes(studentId),
       listStudentFiles(studentId),
+      listStudentFixedSchedules(studentId),
     ])
     setTrainingNotes(nextNotes)
     setStudentFiles(nextFiles)
+    setStudentFixedSchedules(nextFixedSchedules)
   }
 
   useEffect(() => {
@@ -757,6 +771,7 @@ export function AdminStudentsPage() {
     setEditForm(null)
     setTrainingNotes([])
     setStudentFiles([])
+    setStudentFixedSchedules([])
     setTrainingNoteForm(buildTrainingNoteForm())
     setFileMetadataForm(buildFileMetadataForm())
     setUploadFileForm(buildUploadFileForm())
@@ -903,6 +918,29 @@ export function AdminStudentsPage() {
       await loadData()
     } catch (createFixedError) {
       setError(formatAdminError(createFixedError))
+    } finally {
+      setFixedScheduleLoading(false)
+    }
+  }
+
+  async function handleDeactivateFixedSchedule(schedule: StudentFixedSchedule) {
+    const confirmed = window.confirm(
+      'Esto solo desactiva el horario habitual guardado. No cancela reservas ya creadas.',
+    )
+
+    if (!confirmed || !selectedStudent) {
+      return
+    }
+
+    setFixedScheduleLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deactivateStudentFixedSchedule(schedule.schedule_id)
+      setSuccess('Horario habitual desactivado. Las reservas ya creadas no se cancelaron.')
+      await loadSelectedStudentOperations(selectedStudent.id)
+    } catch (deactivateError) {
+      setError(formatAdminError(deactivateError))
     } finally {
       setFixedScheduleLoading(false)
     }
@@ -1925,6 +1963,105 @@ export function AdminStudentsPage() {
                       ) : null}
                     </div>
                   ) : null}
+                </div>
+              )}
+            </article>
+
+            <article className="order-4 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
+                    Horarios habituales seteados
+                  </p>
+                  <h4 className="mt-2 font-display text-xl font-bold">
+                    Configuraciones guardadas
+                  </h4>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Estos son los dias y horarios habituales guardados para el
+                    alumno. Las reservas ya creadas se ven en Asistencia.
+                  </p>
+                </div>
+                {selectedStudent ? (
+                  <button
+                    className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-white"
+                    onClick={() => loadSelectedStudentOperations(selectedStudent.id)}
+                    type="button"
+                  >
+                    Actualizar
+                  </button>
+                ) : null}
+              </div>
+
+              {selectedStudentFixedSchedules.length === 0 ? (
+                <p className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-sm text-[var(--muted)]">
+                  No hay horarios habituales seteados para este alumno.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-3">
+                  {selectedStudentFixedSchedules.map((schedule) => (
+                    <div
+                      className="grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-3"
+                      key={schedule.schedule_id}
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-[var(--ink)]">
+                            {schedule.plan_name}
+                          </p>
+                          <p className="mt-1 text-sm text-[var(--muted)]">
+                            {schedule.activity_name} · {schedule.weekday_labels} ·{' '}
+                            {String(schedule.start_time).slice(0, 5)}
+                          </p>
+                        </div>
+                        <span
+                          className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${
+                            schedule.active
+                              ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                              : 'bg-[var(--surface-strong)] text-[var(--muted)]'
+                          }`}
+                        >
+                          {schedule.active ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+
+                      <div className="grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-3">
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <span className="font-bold text-[var(--ink)]">
+                            Vigencia:{' '}
+                          </span>
+                          {schedule.membership_start_date} a{' '}
+                          {schedule.membership_end_date}
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <span className="font-bold text-[var(--ink)]">
+                            Programa:{' '}
+                          </span>
+                          {programStatusLabels[schedule.membership_status]}
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <span className="font-bold text-[var(--ink)]">
+                            Ultima aplicacion:{' '}
+                          </span>
+                          {schedule.last_applied_at
+                            ? new Date(schedule.last_applied_at).toLocaleString(
+                                'es-AR',
+                              )
+                            : 'Sin aplicar'}
+                        </p>
+                      </div>
+
+                      {schedule.active ? (
+                        <button
+                          className="w-fit rounded-2xl border border-[var(--accent)] px-4 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                          disabled={fixedScheduleLoading}
+                          onClick={() => handleDeactivateFixedSchedule(schedule)}
+                          type="button"
+                        >
+                          Desactivar horario habitual
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               )}
             </article>

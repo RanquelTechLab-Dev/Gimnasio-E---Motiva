@@ -4,6 +4,7 @@ import {
   archiveStudentFileMetadata,
   archiveTrainingNote,
   assignMembership,
+  bulkBookFixedScheduleForStudent,
   checkDriveStatus,
   createStudentFileMetadata,
   createStudent,
@@ -17,6 +18,8 @@ import {
   listPayments,
   listPlans,
   listStudents,
+  listFixedScheduleOptionsForStudent,
+  previewFixedScheduleForStudent,
   registerManualPayment,
   updateStudentProgram,
   updateStudentFileMetadata,
@@ -30,6 +33,8 @@ import type {
   AdminTrainingNote,
   DriveStatusResult,
   FileKind,
+  FixedScheduleOption,
+  FixedScheduleResult,
   MembershipStatus,
   PaymentMethod,
   Payment,
@@ -116,6 +121,12 @@ type UploadFileFormState = {
   file: File | null
 }
 
+type FixedScheduleFormState = {
+  membership_id: string
+  weekdays: number[]
+  start_time: string
+}
+
 const moneyFormatter = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
@@ -159,6 +170,28 @@ const fileKindLabels: Record<FileKind, string> = {
   attachment: 'Adjunto',
   observation: 'Observacion',
   training_plan: 'Plan de entrenamiento',
+}
+
+const weekdayOptions = [
+  { value: 1, label: 'Lunes' },
+  { value: 2, label: 'Martes' },
+  { value: 3, label: 'Miercoles' },
+  { value: 4, label: 'Jueves' },
+  { value: 5, label: 'Viernes' },
+  { value: 6, label: 'Sabado' },
+  { value: 7, label: 'Domingo' },
+]
+
+const fixedScheduleStatusLabels: Record<string, string> = {
+  available: 'Disponible',
+  created: 'Creada',
+  already_booked: 'Ya reservada',
+  skipped_full: 'Sin cupo',
+  skipped_out_of_validity: 'Fuera de vigencia',
+  skipped_weekly_limit: 'Limite semanal',
+  skipped_no_permission: 'Sin permiso',
+  skipped_conflict: 'Conflicto',
+  skipped_other: 'Saltada',
 }
 
 function todayDate() {
@@ -511,6 +544,18 @@ export function AdminStudentsPage() {
     useState<FileMetadataFormState>(buildFileMetadataForm())
   const [uploadFileForm, setUploadFileForm] =
     useState<UploadFileFormState>(buildUploadFileForm())
+  const [fixedScheduleForm, setFixedScheduleForm] =
+    useState<FixedScheduleFormState>({
+      membership_id: '',
+      weekdays: [],
+      start_time: '',
+    })
+  const [fixedScheduleOptions, setFixedScheduleOptions] = useState<
+    FixedScheduleOption[]
+  >([])
+  const [fixedScheduleResult, setFixedScheduleResult] =
+    useState<FixedScheduleResult | null>(null)
+  const [fixedScheduleLoading, setFixedScheduleLoading] = useState(false)
   const [driveStatus, setDriveStatus] = useState<DriveStatusResult | null>(null)
   const [uploadInputKey, setUploadInputKey] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -545,6 +590,16 @@ export function AdminStudentsPage() {
   const payableSelectedStudentPrograms = selectedStudentPrograms.filter(
     (program) => program.status !== 'cancelled',
   )
+  const fixedSchedulePrograms = selectedStudentPrograms.filter(
+    (program) => program.status === 'active' && program.is_fully_paid,
+  )
+  const selectedFixedScheduleProgram =
+    fixedSchedulePrograms.find(
+      (program) => program.program_id === fixedScheduleForm.membership_id,
+    ) ?? null
+  const selectedFixedSchedulePlan = selectedFixedScheduleProgram
+    ? plansById.get(selectedFixedScheduleProgram.plan_id) ?? null
+    : null
   const selectedPayments = payments.filter(
     (payment) => payment.student_id === selectedStudent?.id,
   )
@@ -599,9 +654,22 @@ export function AdminStudentsPage() {
           program.student_id === nextSelected?.id &&
           program.status !== 'cancelled',
       )
+      const firstFixedProgram = nextPrograms.find(
+        (program) =>
+          program.student_id === nextSelected?.id &&
+          program.status === 'active' &&
+          program.is_fully_paid,
+      )
       const firstProgramPlan = firstProgram
         ? nextPlans.find((plan) => plan.id === firstProgram.plan_id)
         : null
+      setFixedScheduleForm({
+        membership_id: firstFixedProgram?.program_id ?? '',
+        weekdays: [],
+        start_time: '',
+      })
+      setFixedScheduleOptions([])
+      setFixedScheduleResult(null)
       setPaymentForm((current) => {
         const nextPaymentDate = current.payment_date || todayDate()
 
@@ -647,6 +715,43 @@ export function AdminStudentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!selectedStudent || !fixedScheduleForm.membership_id) {
+      return
+    }
+
+    let ignore = false
+    listFixedScheduleOptionsForStudent(
+      selectedStudent.id,
+      fixedScheduleForm.membership_id,
+    )
+      .then((options) => {
+        if (ignore) {
+          return
+        }
+        setFixedScheduleOptions(options)
+        setFixedScheduleResult(null)
+        setFixedScheduleForm((current) => ({
+          ...current,
+          start_time:
+            current.start_time &&
+            options.some((option) => option.start_time === current.start_time)
+              ? current.start_time
+              : options[0]?.start_time ?? '',
+        }))
+      })
+      .catch((optionsError) => {
+        if (!ignore) {
+          setError(formatAdminError(optionsError))
+          setFixedScheduleOptions([])
+        }
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [fixedScheduleForm.membership_id, selectedStudent])
+
   function clearSelectedStudentForms() {
     setSelectedStudentId(null)
     setEditForm(null)
@@ -658,6 +763,9 @@ export function AdminStudentsPage() {
     setProgramEditForm(null)
     setProgramDeleteTarget(null)
     setProgramDeleteConfirmation('')
+    setFixedScheduleForm({ membership_id: '', weekdays: [], start_time: '' })
+    setFixedScheduleOptions([])
+    setFixedScheduleResult(null)
     setDriveStatus(null)
     setUploadInputKey((current) => current + 1)
     setMembershipForm(buildMembershipForm(plans))
@@ -692,6 +800,12 @@ export function AdminStudentsPage() {
       (program) =>
         program.student_id === student.id && program.status !== 'cancelled',
     )
+    const firstFixedProgram = studentPrograms.find(
+      (program) =>
+        program.student_id === student.id &&
+        program.status === 'active' &&
+        program.is_fully_paid,
+    )
     const firstProgramPlan = firstProgram
       ? plansById.get(firstProgram.plan_id)
       : null
@@ -710,11 +824,88 @@ export function AdminStudentsPage() {
     setProgramEditForm(null)
     setProgramDeleteTarget(null)
     setProgramDeleteConfirmation('')
+    setFixedScheduleForm({
+      membership_id: firstFixedProgram?.program_id ?? '',
+      weekdays: [],
+      start_time: '',
+    })
+    setFixedScheduleOptions([])
+    setFixedScheduleResult(null)
     setPasswordForm({ password: '', confirmation: '' })
     setPasswordMessage(null)
     setDriveStatus(null)
     setUploadInputKey((current) => current + 1)
     void loadSelectedStudentOperations(student.id)
+  }
+
+  function toggleFixedScheduleWeekday(day: number) {
+    setFixedScheduleResult(null)
+    setFixedScheduleForm((current) => {
+      const nextWeekdays = current.weekdays.includes(day)
+        ? current.weekdays.filter((value) => value !== day)
+        : [...current.weekdays, day].sort((left, right) => left - right)
+
+      return { ...current, weekdays: nextWeekdays }
+    })
+  }
+
+  function resetFixedScheduleSelection() {
+    setFixedScheduleForm((current) => ({
+      ...current,
+      weekdays: [],
+      start_time: fixedScheduleOptions[0]?.start_time ?? '',
+    }))
+    setFixedScheduleResult(null)
+  }
+
+  async function handlePreviewFixedSchedule() {
+    if (!selectedStudent || !fixedScheduleForm.membership_id) {
+      return
+    }
+
+    setFixedScheduleLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await previewFixedScheduleForStudent({
+        student_id: selectedStudent.id,
+        membership_id: fixedScheduleForm.membership_id,
+        weekdays: fixedScheduleForm.weekdays,
+        start_time: fixedScheduleForm.start_time,
+      })
+      setFixedScheduleResult(result)
+    } catch (previewError) {
+      setError(formatAdminError(previewError))
+    } finally {
+      setFixedScheduleLoading(false)
+    }
+  }
+
+  async function handleCreateFixedScheduleBookings() {
+    if (!selectedStudent || !fixedScheduleResult || !fixedScheduleForm.membership_id) {
+      return
+    }
+
+    setFixedScheduleLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await bulkBookFixedScheduleForStudent({
+        student_id: selectedStudent.id,
+        membership_id: fixedScheduleForm.membership_id,
+        weekdays: fixedScheduleForm.weekdays,
+        start_time: fixedScheduleForm.start_time,
+      })
+      setFixedScheduleResult(result)
+      setSuccess(
+        `Reservas fijas creadas: ${result.created_count}. Ya existian: ${result.already_booked_count}.`,
+      )
+      await loadData()
+    } catch (createFixedError) {
+      setError(formatAdminError(createFixedError))
+    } finally {
+      setFixedScheduleLoading(false)
+    }
   }
 
   async function handleCreateStudent(event: FormEvent<HTMLFormElement>) {
@@ -1492,6 +1683,251 @@ export function AdminStudentsPage() {
               </div>
             </article>
             </div>
+
+            <article className="order-3 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
+                    Reserva fija del alumno
+                  </p>
+                  <h4 className="mt-2 font-display text-xl font-bold">
+                    Horarios habituales
+                  </h4>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Elegi dias y horarios habituales para reservar clases
+                    existentes durante la vigencia del programa.
+                  </p>
+                </div>
+              </div>
+
+              {selectedStudentPrograms.length === 0 ? (
+                <p className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-sm text-[var(--muted)]">
+                  Este alumno no tiene programas activos para reservar.
+                </p>
+              ) : fixedSchedulePrograms.length === 0 ? (
+                <p className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-sm text-[var(--muted)]">
+                  Este alumno no tiene programas activos con pago completo.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-4">
+                  <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                    <label className="grid gap-2 text-sm font-semibold">
+                      Programa
+                      <select
+                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal"
+                        onChange={(event) => {
+                          setFixedScheduleForm({
+                            membership_id: event.target.value,
+                            weekdays: [],
+                            start_time: '',
+                          })
+                          setFixedScheduleResult(null)
+                        }}
+                        value={fixedScheduleForm.membership_id}
+                      >
+                        {fixedSchedulePrograms.map((program) => {
+                          const plan = plansById.get(program.plan_id)
+                          return (
+                            <option key={program.program_id} value={program.program_id}>
+                              {describeProgramOption(program, plan)}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </label>
+
+                    <label className="grid gap-2 text-sm font-semibold">
+                      Horario
+                      <select
+                        className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-normal disabled:opacity-60"
+                        disabled={
+                          fixedScheduleLoading || fixedScheduleOptions.length === 0
+                        }
+                        onChange={(event) => {
+                          setFixedScheduleForm({
+                            ...fixedScheduleForm,
+                            start_time: event.target.value,
+                          })
+                          setFixedScheduleResult(null)
+                        }}
+                        value={fixedScheduleForm.start_time}
+                      >
+                        {fixedScheduleOptions.length === 0 ? (
+                          <option value="">
+                            No hay clases creadas para esta actividad
+                          </option>
+                        ) : (
+                          fixedScheduleOptions.map((option) => (
+                            <option key={option.start_time} value={option.start_time}>
+                              {option.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+                  </div>
+
+                  {selectedFixedScheduleProgram ? (
+                    <div className="grid gap-2 rounded-2xl border border-[var(--line)] bg-white p-3 text-xs text-[var(--muted)] sm:grid-cols-3">
+                      <p>
+                        <span className="font-bold text-[var(--ink)]">Vigencia: </span>
+                        {selectedFixedScheduleProgram.start_date} a{' '}
+                        {selectedFixedScheduleProgram.end_date}
+                      </p>
+                      <p>
+                        <span className="font-bold text-[var(--ink)]">Estado: </span>
+                        {programDisplayStatus(selectedFixedScheduleProgram)}
+                      </p>
+                      <p>
+                        <span className="font-bold text-[var(--ink)]">Clases: </span>
+                        {selectedFixedSchedulePlan?.plan_type === 'weekly'
+                          ? weeklyPlanLabel(selectedFixedSchedulePlan)
+                          : selectedFixedScheduleProgram.remaining_credits === null
+                            ? 'segun programa'
+                            : `${selectedFixedScheduleProgram.remaining_credits} disponibles`}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-2">
+                    <p className="text-sm font-semibold">Dias de la semana</p>
+                    <div className="flex flex-wrap gap-2">
+                      {weekdayOptions.map((day) => (
+                        <label
+                          className={`flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold ${
+                            fixedScheduleForm.weekdays.includes(day.value)
+                              ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
+                              : 'border-[var(--line)] bg-white text-[var(--ink)]'
+                          }`}
+                          key={day.value}
+                        >
+                          <input
+                            checked={fixedScheduleForm.weekdays.includes(day.value)}
+                            onChange={() => toggleFixedScheduleWeekday(day.value)}
+                            type="checkbox"
+                          />
+                          {day.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                      disabled={
+                        fixedScheduleLoading ||
+                        fixedScheduleForm.weekdays.length === 0 ||
+                        !fixedScheduleForm.start_time
+                      }
+                      onClick={handlePreviewFixedSchedule}
+                      type="button"
+                    >
+                      Previsualizar reservas
+                    </button>
+                    <button
+                      className="rounded-2xl border border-[var(--line)] px-5 py-3 text-sm font-bold transition hover:bg-white"
+                      onClick={resetFixedScheduleSelection}
+                      type="button"
+                    >
+                      Cancelar seleccion
+                    </button>
+                  </div>
+
+                  {fixedScheduleResult ? (
+                    <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4">
+                      <div className="grid gap-2 text-sm sm:grid-cols-4">
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Encontradas:{' '}
+                          <strong>{fixedScheduleResult.total_found}</strong>
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Disponibles:{' '}
+                          <strong>{fixedScheduleResult.available_count}</strong>
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Ya reservadas:{' '}
+                          <strong>
+                            {fixedScheduleResult.already_booked_count}
+                          </strong>
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Sin cupo:{' '}
+                          <strong>{fixedScheduleResult.skipped_full_count}</strong>
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Fuera de vigencia:{' '}
+                          <strong>
+                            {fixedScheduleResult.skipped_out_of_validity_count}
+                          </strong>
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Limite semanal:{' '}
+                          <strong>
+                            {fixedScheduleResult.skipped_weekly_limit_count}
+                          </strong>
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Conflictos:{' '}
+                          <strong>
+                            {fixedScheduleResult.skipped_conflict_count}
+                          </strong>
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          Creadas:{' '}
+                          <strong>{fixedScheduleResult.created_count}</strong>
+                        </p>
+                      </div>
+
+                      {fixedScheduleResult.total_found === 0 ? (
+                        <p className="rounded-2xl border border-dashed border-[var(--line)] p-3 text-sm text-[var(--muted)]">
+                          No se encontraron clases para esos dias y horario.
+                        </p>
+                      ) : (
+                        <div className="max-h-72 overflow-y-auto pr-1">
+                          <div className="grid gap-2 text-xs">
+                            {fixedScheduleResult.details.slice(0, 40).map((detail) => (
+                              <div
+                                className="grid gap-1 rounded-xl border border-[var(--line)] px-3 py-2 sm:grid-cols-[1fr_auto]"
+                                key={detail.session_id}
+                              >
+                                <p className="font-semibold text-[var(--ink)]">
+                                  {formatDisplayDate(detail.starts_at)} ·{' '}
+                                  {new Date(detail.starts_at).toLocaleTimeString(
+                                    'es-AR',
+                                    { hour: '2-digit', minute: '2-digit' },
+                                  )}{' '}
+                                  · {detail.activity_name}
+                                </p>
+                                <p className="text-[var(--muted)]">
+                                  {fixedScheduleStatusLabels[detail.status] ??
+                                    detail.status}
+                                  {detail.reason ? ` · ${detail.reason}` : ''}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {fixedScheduleResult.mode === 'preview' ? (
+                        <button
+                          className="rounded-2xl bg-[var(--brand)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60"
+                          disabled={
+                            fixedScheduleLoading ||
+                            fixedScheduleResult.available_count === 0
+                          }
+                          onClick={handleCreateFixedScheduleBookings}
+                          type="button"
+                        >
+                          Crear reservas fijas
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </article>
 
             <article className="order-9 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">

@@ -164,6 +164,57 @@ export type UpdateStudentProgramInput = {
   confirm_history?: string | null
 }
 
+export type FixedScheduleOption = {
+  start_time: string
+  label: string
+  activity_names: string
+  sessions_count: number
+}
+
+export type FixedScheduleDetailStatus =
+  | 'available'
+  | 'created'
+  | 'already_booked'
+  | 'skipped_full'
+  | 'skipped_out_of_validity'
+  | 'skipped_weekly_limit'
+  | 'skipped_no_permission'
+  | 'skipped_conflict'
+  | 'skipped_other'
+
+export type FixedScheduleDetail = {
+  session_id: string
+  activity_id: string
+  activity_name: string
+  activity_slug: string
+  title: string
+  starts_at: string
+  ends_at: string
+  capacity: number
+  reserved_count: number
+  status: FixedScheduleDetailStatus
+  reason: string | null
+}
+
+export type FixedScheduleResult = {
+  mode: 'preview' | 'execute'
+  student_id: string
+  membership_id: string
+  weekdays: number[]
+  start_time: string
+  total_found: number
+  created_count: number
+  available_count: number
+  already_booked_count: number
+  skipped_full_count: number
+  skipped_out_of_validity_count: number
+  skipped_weekly_limit_count: number
+  skipped_no_permission_count: number
+  skipped_conflict_count: number
+  skipped_other_count: number
+  details: FixedScheduleDetail[]
+}
+
 export type RegisterPaymentInput = {
   student_id: string
   membership_id: string

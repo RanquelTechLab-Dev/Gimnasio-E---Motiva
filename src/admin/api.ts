@@ -14,6 +14,8 @@ import type {
   ClassRecurringRule,
   ClassRecurringRuleInput,
   CreateStudentInput,
+  FixedScheduleOption,
+  FixedScheduleResult,
   MassEmailInput,
   MassEmailResult,
   Membership,
@@ -464,6 +466,74 @@ export async function deleteStudentProgram(
   }
 
   return data as AdminActionResult
+}
+
+export async function listFixedScheduleOptionsForStudent(
+  studentId: string,
+  membershipId: string,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_list_fixed_schedule_options_for_student',
+    {
+      p_student_id: studentId,
+      p_membership_id: membershipId,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as FixedScheduleOption[]
+}
+
+export async function previewFixedScheduleForStudent(input: {
+  student_id: string
+  membership_id: string
+  weekdays: number[]
+  start_time: string
+}) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_preview_fixed_schedule_for_student',
+    {
+      p_student_id: input.student_id,
+      p_membership_id: input.membership_id,
+      p_weekdays: input.weekdays,
+      p_start_time: input.start_time,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as FixedScheduleResult
+}
+
+export async function bulkBookFixedScheduleForStudent(input: {
+  student_id: string
+  membership_id: string
+  weekdays: number[]
+  start_time: string
+}) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_bulk_book_fixed_schedule_for_student',
+    {
+      p_student_id: input.student_id,
+      p_membership_id: input.membership_id,
+      p_weekdays: input.weekdays,
+      p_start_time: input.start_time,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as FixedScheduleResult
 }
 
 export async function listPayments(status?: PaymentStatus | 'all') {

@@ -586,6 +586,9 @@ export function AdminStudentsPage() {
   const [fixedScheduleCancelPreview, setFixedScheduleCancelPreview] =
     useState<FixedScheduleCancelPreview | null>(null)
   const [fixedScheduleLoading, setFixedScheduleLoading] = useState(false)
+  const [fixedScheduleLoadError, setFixedScheduleLoadError] = useState<
+    string | null
+  >(null)
   const [driveStatus, setDriveStatus] = useState<DriveStatusResult | null>(null)
   const [uploadInputKey, setUploadInputKey] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -720,18 +723,18 @@ export function AdminStudentsPage() {
         }
       })
       if (nextSelected) {
-        const [nextNotes, nextFiles, nextFixedSchedules] = await Promise.all([
+        const [nextNotes, nextFiles] = await Promise.all([
           listStudentTrainingNotes(nextSelected.id),
           listStudentFiles(nextSelected.id),
-          listStudentFixedSchedules(nextSelected.id),
         ])
         setTrainingNotes(nextNotes)
         setStudentFiles(nextFiles)
-        setStudentFixedSchedules(nextFixedSchedules)
+        await loadStudentFixedSchedules(nextSelected.id)
       } else {
         setTrainingNotes([])
         setStudentFiles([])
         setStudentFixedSchedules([])
+        setFixedScheduleLoadError(null)
       }
     } catch (loadError) {
       setError(formatAdminError(loadError))
@@ -740,15 +743,38 @@ export function AdminStudentsPage() {
     }
   }
 
+  async function loadStudentFixedSchedules(studentId: string) {
+    setFixedScheduleLoadError(null)
+    try {
+      const nextFixedSchedules = await listStudentFixedSchedules(studentId)
+      setStudentFixedSchedules(nextFixedSchedules)
+      return nextFixedSchedules
+    } catch (scheduleError) {
+      setStudentFixedSchedules([])
+      setFixedScheduleLoadError(
+        'No se pudieron cargar los horarios habituales.',
+      )
+      throw scheduleError
+    }
+  }
+
   async function loadSelectedStudentOperations(studentId: string) {
-    const [nextNotes, nextFiles, nextFixedSchedules] = await Promise.all([
-      listStudentTrainingNotes(studentId),
-      listStudentFiles(studentId),
-      listStudentFixedSchedules(studentId),
-    ])
-    setTrainingNotes(nextNotes)
-    setStudentFiles(nextFiles)
-    setStudentFixedSchedules(nextFixedSchedules)
+    try {
+      const [nextNotes, nextFiles] = await Promise.all([
+        listStudentTrainingNotes(studentId),
+        listStudentFiles(studentId),
+      ])
+      setTrainingNotes(nextNotes)
+      setStudentFiles(nextFiles)
+    } catch (operationsError) {
+      setError(formatAdminError(operationsError))
+    }
+
+    try {
+      await loadStudentFixedSchedules(studentId)
+    } catch (scheduleError) {
+      setError(formatAdminError(scheduleError))
+    }
   }
 
   useEffect(() => {
@@ -817,6 +843,7 @@ export function AdminStudentsPage() {
       reason: '',
     })
     setFixedScheduleCancelPreview(null)
+    setFixedScheduleLoadError(null)
     setDriveStatus(null)
     setUploadInputKey((current) => current + 1)
     setMembershipForm(buildMembershipForm(plans))
@@ -888,6 +915,7 @@ export function AdminStudentsPage() {
       reason: '',
     })
     setFixedScheduleCancelPreview(null)
+    setFixedScheduleLoadError(null)
     setPasswordForm({ password: '', confirmation: '' })
     setPasswordMessage(null)
     setDriveStatus(null)
@@ -957,7 +985,7 @@ export function AdminStudentsPage() {
       setSuccess(
         `Reservas fijas creadas: ${result.created_count}. Ya existian: ${result.already_booked_count}.`,
       )
-      await loadData()
+      await loadStudentFixedSchedules(selectedStudent.id)
     } catch (createFixedError) {
       setError(formatAdminError(createFixedError))
     } finally {
@@ -2066,7 +2094,7 @@ export function AdminStudentsPage() {
               )}
             </article>
 
-            <article className="order-4 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
+            <article className="order-3 rounded-[20px] border border-[var(--line)] bg-[var(--surface-strong)] p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--brand)]">
@@ -2090,6 +2118,12 @@ export function AdminStudentsPage() {
                   </button>
                 ) : null}
               </div>
+
+              {fixedScheduleLoadError ? (
+                <p className="mt-4 rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] p-4 text-sm font-semibold text-[var(--accent)]">
+                  {fixedScheduleLoadError}
+                </p>
+              ) : null}
 
               {selectedStudentFixedSchedules.length === 0 ? (
                 <p className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-sm text-[var(--muted)]">
@@ -2167,6 +2201,9 @@ export function AdminStudentsPage() {
                             const dayBookings = schedule.booking_details.filter(
                               (detail) => detail.weekday === day.value,
                             )
+                            const scheduleUsesDay = schedule.weekdays.includes(
+                              day.value,
+                            )
                             return (
                               <div
                                 className="min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-strong)] p-2"
@@ -2178,7 +2215,9 @@ export function AdminStudentsPage() {
                                 <div className="mt-2 grid gap-1">
                                   {dayBookings.length === 0 ? (
                                     <p className="text-xs text-[var(--muted)]">
-                                      Sin reservas fijas
+                                      {scheduleUsesDay
+                                        ? 'Sin reservas encontradas para este horario'
+                                        : 'Sin reservas fijas'}
                                     </p>
                                   ) : (
                                     dayBookings.map((booking) => (
@@ -2201,6 +2240,11 @@ export function AdminStudentsPage() {
                                           ] ?? booking.booking_status}
                                           {booking.is_past ? ' · pasada' : ''}
                                         </p>
+                                        {booking.can_admin_cancel ? (
+                                          <p className="mt-1 w-fit rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand)]">
+                                            Puede cancelarse
+                                          </p>
+                                        ) : null}
                                       </div>
                                     ))
                                   )}
@@ -2211,6 +2255,18 @@ export function AdminStudentsPage() {
                         </div>
 
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                          <button
+                            className="rounded-2xl border border-[var(--line)] px-4 py-2 text-xs font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                            disabled={fixedScheduleLoading || !selectedStudent}
+                            onClick={() =>
+                              selectedStudent
+                                ? loadSelectedStudentOperations(selectedStudent.id)
+                                : undefined
+                            }
+                            type="button"
+                          >
+                            Actualizar
+                          </button>
                           <button
                             className="rounded-2xl border border-[var(--line)] px-4 py-2 text-xs font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
                             disabled={fixedScheduleLoading}

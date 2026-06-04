@@ -284,6 +284,33 @@ export type FixedScheduleSelectedCancelResult = {
   does_not_delete_bookings: boolean
 }
 
+export type FixedScheduleSelectedDeleteResult = {
+  requested_count: number
+  deleted_count: number
+  skipped_count: number
+  skipped_past_count: number
+  skipped_with_attendance_count: number
+  skipped_credit_charged_count: number
+  deleted_booking_ids: string[]
+  deleted_schedule_ids: string[]
+  deleted_schedule_count: number
+  details: Array<{
+    booking_id: string
+    status_before: string | null
+    student_id: string | null
+    membership_id: string | null
+    session_id: string | null
+    activity_id: string | null
+    starts_at: string | null
+    credits_charged: number | null
+    is_future: boolean | null
+    attendance_count: number | null
+    schedule_ids: string[]
+    deleted: boolean
+    skipped_reason: string | null
+  }>
+}
+
 export type RegisterPaymentInput = {
   student_id: string
   membership_id: string

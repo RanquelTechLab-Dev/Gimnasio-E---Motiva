@@ -14,6 +14,8 @@ import type {
   ClassRecurringRule,
   ClassRecurringRuleInput,
   CreateStudentInput,
+  FixedScheduleCancelPreview,
+  FixedScheduleCancelResult,
   FixedScheduleOption,
   FixedScheduleResult,
   MassEmailInput,
@@ -564,6 +566,48 @@ export async function deactivateStudentFixedSchedule(scheduleId: string) {
   }
 
   return data as AdminActionResult
+}
+
+export async function previewCancelFixedScheduleBookings(input: {
+  schedule_id: string
+  cancel_past: boolean
+}) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_preview_cancel_fixed_schedule_bookings',
+    {
+      p_schedule_id: input.schedule_id,
+      p_cancel_past: input.cancel_past,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as FixedScheduleCancelPreview
+}
+
+export async function cancelFixedScheduleBookings(input: {
+  schedule_id: string
+  reason: string
+  cancel_past: boolean
+}) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_cancel_fixed_schedule_bookings',
+    {
+      p_schedule_id: input.schedule_id,
+      p_reason: input.reason,
+      p_cancel_past: input.cancel_past,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as FixedScheduleCancelResult
 }
 
 export async function listPayments(status?: PaymentStatus | 'all') {

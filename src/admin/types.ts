@@ -231,6 +231,39 @@ export type StudentFixedSchedule = {
   last_applied_at: string | null
   created_at: string
   updated_at: string
+  booking_details: FixedScheduleBookingDetail[]
+}
+
+export type FixedScheduleBookingDetail = {
+  date: string
+  weekday: number
+  weekday_label: string
+  starts_at: string
+  ends_at: string
+  session_id: string
+  booking_id: string
+  booking_status: 'booked' | 'cancelled' | 'attended' | 'no_show'
+  is_past: boolean
+  can_admin_cancel: boolean
+}
+
+export type FixedScheduleCancelPreview = {
+  schedule_id: string
+  cancel_past: boolean
+  total_matching_bookings: number
+  cancellable_count: number
+  past_count: number
+  future_count: number
+  already_cancelled_count: number
+  details: FixedScheduleBookingDetail[]
+}
+
+export type FixedScheduleCancelResult = {
+  schedule_id: string
+  cancelled_count: number
+  cancelled_booking_ids: string[]
+  cancel_past: boolean
+  does_not_delete_bookings: boolean
 }
 
 export type RegisterPaymentInput = {

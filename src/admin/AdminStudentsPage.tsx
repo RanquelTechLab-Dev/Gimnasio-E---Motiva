@@ -37,6 +37,7 @@ import type {
   AdminTrainingNote,
   DriveStatusResult,
   FileKind,
+  FixedScheduleBookingDetail,
   FixedScheduleCancelPreview,
   FixedScheduleOption,
   FixedScheduleResult,
@@ -139,6 +140,27 @@ type FixedScheduleCancelState = {
   reason: string
 }
 
+type FixedScheduleGroupEntry = {
+  schedule: StudentFixedSchedule
+  startTime: string
+  bookingDetails: FixedScheduleBookingDetail[]
+}
+
+type FixedScheduleGroup = {
+  key: string
+  membershipId: string
+  planName: string
+  activityName: string
+  membershipStartDate: string
+  membershipEndDate: string
+  membershipStatus: MembershipStatus
+  activeSchedules: number
+  totalBookings: number
+  lastAppliedAt: string | null
+  schedules: StudentFixedSchedule[]
+  byWeekday: Record<number, FixedScheduleGroupEntry[]>
+}
+
 const moneyFormatter = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
@@ -211,6 +233,100 @@ const bookingStatusLabels: Record<string, string> = {
   cancelled: 'Cancelada',
   attended: 'Asistio',
   no_show: 'Ausente',
+}
+
+function sortByDateTime(
+  left: FixedScheduleBookingDetail,
+  right: FixedScheduleBookingDetail,
+) {
+  return left.starts_at.localeCompare(right.starts_at)
+}
+
+function buildEmptyFixedScheduleWeekdays() {
+  return weekdayOptions.reduce<Record<number, FixedScheduleGroupEntry[]>>(
+    (accumulator, day) => {
+      accumulator[day.value] = []
+      return accumulator
+    },
+    {},
+  )
+}
+
+function groupFixedSchedulesByProgram(
+  schedules: StudentFixedSchedule[],
+): FixedScheduleGroup[] {
+  const groups = new Map<string, FixedScheduleGroup>()
+
+  schedules.forEach((schedule) => {
+    const key = [
+      schedule.membership_id,
+      schedule.plan_name,
+      schedule.activity_name,
+      schedule.membership_start_date,
+      schedule.membership_end_date,
+    ].join('|')
+
+    const existingGroup = groups.get(key)
+    const group =
+      existingGroup ??
+      {
+        key,
+        membershipId: schedule.membership_id,
+        planName: schedule.plan_name,
+        activityName: schedule.activity_name,
+        membershipStartDate: schedule.membership_start_date,
+        membershipEndDate: schedule.membership_end_date,
+        membershipStatus: schedule.membership_status,
+        activeSchedules: 0,
+        totalBookings: 0,
+        lastAppliedAt: null,
+        schedules: [],
+        byWeekday: buildEmptyFixedScheduleWeekdays(),
+      }
+
+    group.schedules.push(schedule)
+    group.totalBookings += schedule.booking_details.length
+    group.activeSchedules += schedule.active ? 1 : 0
+    group.lastAppliedAt =
+      !group.lastAppliedAt ||
+      (schedule.last_applied_at &&
+        schedule.last_applied_at > group.lastAppliedAt)
+        ? schedule.last_applied_at
+        : group.lastAppliedAt
+
+    schedule.weekdays.forEach((weekday) => {
+      group.byWeekday[weekday] = group.byWeekday[weekday] ?? []
+      group.byWeekday[weekday].push({
+        schedule,
+        startTime: schedule.start_time,
+        bookingDetails: schedule.booking_details
+          .filter((booking) => booking.weekday === weekday)
+          .sort(sortByDateTime),
+      })
+    })
+
+    groups.set(key, group)
+  })
+
+  return Array.from(groups.values())
+    .map((group) => {
+      weekdayOptions.forEach((day) => {
+        group.byWeekday[day.value] = [...(group.byWeekday[day.value] ?? [])].sort(
+          (left, right) => left.startTime.localeCompare(right.startTime),
+        )
+      })
+      group.schedules = [...group.schedules].sort(
+        (left, right) =>
+          left.start_time.localeCompare(right.start_time) ||
+          left.weekday_labels.localeCompare(right.weekday_labels),
+      )
+      return group
+    })
+    .sort(
+      (left, right) =>
+        left.planName.localeCompare(right.planName) ||
+        left.activityName.localeCompare(right.activityName),
+    )
 }
 
 function todayDate() {
@@ -651,6 +767,10 @@ export function AdminStudentsPage() {
   )
   const selectedStudentFixedSchedules = studentFixedSchedules.filter(
     (schedule) => schedule.student_id === selectedStudent?.id,
+  )
+  const selectedStudentFixedScheduleGroups = useMemo(
+    () => groupFixedSchedulesByProgram(selectedStudentFixedSchedules),
+    [selectedStudentFixedSchedules],
   )
   const activePlans = plans.filter((plan) => plan.active)
   const selectedMembershipPlan = plansById.get(membershipForm.plan_id) ?? null
@@ -2125,136 +2245,36 @@ export function AdminStudentsPage() {
                 </p>
               ) : null}
 
-              {selectedStudentFixedSchedules.length === 0 ? (
+              {selectedStudentFixedScheduleGroups.length === 0 ? (
                 <p className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-white p-4 text-sm text-[var(--muted)]">
                   No hay horarios habituales seteados para este alumno.
                 </p>
               ) : (
-                <div className="mt-4 grid gap-3">
-                  {selectedStudentFixedSchedules.map((schedule) => {
-                    const previewForSchedule =
-                      fixedScheduleCancelPreview?.schedule_id ===
-                      schedule.schedule_id
-                        ? fixedScheduleCancelPreview
-                        : null
-                    return (
-                      <div
-                        className="grid gap-4 rounded-2xl border border-[var(--line)] bg-white p-3"
-                        key={schedule.schedule_id}
-                      >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <p className="font-semibold text-[var(--ink)]">
-                              {schedule.plan_name}
-                            </p>
-                            <p className="mt-1 text-sm text-[var(--muted)]">
-                              {schedule.activity_name} · Horario:{' '}
-                              {String(schedule.start_time).slice(0, 5)} ·{' '}
-                              {schedule.weekday_labels}
-                            </p>
-                          </div>
+                <div className="mt-4 grid gap-4">
+                  {selectedStudentFixedScheduleGroups.map((group) => (
+                    <div
+                      className="grid gap-4 rounded-2xl border border-[var(--line)] bg-white p-3"
+                      key={group.key}
+                    >
+                      <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <p className="font-semibold text-[var(--ink)]">
+                            {group.planName}
+                          </p>
+                          <p className="mt-1 text-sm text-[var(--muted)]">
+                            Actividad: {group.activityName}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                           <span
                             className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${
-                              schedule.active
+                              group.activeSchedules > 0
                                 ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
                                 : 'bg-[var(--surface-strong)] text-[var(--muted)]'
                             }`}
                           >
-                            {schedule.active ? 'Activo' : 'Inactivo'}
+                            {group.activeSchedules > 0 ? 'Activo' : 'Inactivo'}
                           </span>
-                        </div>
-
-                        <div className="grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-4">
-                          <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
-                            <span className="font-bold text-[var(--ink)]">
-                              Vigencia:{' '}
-                            </span>
-                            {schedule.membership_start_date} a{' '}
-                            {schedule.membership_end_date}
-                          </p>
-                          <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
-                            <span className="font-bold text-[var(--ink)]">
-                              Programa:{' '}
-                            </span>
-                            {programStatusLabels[schedule.membership_status]}
-                          </p>
-                          <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
-                            <span className="font-bold text-[var(--ink)]">
-                              Reservas:{' '}
-                            </span>
-                            {schedule.booking_details.length}
-                          </p>
-                          <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
-                            <span className="font-bold text-[var(--ink)]">
-                              Ultima aplicacion:{' '}
-                            </span>
-                            {schedule.last_applied_at
-                              ? new Date(schedule.last_applied_at).toLocaleString(
-                                  'es-AR',
-                                )
-                              : 'Sin aplicar'}
-                          </p>
-                        </div>
-
-                        <div className="grid gap-2 md:grid-cols-7">
-                          {weekdayOptions.map((day) => {
-                            const dayBookings = schedule.booking_details.filter(
-                              (detail) => detail.weekday === day.value,
-                            )
-                            const scheduleUsesDay = schedule.weekdays.includes(
-                              day.value,
-                            )
-                            return (
-                              <div
-                                className="min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-strong)] p-2"
-                                key={day.value}
-                              >
-                                <p className="text-xs font-bold text-[var(--ink)]">
-                                  {day.label}
-                                </p>
-                                <div className="mt-2 grid gap-1">
-                                  {dayBookings.length === 0 ? (
-                                    <p className="text-xs text-[var(--muted)]">
-                                      {scheduleUsesDay
-                                        ? 'Sin reservas encontradas para este horario'
-                                        : 'Sin reservas fijas'}
-                                    </p>
-                                  ) : (
-                                    dayBookings.map((booking) => (
-                                      <div
-                                        className="rounded-lg bg-white px-2 py-1 text-[11px] leading-snug"
-                                        key={booking.booking_id}
-                                      >
-                                        <p className="font-semibold text-[var(--ink)]">
-                                          {formatDisplayDate(booking.starts_at)} ·{' '}
-                                          {new Date(
-                                            booking.starts_at,
-                                          ).toLocaleTimeString('es-AR', {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                          })}
-                                        </p>
-                                        <p className="text-[var(--muted)]">
-                                          {bookingStatusLabels[
-                                            booking.booking_status
-                                          ] ?? booking.booking_status}
-                                          {booking.is_past ? ' · pasada' : ''}
-                                        </p>
-                                        {booking.can_admin_cancel ? (
-                                          <p className="mt-1 w-fit rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand)]">
-                                            Puede cancelarse
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
                           <button
                             className="rounded-2xl border border-[var(--line)] px-4 py-2 text-xs font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
                             disabled={fixedScheduleLoading || !selectedStudent}
@@ -2267,111 +2287,286 @@ export function AdminStudentsPage() {
                           >
                             Actualizar
                           </button>
-                          <button
-                            className="rounded-2xl border border-[var(--line)] px-4 py-2 text-xs font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
-                            disabled={fixedScheduleLoading}
-                            onClick={() => handlePreviewCancelFixedSchedule(schedule)}
-                            type="button"
-                          >
-                            Previsualizar cancelacion
-                          </button>
-                          {schedule.active ? (
-                            <button
-                              className="rounded-2xl border border-[var(--line)] px-4 py-2 text-xs font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
-                              disabled={fixedScheduleLoading}
-                              onClick={() => handleDeactivateFixedSchedule(schedule)}
-                              type="button"
-                            >
-                              Desactivar horario habitual
-                            </button>
-                          ) : null}
                         </div>
-
-                        {previewForSchedule ? (
-                          <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
-                            <div className="grid gap-2 text-xs sm:grid-cols-4">
-                              <p className="rounded-xl bg-white px-3 py-2">
-                                Coincidencias:{' '}
-                                <strong>
-                                  {previewForSchedule.total_matching_bookings}
-                                </strong>
-                              </p>
-                              <p className="rounded-xl bg-white px-3 py-2">
-                                Cancelables:{' '}
-                                <strong>
-                                  {previewForSchedule.cancellable_count}
-                                </strong>
-                              </p>
-                              <p className="rounded-xl bg-white px-3 py-2">
-                                Futuras:{' '}
-                                <strong>{previewForSchedule.future_count}</strong>
-                              </p>
-                              <p className="rounded-xl bg-white px-3 py-2">
-                                Ya canceladas:{' '}
-                                <strong>
-                                  {previewForSchedule.already_cancelled_count}
-                                </strong>
-                              </p>
-                            </div>
-                            <label className="flex items-center gap-2 text-xs font-semibold text-[var(--muted)]">
-                              <input
-                                checked={
-                                  fixedScheduleCancelForm.schedule_id ===
-                                    schedule.schedule_id &&
-                                  fixedScheduleCancelForm.cancel_past
-                                }
-                                onChange={(event) => {
-                                  const nextCancelPast = event.target.checked
-                                  setFixedScheduleCancelForm((current) => ({
-                                    ...current,
-                                    schedule_id: schedule.schedule_id,
-                                    cancel_past: nextCancelPast,
-                                  }))
-                                  void previewCancelFixedScheduleBookings({
-                                    schedule_id: schedule.schedule_id,
-                                    cancel_past: nextCancelPast,
-                                  }).then(setFixedScheduleCancelPreview)
-                                }}
-                                type="checkbox"
-                              />
-                              Incluir reservas pasadas
-                            </label>
-                            <textarea
-                              className="min-h-20 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                              onChange={(event) =>
-                                setFixedScheduleCancelForm((current) => ({
-                                  ...current,
-                                  schedule_id: schedule.schedule_id,
-                                  reason: event.target.value,
-                                }))
-                              }
-                              placeholder="Motivo para cancelar reservas fijas"
-                              value={
-                                fixedScheduleCancelForm.schedule_id ===
-                                schedule.schedule_id
-                                  ? fixedScheduleCancelForm.reason
-                                  : ''
-                              }
-                            />
-                            <button
-                              className="w-fit rounded-2xl border border-[var(--accent)] px-4 py-2 text-xs font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
-                              disabled={
-                                fixedScheduleLoading ||
-                                previewForSchedule.cancellable_count === 0 ||
-                                fixedScheduleCancelForm.schedule_id !==
-                                  schedule.schedule_id ||
-                                fixedScheduleCancelForm.reason.trim() === ''
-                              }
-                              onClick={() => handleCancelFixedScheduleBookings(schedule)}
-                              type="button"
-                            >
-                              Cancelar reservas fijas
-                            </button>
-                          </div>
-                        ) : null}
                       </div>
-                    )
-                  })}
+
+                      <div className="grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-4">
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <span className="font-bold text-[var(--ink)]">
+                            Vigencia:{' '}
+                          </span>
+                          {group.membershipStartDate} a {group.membershipEndDate}
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <span className="font-bold text-[var(--ink)]">
+                            Programa:{' '}
+                          </span>
+                          {programStatusLabels[group.membershipStatus]}
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <span className="font-bold text-[var(--ink)]">
+                            Reservas:{' '}
+                          </span>
+                          {group.totalBookings}
+                        </p>
+                        <p className="rounded-xl bg-[var(--surface-strong)] px-3 py-2">
+                          <span className="font-bold text-[var(--ink)]">
+                            Horarios:{' '}
+                          </span>
+                          {group.schedules.length}
+                        </p>
+                      </div>
+
+                      <p className="text-xs text-[var(--muted)]">
+                        Ultima aplicacion:{' '}
+                        {group.lastAppliedAt
+                          ? new Date(group.lastAppliedAt).toLocaleString('es-AR')
+                          : 'Sin aplicar'}
+                      </p>
+
+                      <div className="grid gap-2 md:grid-cols-7">
+                        {weekdayOptions.map((day) => {
+                          const dayEntries = group.byWeekday[day.value] ?? []
+
+                          return (
+                            <div
+                              className="min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-strong)] p-2"
+                              key={day.value}
+                            >
+                              <p className="text-xs font-bold text-[var(--ink)]">
+                                {day.label}
+                              </p>
+                              <div className="mt-2 grid gap-2">
+                                {dayEntries.length === 0 ? (
+                                  <p className="text-xs text-[var(--muted)]">
+                                    Sin reservas fijas
+                                  </p>
+                                ) : (
+                                  dayEntries.map((entry) => {
+                                    const schedule = entry.schedule
+                                    const previewForSchedule =
+                                      fixedScheduleCancelPreview?.schedule_id ===
+                                      schedule.schedule_id
+                                        ? fixedScheduleCancelPreview
+                                        : null
+
+                                    return (
+                                      <div
+                                        className="grid gap-2 rounded-lg bg-white px-2 py-2 text-[11px] leading-snug"
+                                        key={schedule.schedule_id}
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p className="font-bold text-[var(--ink)]">
+                                            {String(entry.startTime).slice(0, 5)}
+                                          </p>
+                                          <span
+                                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                              schedule.active
+                                                ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                                                : 'bg-[var(--surface-strong)] text-[var(--muted)]'
+                                            }`}
+                                          >
+                                            {schedule.active
+                                              ? 'Activo'
+                                              : 'Inactivo'}
+                                          </span>
+                                        </div>
+
+                                        {entry.bookingDetails.length === 0 ? (
+                                          <p className="text-[var(--muted)]">
+                                            Sin reservas encontradas para este
+                                            horario
+                                          </p>
+                                        ) : (
+                                          <div className="grid gap-1">
+                                            {entry.bookingDetails.map((booking) => (
+                                              <div
+                                                className={`rounded-md px-2 py-1 ${
+                                                  booking.booking_status ===
+                                                  'cancelled'
+                                                    ? 'bg-[var(--surface-strong)] text-[var(--muted)]'
+                                                    : 'bg-white text-[var(--muted)]'
+                                                }`}
+                                                key={booking.booking_id}
+                                              >
+                                                <p className="font-semibold text-[var(--ink)]">
+                                                  {formatDisplayDate(
+                                                    booking.starts_at,
+                                                  )}{' '}
+                                                  ·{' '}
+                                                  {new Date(
+                                                    booking.starts_at,
+                                                  ).toLocaleTimeString('es-AR', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                  })}
+                                                </p>
+                                                <p>
+                                                  {bookingStatusLabels[
+                                                    booking.booking_status
+                                                  ] ?? booking.booking_status}
+                                                  {booking.is_past
+                                                    ? ' · pasada'
+                                                    : ''}
+                                                </p>
+                                                {booking.can_admin_cancel ? (
+                                                  <p className="mt-1 w-fit rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand)]">
+                                                    Puede cancelarse
+                                                  </p>
+                                                ) : null}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        <div className="grid gap-1">
+                                          <button
+                                            className="rounded-xl border border-[var(--line)] px-2 py-1 text-[11px] font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                                            disabled={fixedScheduleLoading}
+                                            onClick={() =>
+                                              handlePreviewCancelFixedSchedule(
+                                                schedule,
+                                              )
+                                            }
+                                            type="button"
+                                          >
+                                            Previsualizar cancelacion
+                                          </button>
+                                          {schedule.active ? (
+                                            <button
+                                              className="rounded-xl border border-[var(--line)] px-2 py-1 text-[11px] font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                                              disabled={fixedScheduleLoading}
+                                              onClick={() =>
+                                                handleDeactivateFixedSchedule(
+                                                  schedule,
+                                                )
+                                              }
+                                              type="button"
+                                            >
+                                              Desactivar horario
+                                            </button>
+                                          ) : null}
+                                        </div>
+
+                                        {previewForSchedule ? (
+                                          <div className="grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-strong)] p-2">
+                                            <div className="grid gap-1 text-[11px]">
+                                              <p>
+                                                Coincidencias:{' '}
+                                                <strong>
+                                                  {
+                                                    previewForSchedule.total_matching_bookings
+                                                  }
+                                                </strong>
+                                              </p>
+                                              <p>
+                                                Cancelables:{' '}
+                                                <strong>
+                                                  {
+                                                    previewForSchedule.cancellable_count
+                                                  }
+                                                </strong>
+                                              </p>
+                                              <p>
+                                                Futuras:{' '}
+                                                <strong>
+                                                  {previewForSchedule.future_count}
+                                                </strong>
+                                              </p>
+                                              <p>
+                                                Ya canceladas:{' '}
+                                                <strong>
+                                                  {
+                                                    previewForSchedule.already_cancelled_count
+                                                  }
+                                                </strong>
+                                              </p>
+                                            </div>
+                                            <label className="flex items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
+                                              <input
+                                                checked={
+                                                  fixedScheduleCancelForm.schedule_id ===
+                                                    schedule.schedule_id &&
+                                                  fixedScheduleCancelForm.cancel_past
+                                                }
+                                                onChange={(event) => {
+                                                  const nextCancelPast =
+                                                    event.target.checked
+                                                  setFixedScheduleCancelForm(
+                                                    (current) => ({
+                                                      ...current,
+                                                      schedule_id:
+                                                        schedule.schedule_id,
+                                                      cancel_past: nextCancelPast,
+                                                    }),
+                                                  )
+                                                  void previewCancelFixedScheduleBookings(
+                                                    {
+                                                      schedule_id:
+                                                        schedule.schedule_id,
+                                                      cancel_past: nextCancelPast,
+                                                    },
+                                                  ).then(
+                                                    setFixedScheduleCancelPreview,
+                                                  )
+                                                }}
+                                                type="checkbox"
+                                              />
+                                              Incluir pasadas
+                                            </label>
+                                            <textarea
+                                              className="min-h-16 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs"
+                                              onChange={(event) =>
+                                                setFixedScheduleCancelForm(
+                                                  (current) => ({
+                                                    ...current,
+                                                    schedule_id:
+                                                      schedule.schedule_id,
+                                                    reason: event.target.value,
+                                                  }),
+                                                )
+                                              }
+                                              placeholder="Motivo"
+                                              value={
+                                                fixedScheduleCancelForm.schedule_id ===
+                                                schedule.schedule_id
+                                                  ? fixedScheduleCancelForm.reason
+                                                  : ''
+                                              }
+                                            />
+                                            <button
+                                              className="w-fit rounded-xl border border-[var(--accent)] px-3 py-1 text-[11px] font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                                              disabled={
+                                                fixedScheduleLoading ||
+                                                previewForSchedule.cancellable_count ===
+                                                  0 ||
+                                                fixedScheduleCancelForm.schedule_id !==
+                                                  schedule.schedule_id ||
+                                                fixedScheduleCancelForm.reason.trim() ===
+                                                  ''
+                                              }
+                                              onClick={() =>
+                                                handleCancelFixedScheduleBookings(
+                                                  schedule,
+                                                )
+                                              }
+                                              type="button"
+                                            >
+                                              Cancelar reservas fijas
+                                            </button>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    )
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </article>

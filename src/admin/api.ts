@@ -18,6 +18,7 @@ import type {
   FixedScheduleCancelResult,
   FixedScheduleOption,
   FixedScheduleResult,
+  FixedScheduleSelectedCancelResult,
   MassEmailInput,
   MassEmailResult,
   Membership,
@@ -608,6 +609,26 @@ export async function cancelFixedScheduleBookings(input: {
   }
 
   return data as FixedScheduleCancelResult
+}
+
+export async function cancelSelectedFixedScheduleBookings(input: {
+  booking_ids: string[]
+  reason: string
+}) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_cancel_fixed_schedule_selected_bookings',
+    {
+      p_booking_ids: input.booking_ids,
+      p_reason: input.reason,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as FixedScheduleSelectedCancelResult
 }
 
 export async function listPayments(status?: PaymentStatus | 'all') {

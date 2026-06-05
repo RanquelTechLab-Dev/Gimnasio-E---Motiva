@@ -5,11 +5,11 @@ import {
   archiveTrainingNote,
   assignMembership,
   bulkBookFixedScheduleForStudent,
-  cancelSelectedFixedScheduleBookings,
   checkDriveStatus,
   createStudentFileMetadata,
   createStudent,
   deactivateStudent,
+  deleteSelectedFixedScheduleBookings,
   deleteStudentProgram,
   deleteStudent,
   formatAdminError,
@@ -249,6 +249,19 @@ function groupFixedSchedulesByProgram(
   const groups = new Map<string, FixedScheduleGroup>()
 
   schedules.forEach((schedule) => {
+    const visibleBookingDetails = schedule.booking_details.filter(
+      (booking) => booking.booking_status !== 'cancelled',
+    )
+
+    if (visibleBookingDetails.length === 0) {
+      return
+    }
+
+    const visibleSchedule = {
+      ...schedule,
+      booking_details: visibleBookingDetails,
+    }
+
     const key = [
       schedule.membership_id,
       schedule.plan_name,
@@ -275,10 +288,8 @@ function groupFixedSchedulesByProgram(
         byWeekday: buildEmptyFixedScheduleWeekdays(),
       }
 
-    group.schedules.push(schedule)
-    group.totalBookings += schedule.booking_details.filter(
-      (booking) => booking.booking_status !== 'cancelled',
-    ).length
+    group.schedules.push(visibleSchedule)
+    group.totalBookings += visibleBookingDetails.length
     group.activeSchedules += schedule.active ? 1 : 0
     group.lastAppliedAt =
       !group.lastAppliedAt ||
@@ -288,17 +299,23 @@ function groupFixedSchedulesByProgram(
         : group.lastAppliedAt
 
     schedule.weekdays.forEach((weekday) => {
+      const weekdayBookingDetails = visibleBookingDetails
+        .filter(
+          (booking) =>
+            booking.weekday === weekday &&
+            booking.booking_status !== 'cancelled',
+        )
+        .sort(sortByDateTime)
+
+      if (weekdayBookingDetails.length === 0) {
+        return
+      }
+
       group.byWeekday[weekday] = group.byWeekday[weekday] ?? []
       group.byWeekday[weekday].push({
-        schedule,
+        schedule: visibleSchedule,
         startTime: schedule.start_time,
-        bookingDetails: schedule.booking_details
-          .filter(
-            (booking) =>
-              booking.weekday === weekday &&
-              booking.booking_status !== 'cancelled',
-          )
-          .sort(sortByDateTime),
+        bookingDetails: weekdayBookingDetails,
       })
     })
 
@@ -1116,14 +1133,14 @@ export function AdminStudentsPage() {
       new Set(
         group.schedules.flatMap((schedule) =>
           schedule.booking_details
-            .filter((booking) => booking.booking_status === 'booked')
+            .filter((booking) => booking.can_admin_cancel)
             .map((booking) => booking.booking_id),
         ),
       ),
     )
   }
 
-  async function handleCancelFixedScheduleBookingIds(
+  async function handleDeleteFixedScheduleBookingIds(
     group: FixedScheduleGroup,
     bookingIds: string[],
     mode: 'selected' | 'all',
@@ -1136,19 +1153,19 @@ export function AdminStudentsPage() {
     const reason = (fixedScheduleCancelReasons[group.key] ?? '').trim()
 
     if (uniqueBookingIds.length === 0) {
-      setError('Selecciona al menos una reserva fija para cancelar.')
+      setError('Selecciona al menos una reserva fija para eliminar.')
       return
     }
 
     if (!reason) {
-      setError('El motivo de cancelacion es obligatorio.')
+      setError('El motivo de eliminacion es obligatorio.')
       return
     }
 
     const confirmed = window.confirm(
       mode === 'all'
-        ? `Se cancelaran todas las reservas fijas visibles de este programa (${uniqueBookingIds.length}). No se borrara historial. ¿Continuar?`
-        : `Se cancelaran ${uniqueBookingIds.length} reservas fijas seleccionadas. No se borrara historial. ¿Continuar?`,
+        ? `Se eliminaran ${uniqueBookingIds.length} reservas futuras visibles de este programa. Esta accion no borra pagos ni programas. ¿Continuar?`
+        : `Se eliminaran ${uniqueBookingIds.length} reservas futuras seleccionadas. Esta accion no borra pagos ni programas. ¿Continuar?`,
     )
 
     if (!confirmed) {
@@ -1159,12 +1176,12 @@ export function AdminStudentsPage() {
     setError(null)
     setSuccess(null)
     try {
-      const result = await cancelSelectedFixedScheduleBookings({
+      const result = await deleteSelectedFixedScheduleBookings({
         booking_ids: uniqueBookingIds,
         reason,
       })
       setSuccess(
-        `Reservas fijas canceladas: ${result.cancelled_count}. No se borraron reservas.`,
+        `Reservas fijas eliminadas: ${result.deleted_count}. Horarios habituales vacios limpiados: ${result.deleted_schedule_count}.`,
       )
       setSelectedFixedBookingIds((current) =>
         current.filter((id) => !uniqueBookingIds.includes(id)),
@@ -2359,70 +2376,62 @@ export function AdminStudentsPage() {
                                             </span>
                                           </div>
 
-                                          {entry.bookingDetails.length === 0 ? (
-                                            <p className="rounded-md bg-white px-2 py-2 text-[var(--muted)]">
-                                              Sin reservas encontradas para este
-                                              horario
-                                            </p>
-                                          ) : (
-                                            <div className="grid gap-1">
-                                              {entry.bookingDetails.map((booking) => (
-                                                <label
-                                                  className="flex gap-2 rounded-md bg-white px-2 py-2 text-[var(--muted)]"
-                                                  key={booking.booking_id}
-                                                >
-                                                  <input
-                                                    checked={selectedFixedBookingIds.includes(
+                                          <div className="grid gap-1">
+                                            {entry.bookingDetails.map((booking) => (
+                                              <label
+                                                className="flex gap-2 rounded-md bg-white px-2 py-2 text-[var(--muted)]"
+                                                key={booking.booking_id}
+                                              >
+                                                <input
+                                                  checked={selectedFixedBookingIds.includes(
+                                                    booking.booking_id,
+                                                  )}
+                                                  className="mt-0.5 h-4 w-4 rounded border-[var(--line)]"
+                                                  disabled={
+                                                    fixedScheduleLoading ||
+                                                    !booking.can_admin_cancel
+                                                  }
+                                                  onChange={(event) =>
+                                                    toggleFixedBookingSelection(
                                                       booking.booking_id,
+                                                      event.target.checked,
+                                                    )
+                                                  }
+                                                  type="checkbox"
+                                                />
+                                                <span className="grid gap-1">
+                                                  <span className="font-semibold text-[var(--ink)]">
+                                                    {formatDisplayDate(
+                                                      booking.starts_at,
+                                                    )}{' '}
+                                                    ·{' '}
+                                                    {new Date(
+                                                      booking.starts_at,
+                                                    ).toLocaleTimeString(
+                                                      'es-AR',
+                                                      {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                      },
                                                     )}
-                                                    className="mt-0.5 h-4 w-4 rounded border-[var(--line)]"
-                                                    disabled={
-                                                      fixedScheduleLoading ||
-                                                      booking.booking_status !==
-                                                        'booked'
-                                                    }
-                                                    onChange={(event) =>
-                                                      toggleFixedBookingSelection(
-                                                        booking.booking_id,
-                                                        event.target.checked,
-                                                      )
-                                                    }
-                                                    type="checkbox"
-                                                  />
-                                                  <span className="grid gap-1">
-                                                    <span className="font-semibold text-[var(--ink)]">
-                                                      {formatDisplayDate(
-                                                        booking.starts_at,
-                                                      )}{' '}
-                                                      ·{' '}
-                                                      {new Date(
-                                                        booking.starts_at,
-                                                      ).toLocaleTimeString(
-                                                        'es-AR',
-                                                        {
-                                                          hour: '2-digit',
-                                                          minute: '2-digit',
-                                                        },
-                                                      )}
-                                                    </span>
-                                                    <span>
-                                                      {bookingStatusLabels[
-                                                        booking.booking_status
-                                                      ] ?? booking.booking_status}
-                                                      {booking.is_past
-                                                        ? ' · pasada'
-                                                        : ''}
-                                                    </span>
-                                                    {booking.can_admin_cancel ? (
-                                                      <span className="w-fit rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand)]">
-                                                        Puede cancelarse
-                                                      </span>
-                                                    ) : null}
                                                   </span>
-                                                </label>
-                                              ))}
-                                            </div>
-                                          )}
+                                                  <span>
+                                                    {bookingStatusLabels[
+                                                      booking.booking_status
+                                                    ] ?? booking.booking_status}
+                                                    {booking.is_past
+                                                      ? ' · pasada'
+                                                      : ''}
+                                                  </span>
+                                                  {booking.can_admin_cancel ? (
+                                                    <span className="w-fit rounded-full bg-[var(--brand-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand)]">
+                                                      Puede eliminarse
+                                                    </span>
+                                                  ) : null}
+                                                </span>
+                                              </label>
+                                            ))}
+                                          </div>
                                         </div>
                                       )
                                     })
@@ -2448,7 +2457,7 @@ export function AdminStudentsPage() {
                           <div className="grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
                             <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
                               <label className="grid flex-1 gap-1 text-sm font-semibold text-[var(--ink)]">
-                                Motivo de cancelacion
+                                Motivo de eliminacion
                                 <textarea
                                   className="min-h-20 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-normal"
                                   onChange={(event) =>
@@ -2470,7 +2479,7 @@ export function AdminStudentsPage() {
                                     cancelReason.trim() === ''
                                   }
                                   onClick={() =>
-                                    handleCancelFixedScheduleBookingIds(
+                                    handleDeleteFixedScheduleBookingIds(
                                       group,
                                       selectedGroupBookingIds,
                                       'selected',
@@ -2478,7 +2487,7 @@ export function AdminStudentsPage() {
                                   }
                                   type="button"
                                 >
-                                  Cancelar reservas seleccionadas
+                                  Eliminar reservas seleccionadas
                                 </button>
                                 <button
                                   className="rounded-xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
@@ -2488,7 +2497,7 @@ export function AdminStudentsPage() {
                                     cancelReason.trim() === ''
                                   }
                                   onClick={() =>
-                                    handleCancelFixedScheduleBookingIds(
+                                    handleDeleteFixedScheduleBookingIds(
                                       group,
                                       cancellableBookingIds,
                                       'all',
@@ -2496,14 +2505,18 @@ export function AdminStudentsPage() {
                                   }
                                   type="button"
                                 >
-                                  Cancelar todas las reservas fijas
+                                  Eliminar todas las reservas fijas
                                 </button>
                               </div>
                             </div>
                             <p className="text-xs text-[var(--muted)]">
                               Seleccionadas: {selectedGroupBookingIds.length} ·
-                              reservas visibles para cancelar:{' '}
+                              reservas futuras para eliminar:{' '}
                               {cancellableBookingIds.length}
+                            </p>
+                            <p className="text-xs text-[var(--muted)]">
+                              Se eliminaran las reservas futuras seleccionadas y
+                              se conservara una auditoria de la accion.
                             </p>
                           </div>
                         )

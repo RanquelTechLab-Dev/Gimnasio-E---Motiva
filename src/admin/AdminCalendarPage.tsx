@@ -342,6 +342,9 @@ export function AdminCalendarPage() {
   const canSubmitClass =
     Boolean(selectedSession) || (hasActiveActivities && Boolean(form.activity_id))
   const selectedIsRecurring = Boolean(selectedSession?.recurring_rule_id)
+  const selectedSessionHasReservations = Boolean(
+    selectedSession && selectedSession.reserved_count > 0,
+  )
   const isPersonalizedOneOnOne =
     selectedActivity?.slug === 'personalizado_1_1'
   const startParts = getDateTimeParts(form.starts_at)
@@ -574,7 +577,7 @@ export function AdminCalendarPage() {
               : 'Clase actualizada y convertida en horario recurrente.',
           )
         } else {
-          setSuccess('Clase actualizada correctamente.')
+          setSuccess('Clase actualizada.')
         }
         resetForm()
       } else if (recurrence.enabled) {
@@ -600,7 +603,12 @@ export function AdminCalendarPage() {
       }
       await loadData()
     } catch (saveError) {
-      setError(formatAdminError(saveError))
+      const formattedError = formatAdminError(saveError)
+      setError(
+        selectedSession
+          ? `No se pudo actualizar la clase. ${formattedError}`
+          : formattedError,
+      )
     } finally {
       setSaving(false)
     }
@@ -1099,6 +1107,13 @@ export function AdminCalendarPage() {
             {isPersonalizedOneOnOne ? (
               <p className="rounded-2xl bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
                 Personalizado 1:1 permite maximo 1 alumno.
+              </p>
+            ) : null}
+            {selectedSessionHasReservations ? (
+              <p className="rounded-2xl border border-[var(--brand)] bg-[var(--brand-soft)] px-4 py-3 text-xs font-semibold text-[var(--brand)]">
+                Esta clase tiene reservas. El cambio de horario afectara a los
+                alumnos reservados y el cupo no puede quedar por debajo de las
+                reservas existentes.
               </p>
             ) : null}
             <textarea

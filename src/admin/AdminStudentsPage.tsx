@@ -1719,13 +1719,13 @@ export function AdminStudentsPage() {
       setSuccess(
         result.drive_status?.warning
           ? 'Archivo subido. Atencion: queda 10% o menos de espacio en Drive.'
-          : 'Archivo subido a Drive y registrado.',
+          : 'Archivo subido correctamente.',
       )
       setUploadFileForm(buildUploadFileForm())
       setUploadInputKey((current) => current + 1)
       await loadSelectedStudentOperations(selectedStudent.id)
     } catch (uploadError) {
-      setError(formatAdminError(uploadError))
+      setError(`No se pudo subir el archivo: ${formatAdminError(uploadError)}`)
     } finally {
       setSaving(false)
     }

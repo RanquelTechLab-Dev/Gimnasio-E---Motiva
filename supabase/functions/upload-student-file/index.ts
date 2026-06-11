@@ -40,6 +40,13 @@ function cleanText(value: FormDataEntryValue | null) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function cleanBoolean(value: FormDataEntryValue | null) {
+  const normalized = cleanText(value).toLowerCase()
+  return normalized === 'false' || normalized === '0' || normalized === 'no'
+    ? false
+    : true
+}
+
 async function getGoogleAccessToken() {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
@@ -268,15 +275,21 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Formulario invalido.' }, 400)
   }
 
-  const studentId = cleanText(formData.get('student_id'))
-  const title = cleanText(formData.get('title'))
+  const studentId =
+    cleanText(formData.get('student_id')) || cleanText(formData.get('studentId'))
+  const rawTitle = cleanText(formData.get('title'))
   const description = cleanText(formData.get('description')) || null
-  const kind = cleanText(formData.get('kind')) || 'attachment'
-  const visibleToStudent = cleanText(formData.get('visible_to_student')) === 'true'
+  const kind =
+    cleanText(formData.get('kind')) ||
+    cleanText(formData.get('file_kind')) ||
+    'attachment'
+  const visibleToStudent = cleanBoolean(
+    formData.get('visible_to_student') ?? formData.get('visibleToStudent'),
+  )
   const file = formData.get('file')
 
-  if (!studentId || !title) {
-    return jsonResponse({ error: 'Alumno y titulo son requeridos.' }, 400)
+  if (!studentId) {
+    return jsonResponse({ error: 'Alumno requerido.' }, 400)
   }
 
   if (!allowedKinds.has(kind)) {
@@ -294,6 +307,8 @@ Deno.serve(async (req) => {
   if (!allowedMimeTypes.has(file.type)) {
     return jsonResponse({ error: 'Tipo de archivo no permitido.' }, 400)
   }
+
+  const title = rawTitle || safeFileName(file.name)
 
   const { data: student, error: studentError } = await adminClient
     .from('profiles')
@@ -388,7 +403,10 @@ Deno.serve(async (req) => {
   })
 
   return jsonResponse({
-    file: insertedFile,
+    file: {
+      ...insertedFile,
+      file_id: insertedFile.id,
+    },
     drive_status: quota,
   })
 })

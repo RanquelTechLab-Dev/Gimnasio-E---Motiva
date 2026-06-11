@@ -127,6 +127,7 @@ type UploadFileFormState = {
 
 type FixedScheduleFormState = {
   membership_id: string
+  activity_id: string
   weekdays: number[]
   start_time: string
 }
@@ -224,6 +225,25 @@ const bookingStatusLabels: Record<string, string> = {
   cancelled: 'Cancelada',
   attended: 'Asistio',
   no_show: 'Ausente',
+}
+
+function fixedScheduleOptionValue(option: FixedScheduleOption) {
+  return `${option.activity_id}|${option.start_time}`
+}
+
+function fixedScheduleFormValue(form: FixedScheduleFormState) {
+  return form.activity_id && form.start_time
+    ? `${form.activity_id}|${form.start_time}`
+    : ''
+}
+
+function parseFixedScheduleOptionValue(value: string) {
+  const [activityId, startTime] = value.split('|')
+
+  return {
+    activity_id: activityId ?? '',
+    start_time: startTime ?? '',
+  }
 }
 
 function sortByDateTime(
@@ -621,7 +641,7 @@ function buildFileMetadataForm(): FileMetadataFormState {
     drive_url: '',
     mime_type: '',
     size_bytes: '',
-    visible_to_student: false,
+    visible_to_student: true,
   }
 }
 
@@ -630,7 +650,7 @@ function buildUploadFileForm(): UploadFileFormState {
     kind: 'attachment',
     title: '',
     description: '',
-    visible_to_student: false,
+    visible_to_student: true,
     file: null,
   }
 }
@@ -699,6 +719,7 @@ export function AdminStudentsPage() {
   const [fixedScheduleForm, setFixedScheduleForm] =
     useState<FixedScheduleFormState>({
       membership_id: '',
+      activity_id: '',
       weekdays: [],
       start_time: '',
     })
@@ -833,6 +854,7 @@ export function AdminStudentsPage() {
         : null
       setFixedScheduleForm({
         membership_id: firstFixedProgram?.program_id ?? '',
+        activity_id: '',
         weekdays: [],
         start_time: '',
       })
@@ -931,9 +953,24 @@ export function AdminStudentsPage() {
         setFixedScheduleResult(null)
         setFixedScheduleForm((current) => ({
           ...current,
+          activity_id:
+            current.activity_id &&
+            current.start_time &&
+            options.some(
+              (option) =>
+                option.activity_id === current.activity_id &&
+                option.start_time === current.start_time,
+            )
+              ? current.activity_id
+              : options[0]?.activity_id ?? '',
           start_time:
             current.start_time &&
-            options.some((option) => option.start_time === current.start_time)
+            current.activity_id &&
+            options.some(
+              (option) =>
+                option.activity_id === current.activity_id &&
+                option.start_time === current.start_time,
+            )
               ? current.start_time
               : options[0]?.start_time ?? '',
         }))
@@ -962,7 +999,12 @@ export function AdminStudentsPage() {
     setProgramEditForm(null)
     setProgramDeleteTarget(null)
     setProgramDeleteConfirmation('')
-    setFixedScheduleForm({ membership_id: '', weekdays: [], start_time: '' })
+    setFixedScheduleForm({
+      membership_id: '',
+      activity_id: '',
+      weekdays: [],
+      start_time: '',
+    })
     setFixedScheduleOptions([])
     setFixedScheduleResult(null)
     setSelectedFixedBookingIds([])
@@ -1028,6 +1070,7 @@ export function AdminStudentsPage() {
     setProgramDeleteConfirmation('')
     setFixedScheduleForm({
       membership_id: firstFixedProgram?.program_id ?? '',
+      activity_id: '',
       weekdays: [],
       start_time: '',
     })
@@ -1055,16 +1098,28 @@ export function AdminStudentsPage() {
   }
 
   function resetFixedScheduleSelection() {
+    const firstOption = fixedScheduleOptions[0]
     setFixedScheduleForm((current) => ({
       ...current,
       weekdays: [],
-      start_time: fixedScheduleOptions[0]?.start_time ?? '',
+      activity_id: firstOption?.activity_id ?? '',
+      start_time: firstOption?.start_time ?? '',
     }))
     setFixedScheduleResult(null)
   }
 
   async function handlePreviewFixedSchedule() {
     if (!selectedStudent || !fixedScheduleForm.membership_id) {
+      return
+    }
+
+    if (fixedScheduleForm.weekdays.length === 0) {
+      setError('Selecciona al menos un dia.')
+      return
+    }
+
+    if (!fixedScheduleForm.activity_id || !fixedScheduleForm.start_time) {
+      setError('Selecciona un horario.')
       return
     }
 
@@ -1075,6 +1130,7 @@ export function AdminStudentsPage() {
       const result = await previewFixedScheduleForStudent({
         student_id: selectedStudent.id,
         membership_id: fixedScheduleForm.membership_id,
+        activity_id: fixedScheduleForm.activity_id,
         weekdays: fixedScheduleForm.weekdays,
         start_time: fixedScheduleForm.start_time,
       })
@@ -1091,6 +1147,11 @@ export function AdminStudentsPage() {
       return
     }
 
+    if (!fixedScheduleForm.activity_id || !fixedScheduleForm.start_time) {
+      setError('Selecciona un horario.')
+      return
+    }
+
     setFixedScheduleLoading(true)
     setError(null)
     setSuccess(null)
@@ -1098,6 +1159,7 @@ export function AdminStudentsPage() {
       const result = await bulkBookFixedScheduleForStudent({
         student_id: selectedStudent.id,
         membership_id: fixedScheduleForm.membership_id,
+        activity_id: fixedScheduleForm.activity_id,
         weekdays: fixedScheduleForm.weekdays,
         start_time: fixedScheduleForm.start_time,
       })
@@ -1637,7 +1699,7 @@ export function AdminStudentsPage() {
     }
 
     if (!uploadFileForm.file) {
-      setError('Selecciona un archivo para subir.')
+      setError('Selecciona un archivo.')
       return
     }
 
@@ -1657,13 +1719,13 @@ export function AdminStudentsPage() {
       setSuccess(
         result.drive_status?.warning
           ? 'Archivo subido. Atencion: queda 10% o menos de espacio en Drive.'
-          : 'Archivo subido a Drive y registrado.',
+          : 'Archivo subido correctamente.',
       )
       setUploadFileForm(buildUploadFileForm())
       setUploadInputKey((current) => current + 1)
       await loadSelectedStudentOperations(selectedStudent.id)
     } catch (uploadError) {
-      setError(formatAdminError(uploadError))
+      setError(`No se pudo subir el archivo: ${formatAdminError(uploadError)}`)
     } finally {
       setSaving(false)
     }
@@ -2008,6 +2070,7 @@ export function AdminStudentsPage() {
                         onChange={(event) => {
                           setFixedScheduleForm({
                             membership_id: event.target.value,
+                            activity_id: '',
                             weekdays: [],
                             start_time: '',
                           })
@@ -2034,21 +2097,28 @@ export function AdminStudentsPage() {
                           fixedScheduleLoading || fixedScheduleOptions.length === 0
                         }
                         onChange={(event) => {
+                          const nextOption = parseFixedScheduleOptionValue(
+                            event.target.value,
+                          )
                           setFixedScheduleForm({
                             ...fixedScheduleForm,
-                            start_time: event.target.value,
+                            activity_id: nextOption.activity_id,
+                            start_time: nextOption.start_time,
                           })
                           setFixedScheduleResult(null)
                         }}
-                        value={fixedScheduleForm.start_time}
+                        value={fixedScheduleFormValue(fixedScheduleForm)}
                       >
                         {fixedScheduleOptions.length === 0 ? (
                           <option value="">
-                            No hay clases creadas para esta actividad
+                            No hay clases creadas para las actividades de este programa
                           </option>
                         ) : (
                           fixedScheduleOptions.map((option) => (
-                            <option key={option.start_time} value={option.start_time}>
+                            <option
+                              key={fixedScheduleOptionValue(option)}
+                              value={fixedScheduleOptionValue(option)}
+                            >
                               {option.label}
                             </option>
                           ))
@@ -2108,6 +2178,7 @@ export function AdminStudentsPage() {
                       disabled={
                         fixedScheduleLoading ||
                         fixedScheduleForm.weekdays.length === 0 ||
+                        !fixedScheduleForm.activity_id ||
                         !fixedScheduleForm.start_time
                       }
                       onClick={handlePreviewFixedSchedule}

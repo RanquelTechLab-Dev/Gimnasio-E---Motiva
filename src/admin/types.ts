@@ -165,6 +165,8 @@ export type UpdateStudentProgramInput = {
 }
 
 export type FixedScheduleOption = {
+  activity_id: string
+  activity_name: string
   start_time: string
   label: string
   activity_names: string
@@ -200,6 +202,7 @@ export type FixedScheduleResult = {
   mode: 'preview' | 'execute'
   student_id: string
   membership_id: string
+  activity_id?: string | null
   weekdays: number[]
   start_time: string
   total_found: number
@@ -529,6 +532,16 @@ export type AdminStorageFile = DriveCleanupFile & {
   student_name: string | null
   student_email: string | null
   archived_at: string | null
+}
+
+export type FileStorageSummary = {
+  total_files: number
+  active_files: number
+  visible_active_files: number
+  hidden_active_files: number
+  archived_files: number
+  active_size_bytes: number
+  total_size_bytes: number
 }
 
 export type DriveCleanupResult = {

@@ -20,6 +20,7 @@ import type {
   FixedScheduleResult,
   FixedScheduleSelectedDeleteResult,
   FixedScheduleSelectedCancelResult,
+  FileStorageSummary,
   MassEmailInput,
   MassEmailResult,
   Membership,
@@ -190,7 +191,7 @@ export async function deactivateStudent(studentId: string) {
   })
 
   if (error) {
-    throw error
+    await throwEdgeFunctionError(error)
   }
 
   return data as AdminActionResult
@@ -496,6 +497,7 @@ export async function listFixedScheduleOptionsForStudent(
 export async function previewFixedScheduleForStudent(input: {
   student_id: string
   membership_id: string
+  activity_id: string
   weekdays: number[]
   start_time: string
 }) {
@@ -505,6 +507,7 @@ export async function previewFixedScheduleForStudent(input: {
     {
       p_student_id: input.student_id,
       p_membership_id: input.membership_id,
+      p_activity_id: input.activity_id || null,
       p_weekdays: input.weekdays,
       p_start_time: input.start_time,
     },
@@ -520,6 +523,7 @@ export async function previewFixedScheduleForStudent(input: {
 export async function bulkBookFixedScheduleForStudent(input: {
   student_id: string
   membership_id: string
+  activity_id: string
   weekdays: number[]
   start_time: string
 }) {
@@ -529,6 +533,7 @@ export async function bulkBookFixedScheduleForStudent(input: {
     {
       p_student_id: input.student_id,
       p_membership_id: input.membership_id,
+      p_activity_id: input.activity_id || null,
       p_weekdays: input.weekdays,
       p_start_time: input.start_time,
     },
@@ -1209,7 +1214,7 @@ export async function uploadStudentFile(input: UploadStudentFileInput) {
   const formData = new FormData()
   formData.append('student_id', input.student_id)
   formData.append('kind', input.kind)
-  formData.append('title', input.title)
+  formData.append('title', input.title.trim() || input.file.name)
   formData.append('description', input.description)
   formData.append('visible_to_student', String(input.visible_to_student))
   formData.append('file', input.file)
@@ -1304,6 +1309,53 @@ export async function listDriveStorageFiles() {
       student_email: student?.email ?? null,
     }
   }) as AdminStorageFile[]
+}
+
+export async function getFileStorageSummary() {
+  const client = getClient()
+  const { data, error } = await client
+    .from('files')
+    .select('size_bytes, visible_to_student, archived_at')
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []).reduce<FileStorageSummary>(
+    (summary, file) => {
+      const size = Number(file.size_bytes ?? 0)
+      const safeSize = Number.isFinite(size) && size > 0 ? Math.trunc(size) : 0
+      const archived = Boolean(file.archived_at)
+
+      summary.total_files += 1
+      summary.total_size_bytes += safeSize
+
+      if (archived) {
+        summary.archived_files += 1
+        return summary
+      }
+
+      summary.active_files += 1
+      summary.active_size_bytes += safeSize
+
+      if (file.visible_to_student) {
+        summary.visible_active_files += 1
+      } else {
+        summary.hidden_active_files += 1
+      }
+
+      return summary
+    },
+    {
+      total_files: 0,
+      active_files: 0,
+      visible_active_files: 0,
+      hidden_active_files: 0,
+      archived_files: 0,
+      active_size_bytes: 0,
+      total_size_bytes: 0,
+    },
+  )
 }
 
 export async function runDriveCleanup(fileIds: string[], maxFiles = 50) {

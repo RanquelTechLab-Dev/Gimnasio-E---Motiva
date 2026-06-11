@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   deleteStudentDriveFile,
   formatAdminError,
+  getFileStorageSummary,
   listDriveStorageFiles,
   previewDriveCleanup,
   runDriveCleanup,
@@ -10,6 +11,7 @@ import type {
   AdminStorageFile,
   DriveCleanupFile,
   DriveCleanupResult,
+  FileStorageSummary,
 } from '../../admin/types'
 
 function formatSize(value: number | null | undefined) {
@@ -51,6 +53,9 @@ export function AdminStoragePage() {
   const [result, setResult] = useState<DriveCleanupResult | null>(null)
   const [lastAction, setLastAction] = useState<DriveCleanupResult | null>(null)
   const [storageFiles, setStorageFiles] = useState<AdminStorageFile[]>([])
+  const [storageSummary, setStorageSummary] = useState<FileStorageSummary | null>(
+    null,
+  )
   const [loading, setLoading] = useState(false)
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [executing, setExecuting] = useState(false)
@@ -61,8 +66,12 @@ export function AdminStoragePage() {
   const loadStorageFiles = useCallback(async () => {
     setLoadingFiles(true)
     try {
-      const files = await listDriveStorageFiles()
+      const [files, summary] = await Promise.all([
+        listDriveStorageFiles(),
+        getFileStorageSummary(),
+      ])
       setStorageFiles(files)
+      setStorageSummary(summary)
     } catch (filesError) {
       setError(formatAdminError(filesError))
     } finally {
@@ -215,6 +224,63 @@ export function AdminStoragePage() {
             {success}
           </p>
         ) : null}
+      </article>
+
+      <article className="rounded-[20px] border border-[var(--line)] bg-[var(--surface)] p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">
+              Metadata local
+            </p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Total calculado desde la tabla de archivos, no desde la cuota fija
+              de Google Drive.
+            </p>
+          </div>
+          <button
+            className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold text-[var(--ink)] disabled:opacity-50"
+            disabled={loadingFiles}
+            onClick={() => void loadStorageFiles()}
+            type="button"
+          >
+            {loadingFiles ? 'Actualizando...' : 'Actualizar metadata'}
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
+          <div className="rounded-2xl bg-[var(--surface-strong)] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+              Activos
+            </p>
+            <p className="mt-1 text-lg font-bold text-[var(--ink)]">
+              {storageSummary?.active_files ?? 0}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-[var(--surface-strong)] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+              Visibles
+            </p>
+            <p className="mt-1 text-lg font-bold text-[var(--ink)]">
+              {storageSummary?.visible_active_files ?? 0}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-[var(--surface-strong)] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+              Ocultos
+            </p>
+            <p className="mt-1 text-lg font-bold text-[var(--ink)]">
+              {storageSummary?.hidden_active_files ?? 0}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-[var(--surface-strong)] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+              Tamano activo
+            </p>
+            <p className="mt-1 text-lg font-bold text-[var(--ink)]">
+              {formatSize(storageSummary?.active_size_bytes ?? 0)}
+            </p>
+          </div>
+        </div>
       </article>
 
       {result ? (

@@ -1699,7 +1699,7 @@ export function AdminStudentsPage() {
     }
 
     if (!uploadFileForm.file) {
-      setError('Selecciona un archivo para subir.')
+      setError('Selecciona un archivo.')
       return
     }
 

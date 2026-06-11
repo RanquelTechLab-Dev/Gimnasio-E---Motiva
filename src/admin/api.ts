@@ -191,7 +191,7 @@ export async function deactivateStudent(studentId: string) {
   })
 
   if (error) {
-    throw error
+    await throwEdgeFunctionError(error)
   }
 
   return data as AdminActionResult
@@ -1214,7 +1214,7 @@ export async function uploadStudentFile(input: UploadStudentFileInput) {
   const formData = new FormData()
   formData.append('student_id', input.student_id)
   formData.append('kind', input.kind)
-  formData.append('title', input.title)
+  formData.append('title', input.title.trim() || input.file.name)
   formData.append('description', input.description)
   formData.append('visible_to_student', String(input.visible_to_student))
   formData.append('file', input.file)

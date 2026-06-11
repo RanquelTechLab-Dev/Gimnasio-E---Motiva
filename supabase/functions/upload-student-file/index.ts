@@ -269,14 +269,18 @@ Deno.serve(async (req) => {
   }
 
   const studentId = cleanText(formData.get('student_id'))
-  const title = cleanText(formData.get('title'))
+  const rawTitle = cleanText(formData.get('title'))
   const description = cleanText(formData.get('description')) || null
-  const kind = cleanText(formData.get('kind')) || 'attachment'
+  const kind = cleanText(formData.get('kind'))
   const visibleToStudent = cleanText(formData.get('visible_to_student')) !== 'false'
   const file = formData.get('file')
 
-  if (!studentId || !title) {
-    return jsonResponse({ error: 'Alumno y titulo son requeridos.' }, 400)
+  if (!studentId) {
+    return jsonResponse({ error: 'Alumno requerido.' }, 400)
+  }
+
+  if (!kind) {
+    return jsonResponse({ error: 'Tipo de archivo requerido.' }, 400)
   }
 
   if (!allowedKinds.has(kind)) {
@@ -294,6 +298,8 @@ Deno.serve(async (req) => {
   if (!allowedMimeTypes.has(file.type)) {
     return jsonResponse({ error: 'Tipo de archivo no permitido.' }, 400)
   }
+
+  const title = rawTitle || safeFileName(file.name)
 
   const { data: student, error: studentError } = await adminClient
     .from('profiles')

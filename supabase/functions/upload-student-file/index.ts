@@ -21,6 +21,7 @@ const allowedMimeTypes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
+  'text/plain',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ])
@@ -88,10 +89,31 @@ function safeFileName(fileName: string) {
   return fileName.replace(/[^\w.\- ]+/g, '_').slice(0, 120) || 'archivo'
 }
 
+function resolvedMimeType(file: File) {
+  if (file.type) {
+    return file.type
+  }
+
+  return file.name.toLowerCase().endsWith('.txt')
+    ? 'text/plain'
+    : 'application/octet-stream'
+}
+
+function safeUploadLog(message: string, metadata: Record<string, unknown>) {
+  console.log(
+    JSON.stringify({
+      event: 'upload-student-file',
+      message,
+      ...metadata,
+    }),
+  )
+}
+
 async function uploadToDrive(
   accessToken: string,
   rootFolderId: string,
   file: File,
+  mimeType: string,
   title: string,
   description: string | null,
 ) {
@@ -110,7 +132,7 @@ async function uploadToDrive(
       )}\r\n`,
     ),
     encoder.encode(
-      `--${boundary}\r\nContent-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`,
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
     ),
     fileBytes,
     encoder.encode(`\r\n--${boundary}--\r\n`),
@@ -276,7 +298,9 @@ Deno.serve(async (req) => {
   }
 
   const studentId =
-    cleanText(formData.get('student_id')) || cleanText(formData.get('studentId'))
+    cleanText(formData.get('student_id')) ||
+    cleanText(formData.get('studentId')) ||
+    cleanText(formData.get('profile_id'))
   const rawTitle = cleanText(formData.get('title'))
   const description = cleanText(formData.get('description')) || null
   const kind =
@@ -286,10 +310,30 @@ Deno.serve(async (req) => {
   const visibleToStudent = cleanBoolean(
     formData.get('visible_to_student') ?? formData.get('visibleToStudent'),
   )
-  const file = formData.get('file')
+  const fileFieldNames = ['file', 'document', 'upload']
+  const fileFieldName =
+    fileFieldNames.find((fieldName) => formData.get(fieldName) instanceof File) ??
+    fileFieldNames.find((fieldName) => formData.has(fieldName)) ??
+    'file'
+  const file = formData.get(fileFieldName)
+  const hasFile = file instanceof File
+
+  safeUploadLog('form parsed', {
+    method: req.method,
+    content_type: req.headers.get('content-type') ?? null,
+    form_keys: Array.from(formData.keys()),
+    has_student_id: Boolean(studentId),
+    kind,
+    visible_to_student: visibleToStudent,
+    file_field: hasFile ? fileFieldName : null,
+    has_file: hasFile,
+    file_name: hasFile ? file.name : null,
+    file_size: hasFile ? file.size : null,
+    file_type: hasFile ? resolvedMimeType(file) : null,
+  })
 
   if (!studentId) {
-    return jsonResponse({ error: 'Alumno requerido.' }, 400)
+    return jsonResponse({ error: 'Falta alumno seleccionado.' }, 400)
   }
 
   if (!allowedKinds.has(kind)) {
@@ -297,18 +341,38 @@ Deno.serve(async (req) => {
   }
 
   if (!(file instanceof File)) {
-    return jsonResponse({ error: 'Archivo requerido.' }, 400)
+    return jsonResponse({ error: 'Falta archivo.' }, 400)
   }
 
-  if (file.size <= 0 || file.size > maxFileSize) {
+  if (file.size <= 0) {
+    return jsonResponse({ error: 'El archivo esta vacio.' }, 400)
+  }
+
+  if (file.size > maxFileSize) {
     return jsonResponse({ error: 'El archivo debe pesar hasta 10 MB.' }, 400)
   }
 
-  if (!allowedMimeTypes.has(file.type)) {
-    return jsonResponse({ error: 'Tipo de archivo no permitido.' }, 400)
+  const mimeType = resolvedMimeType(file)
+
+  if (!allowedMimeTypes.has(mimeType)) {
+    return jsonResponse(
+      { error: `Tipo de archivo no permitido: ${mimeType}.` },
+      400,
+    )
   }
 
   const title = rawTitle || safeFileName(file.name)
+
+  safeUploadLog('validated upload input', {
+    student_id_present: true,
+    kind,
+    title,
+    file_field: fileFieldName,
+    file_name: file.name,
+    file_size: file.size,
+    file_type: mimeType,
+    visible_to_student: visibleToStudent,
+  })
 
   const { data: student, error: studentError } = await adminClient
     .from('profiles')
@@ -337,7 +401,14 @@ Deno.serve(async (req) => {
 
   let driveFile: Awaited<ReturnType<typeof uploadToDrive>>
   try {
-    driveFile = await uploadToDrive(accessToken, rootFolderId, file, title, description)
+    driveFile = await uploadToDrive(
+      accessToken,
+      rootFolderId,
+      file,
+      mimeType,
+      title,
+      description,
+    )
     if (visibleToStudent && student.email) {
       await grantReaderPermission(accessToken, driveFile.id, student.email)
     }
@@ -368,7 +439,7 @@ Deno.serve(async (req) => {
       description,
       drive_file_id: driveFile.id,
       drive_url: driveFile.webViewLink ?? null,
-      mime_type: driveFile.mimeType ?? file.type,
+      mime_type: driveFile.mimeType ?? mimeType,
       size_bytes: Number(driveFile.size ?? file.size),
       visible_to_student: visibleToStudent,
       uploaded_by: requester.id,
@@ -378,6 +449,15 @@ Deno.serve(async (req) => {
     .single()
 
   if (insertError || !insertedFile) {
+    console.error(
+      JSON.stringify({
+        event: 'upload-student-file',
+        message: 'metadata insert failed',
+        error_code: insertError?.code ?? null,
+        error_message: insertError?.message ?? null,
+        error_details: insertError?.details ?? null,
+      }),
+    )
     await deleteDriveFile(accessToken, driveFile.id)
     return jsonResponse(
       { error: 'Archivo subido a Drive, pero fallo la metadata. Se limpio Drive.' },

@@ -1224,7 +1224,7 @@ export async function uploadStudentFile(input: UploadStudentFileInput) {
   })
 
   if (error) {
-    throw error
+    await throwEdgeFunctionError(error)
   }
 
   return data as UploadStudentFileResult

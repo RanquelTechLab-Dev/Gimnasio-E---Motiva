@@ -1695,6 +1695,7 @@ export function AdminStudentsPage() {
   async function handleUploadStudentFile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!selectedStudent) {
+      setError('Selecciona un alumno.')
       return
     }
 

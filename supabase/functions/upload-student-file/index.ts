@@ -272,7 +272,7 @@ Deno.serve(async (req) => {
   const title = cleanText(formData.get('title'))
   const description = cleanText(formData.get('description')) || null
   const kind = cleanText(formData.get('kind')) || 'attachment'
-  const visibleToStudent = cleanText(formData.get('visible_to_student')) === 'true'
+  const visibleToStudent = cleanText(formData.get('visible_to_student')) !== 'false'
   const file = formData.get('file')
 
   if (!studentId || !title) {
@@ -388,7 +388,10 @@ Deno.serve(async (req) => {
   })
 
   return jsonResponse({
-    file: insertedFile,
+    file: {
+      ...insertedFile,
+      file_id: insertedFile.id,
+    },
     drive_status: quota,
   })
 })

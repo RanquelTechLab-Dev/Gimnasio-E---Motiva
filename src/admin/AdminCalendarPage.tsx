@@ -12,6 +12,7 @@ import {
   listActivities,
   listCalendarSessions,
   updateActivity,
+  updateRecurringClassSession,
   updateClassSession,
 } from './api'
 import type { DeleteClassSessionScope } from './api'
@@ -67,6 +68,8 @@ type SessionDeleteRequest = {
   title: string
   description: string
 }
+
+type RecurringEditScope = 'single' | 'series'
 
 const weekdayLabels = [
   'Domingo',
@@ -310,6 +313,8 @@ export function AdminCalendarPage() {
     useState<SessionDeleteRequest | null>(null)
   const [sessionDeleteConfirmation, setSessionDeleteConfirmation] =
     useState('')
+  const [recurringEditScope, setRecurringEditScope] =
+    useState<RecurringEditScope>('single')
 
   const selectedSession = useMemo(
     () =>
@@ -423,6 +428,7 @@ export function AdminCalendarPage() {
     setRecurrence(buildRecurrenceForm(nextForm, Boolean(session.recurring_rule_id)))
     setCancelReason('')
     setCapacityNotice(null)
+    setRecurringEditScope(session.recurring_rule_id ? 'series' : 'single')
     setError(null)
     setSuccess(null)
   }
@@ -441,6 +447,7 @@ export function AdminCalendarPage() {
     setRecurrence(buildRecurrenceForm(nextForm))
     setCancelReason('')
     setCapacityNotice(null)
+    setRecurringEditScope('single')
     setError(null)
     setSuccess(null)
   }
@@ -563,21 +570,30 @@ export function AdminCalendarPage() {
         title: input.title || selectedActivityName,
       }
       if (selectedSession) {
-        await updateClassSession({
+        const updateInput = {
           ...inputWithTitle,
           session_id: selectedSession.session_id,
           active: form.active,
-        } satisfies UpdateClassSessionInput)
-        if (recurrence.enabled && !selectedSession.recurring_rule_id) {
-          const recurringResult =
-            await convertClassSessionToRecurringRule(selectedSession.session_id)
+        } satisfies UpdateClassSessionInput
+
+        if (selectedSession.recurring_rule_id && recurringEditScope === 'series') {
+          await updateRecurringClassSession(updateInput)
           setSuccess(
-            recurringResult.action === 'restored'
-              ? 'Clase restaurada correctamente.'
-              : 'Clase actualizada y convertida en horario recurrente.',
+            'Horario recurrente actualizado desde esta fecha. Las clases futuras ya no deberian volver al estado anterior.',
           )
         } else {
-          setSuccess('Clase actualizada.')
+          await updateClassSession(updateInput)
+          if (recurrence.enabled && !selectedSession.recurring_rule_id) {
+            const recurringResult =
+              await convertClassSessionToRecurringRule(selectedSession.session_id)
+            setSuccess(
+              recurringResult.action === 'restored'
+                ? 'Clase restaurada correctamente.'
+                : 'Clase actualizada y convertida en horario recurrente.',
+            )
+          } else {
+            setSuccess('Clase actualizada.')
+          }
         }
         resetForm()
       } else if (recurrence.enabled) {
@@ -822,6 +838,50 @@ export function AdminCalendarPage() {
             ) : null}
           </div>
 
+          {selectedIsRecurring ? (
+            <div className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
+                  Alcance de la edicion
+                </p>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  Esta clase viene de un horario recurrente. Elegi si queres
+                  editar solo esta fecha o reemplazar el horario recurrente
+                  desde esta fecha en adelante.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+                    recurringEditScope === 'single'
+                      ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
+                      : 'border-[var(--line)] bg-white text-[var(--ink)] hover:bg-[var(--surface-strong)]'
+                  }`}
+                  onClick={() => setRecurringEditScope('single')}
+                  type="button"
+                >
+                  Editar solo esta clase
+                </button>
+                <button
+                  className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+                    recurringEditScope === 'series'
+                      ? 'border-[var(--brand)] bg-[var(--brand-soft)] text-[var(--brand)]'
+                      : 'border-[var(--line)] bg-white text-[var(--ink)] hover:bg-[var(--surface-strong)]'
+                  }`}
+                  onClick={() => setRecurringEditScope('series')}
+                  type="button"
+                >
+                  Editar horario recurrente
+                </button>
+              </div>
+              <p className="text-xs text-[var(--muted)]">
+                {recurringEditScope === 'single'
+                  ? 'Esta opcion crea una excepcion puntual para esta fecha y deja intacto el horario recurrente de las proximas semanas.'
+                  : 'Esta opcion reemplaza el horario recurrente desde esta fecha y evita que la regla vieja vuelva a recrear clases anteriores.'}
+              </p>
+            </div>
+          ) : null}
+
           <label className="mt-4 flex items-start gap-3 rounded-2xl border border-[var(--line)] bg-[var(--page)] p-3 text-sm font-semibold text-[var(--ink)]">
             <input
               checked={recurrence.enabled}
@@ -839,7 +899,9 @@ export function AdminCalendarPage() {
               Clase recurrente
               <span className="block text-xs font-normal text-[var(--muted)]">
                 {selectedIsRecurring
-                  ? 'Esta clase ya pertenece a un horario recurrente. Los cambios del formulario afectan esta fecha; para quitar toda la serie usa la accion de eliminacion recurrente.'
+                  ? recurringEditScope === 'series'
+                    ? 'Estas editando el horario recurrente desde esta fecha. Si queres tocar solo una fecha puntual, cambia el alcance arriba.'
+                    : 'Estas editando solo esta fecha. La regla recurrente original seguira activa para las proximas semanas.'
                   : selectedSession
                     ? 'Si lo tildas, esta clase se convierte en un horario recurrente usando la fecha y hora actuales.'
                     : 'Si lo tildas, se repetira todas las semanas sin fecha de fin. Si no lo tildas, se crea solo esta clase.'}
@@ -1123,7 +1185,8 @@ export function AdminCalendarPage() {
               placeholder="Notas internas"
               value={form.notes}
             />
-            {selectedSession ? (
+            {selectedSession &&
+            (!selectedIsRecurring || recurringEditScope === 'single') ? (
               <label className="flex items-center gap-3 text-sm font-semibold">
                 <input
                   checked={form.active}
@@ -1143,7 +1206,11 @@ export function AdminCalendarPage() {
               {saving
                 ? 'Guardando...'
                 : selectedSession
-                  ? recurrence.enabled && !selectedIsRecurring
+                  ? selectedIsRecurring
+                    ? recurringEditScope === 'series'
+                      ? 'Guardar horario recurrente'
+                      : 'Guardar solo esta clase'
+                    : recurrence.enabled && !selectedIsRecurring
                     ? 'Guardar y convertir en recurrente'
                     : 'Guardar clase'
                   : recurrence.enabled

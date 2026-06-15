@@ -925,6 +925,32 @@ export async function updateClassSession(input: UpdateClassSessionInput) {
   return data
 }
 
+export async function updateRecurringClassSession(
+  input: UpdateClassSessionInput,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_update_class_recurring_rule_from_session',
+    {
+      p_session_id: input.session_id,
+      p_activity_id: input.activity_id,
+      p_title: input.title,
+      p_starts_at: input.starts_at,
+      p_ends_at: input.ends_at,
+      p_capacity: input.capacity,
+      p_trainer_name: input.coach_name.trim() || null,
+      p_notes: input.notes.trim() || null,
+      p_active: input.active,
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as AdminActionResult
+}
+
 export async function cancelClassSession(sessionId: string, reason: string) {
   const client = getClient()
   const { data, error } = await client.rpc('cancel_class_session', {

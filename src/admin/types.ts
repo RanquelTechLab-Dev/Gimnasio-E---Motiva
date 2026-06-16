@@ -434,6 +434,10 @@ export type AdminActionResult = {
   rule_id?: string
   has_history?: boolean
   future_active_bookings_cancelled?: number
+  reconciled_future_sessions?: number
+  skipped_future_sessions?: number
+  skipped_future_sessions_with_bookings?: number
+  skipped_future_sessions_with_attendance?: number
   credits_returned?: number
   warning?: string
 }

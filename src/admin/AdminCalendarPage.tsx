@@ -107,6 +107,14 @@ function formatLocalTime(date: Date) {
   return `${hours}:${minutes}`
 }
 
+function appendRecurringWarning(message: string, warning?: string | null) {
+  if (!warning) {
+    return message
+  }
+
+  return `${message} ${warning}`
+}
+
 function dateTimeLocalToIso(value: string) {
   return new Date(value).toISOString()
 }
@@ -577,9 +585,12 @@ export function AdminCalendarPage() {
         } satisfies UpdateClassSessionInput
 
         if (selectedSession.recurring_rule_id && recurringEditScope === 'series') {
-          await updateRecurringClassSession(updateInput)
+          const result = await updateRecurringClassSession(updateInput)
           setSuccess(
-            'Horario recurrente actualizado desde esta fecha. Las clases futuras ya no deberian volver al estado anterior.',
+            appendRecurringWarning(
+              'Horario recurrente actualizado desde esta fecha. Las clases futuras ya no deberian volver al estado anterior.',
+              result.warning,
+            ),
           )
         } else {
           await updateClassSession(updateInput)
@@ -661,9 +672,10 @@ export function AdminCalendarPage() {
     try {
       const result = await deleteClassSession(selectedSession.session_id, scope)
       if (result.action === 'deleted_series') {
-        setSuccess(
+        setSuccess(appendRecurringWarning(
           'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
-        )
+          result.warning,
+        ))
       } else if (result.action === 'cancelled') {
         setSuccess('Clase cancelada de forma segura. El historial se conservo.')
       } else {
@@ -695,9 +707,12 @@ export function AdminCalendarPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteClassSession(selectedSession.session_id, 'series')
+      const result = await deleteClassSession(selectedSession.session_id, 'series')
       setSuccess(
-        'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
+        appendRecurringWarning(
+          'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
+          result.warning,
+        ),
       )
       setSessionDeleteRequest(null)
       setSessionDeleteConfirmation('')

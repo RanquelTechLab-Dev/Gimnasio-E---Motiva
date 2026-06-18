@@ -316,17 +316,14 @@ export function WeeklyScheduleGrid<TSession extends ScheduleSession>({
       sessions.filter(
         (session) =>
           visibleDays.has(getDayKey(session.starts_at)) &&
-          (mode === 'admin' || (session.active && !session.cancelled_at)),
+          session.active === true &&
+          !session.cancelled_at,
       ),
-    [mode, sessions, visibleDays],
+    [sessions, visibleDays],
   )
   const slotSessions = useMemo(
-    () =>
-      renderSessions.filter(
-        (session) =>
-          mode === 'admin' || (session.active && !session.cancelled_at),
-      ),
-    [mode, renderSessions],
+    () => renderSessions,
+    [renderSessions],
   )
   const todayKey = formatLocalDate(new Date())
   const rangeStartKey = fromDate

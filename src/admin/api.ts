@@ -241,19 +241,6 @@ export async function deactivateStudent(studentId: string) {
   return data as AdminActionResult
 }
 
-export async function deleteStudent(studentId: string) {
-  const client = getClient()
-  const { data, error } = await client.functions.invoke('delete-student', {
-    body: { student_id: studentId },
-  })
-
-  if (error) {
-    await throwEdgeFunctionError(error)
-  }
-
-  return data as AdminActionResult
-}
-
 export async function listPlans() {
   const client = getClient()
   const { data, error } = await client

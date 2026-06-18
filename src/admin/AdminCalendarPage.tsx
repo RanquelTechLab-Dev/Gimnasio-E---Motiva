@@ -19,6 +19,7 @@ import type { DeleteClassSessionScope } from './api'
 import type {
   Activity,
   ActivityInput,
+  AdminActionResult,
   CalendarSession,
   ClassSessionInput,
   UpdateClassSessionInput,
@@ -113,6 +114,29 @@ function appendRecurringWarning(message: string, warning?: string | null) {
   }
 
   return `${message} ${warning}`
+}
+
+function calendarActionMessage(result: AdminActionResult, fallback: string) {
+  const baseMessage = result.message?.trim() || fallback
+  const warnings = [
+    result.warning,
+    ...(Array.isArray(result.warnings) ? result.warnings : []),
+  ].filter((warning): warning is string => Boolean(warning?.trim()))
+
+  if (
+    warnings.length === 0 &&
+    result.skipped_future_sessions &&
+    result.skipped_future_sessions > 0
+  ) {
+    warnings.push(
+      'Algunas clases futuras con reservas/asistencia no se modificaron y deben revisarse manualmente.',
+    )
+  }
+
+  return warnings.reduce(
+    (message, warning) => appendRecurringWarning(message, warning),
+    baseMessage,
+  )
 }
 
 function dateTimeLocalToIso(value: string) {
@@ -587,9 +611,9 @@ export function AdminCalendarPage() {
         if (selectedSession.recurring_rule_id && recurringEditScope === 'series') {
           const result = await updateRecurringClassSession(updateInput)
           setSuccess(
-            appendRecurringWarning(
+            calendarActionMessage(
+              result,
               'Horario recurrente actualizado desde esta fecha. Las clases futuras ya no deberian volver al estado anterior.',
-              result.warning,
             ),
           )
         } else {
@@ -620,9 +644,13 @@ export function AdminCalendarPage() {
           valid_from: recurrence.date_from,
         })
         setSuccess(
-          recurringResult.action === 'restored'
-            ? 'Clase restaurada correctamente.'
-            : 'Horario recurrente creado. Se repetira todas las semanas hasta que lo pauses o modifiques.',
+          calendarActionMessage(
+            recurringResult,
+            recurringResult.action === 'restored' ||
+              recurringResult.action === 'restored_occurrence'
+              ? 'Clase restaurada correctamente.'
+              : 'Horario recurrente creado. Se repetira todas las semanas hasta que lo pauses o modifiques.',
+          ),
         )
       } else {
         await createClassSession(inputWithTitle)
@@ -672,10 +700,12 @@ export function AdminCalendarPage() {
     try {
       const result = await deleteClassSession(selectedSession.session_id, scope)
       if (result.action === 'deleted_series') {
-        setSuccess(appendRecurringWarning(
-          'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
-          result.warning,
-        ))
+        setSuccess(
+          calendarActionMessage(
+            result,
+            'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
+          ),
+        )
       } else if (result.action === 'cancelled') {
         setSuccess('Clase cancelada de forma segura. El historial se conservo.')
       } else {
@@ -709,9 +739,9 @@ export function AdminCalendarPage() {
     try {
       const result = await deleteClassSession(selectedSession.session_id, 'series')
       setSuccess(
-        appendRecurringWarning(
+        calendarActionMessage(
+          result,
           'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
-          result.warning,
         ),
       )
       setSessionDeleteRequest(null)

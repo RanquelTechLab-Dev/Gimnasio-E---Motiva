@@ -426,13 +426,18 @@ export type AdminActionResult = {
     | 'deleted'
     | 'deleted_series'
     | 'restored'
+    | 'restored_occurrence'
     | 'updated'
+  ok?: boolean
   student_id?: string
   plan_id?: string
   activity_id?: string
   session_id?: string
   rule_id?: string
+  message?: string | null
   has_history?: boolean
+  affected_sessions?: number
+  created_sessions?: number
   future_active_bookings_cancelled?: number
   reconciled_future_sessions?: number
   skipped_future_sessions?: number
@@ -440,6 +445,7 @@ export type AdminActionResult = {
   skipped_future_sessions_with_attendance?: number
   credits_returned?: number
   warning?: string
+  warnings?: string[]
 }
 
 export type AdminTrainingNote = {

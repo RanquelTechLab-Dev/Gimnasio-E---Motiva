@@ -49,6 +49,16 @@ import type {
 
 export type DeleteClassSessionScope = 'single' | 'series'
 
+class CalendarRpcError extends Error {
+  readonly rpcName: string
+
+  constructor(rpcName: string, message: string) {
+    super(message)
+    this.name = 'CalendarRpcError'
+    this.rpcName = rpcName
+  }
+}
+
 function getClient() {
   if (!supabase) {
     throw new Error(supabaseConfigError ?? 'La app no esta configurada.')
@@ -96,6 +106,40 @@ function getErrorMessage(error: unknown) {
 
 export function formatAdminError(error: unknown) {
   return getErrorMessage(error)
+}
+
+function throwCalendarRpcError(rpcName: string, error: unknown): never {
+  const candidate =
+    error && typeof error === 'object'
+      ? (error as {
+          code?: unknown
+          details?: unknown
+          hint?: unknown
+          message?: unknown
+          status?: unknown
+        })
+      : null
+  const message = getErrorMessage(error)
+  const lowerMessage = message.toLowerCase()
+  const isNetworkError =
+    lowerMessage.includes('networkerror') ||
+    lowerMessage.includes('failed to fetch') ||
+    lowerMessage.includes('fetch')
+  const contextParts = [
+    typeof candidate?.code === 'string' ? `codigo ${candidate.code}` : null,
+    typeof candidate?.status === 'number' ? `status ${candidate.status}` : null,
+    typeof candidate?.details === 'string' ? candidate.details : null,
+    typeof candidate?.hint === 'string' ? candidate.hint : null,
+  ].filter(Boolean)
+
+  const prefix = isNetworkError
+    ? `No se pudo contactar Supabase para RPC ${rpcName}. Revisa conexion o deployment.`
+    : `RPC ${rpcName}:`
+
+  throw new CalendarRpcError(
+    rpcName,
+    [prefix, message, ...contextParts].join(' ').trim(),
+  )
 }
 
 async function throwEdgeFunctionError(error: unknown): Promise<never> {
@@ -770,7 +814,10 @@ export async function listCalendarSessions(fromDate: string, toDate: string) {
   )
 
   if (materializeError) {
-    throw materializeError
+    throwCalendarRpcError(
+      'materialize_recurring_class_sessions',
+      materializeError,
+    )
   }
 
   const { data, error } = await client.rpc('list_calendar_sessions', {
@@ -779,7 +826,7 @@ export async function listCalendarSessions(fromDate: string, toDate: string) {
   })
 
   if (error) {
-    throw error
+    throwCalendarRpcError('list_calendar_sessions', error)
   }
 
   return hydrateCalendarSessionColors(client, (data ?? []) as CalendarSession[])
@@ -826,7 +873,7 @@ export async function listClassRecurringRules() {
   const { data, error } = await client.rpc('admin_list_class_recurring_rules')
 
   if (error) {
-    throw error
+    throwCalendarRpcError('admin_list_class_recurring_rules', error)
   }
 
   return (data ?? []) as ClassRecurringRule[]
@@ -850,7 +897,7 @@ export async function createClassRecurringRule(
   })
 
   if (error) {
-    throw error
+    throwCalendarRpcError('admin_create_class_recurring_rule', error)
   }
 
   return data as AdminActionResult
@@ -866,7 +913,7 @@ export async function convertClassSessionToRecurringRule(sessionId: string) {
   )
 
   if (error) {
-    throw error
+    throwCalendarRpcError('admin_convert_class_session_to_recurring_rule', error)
   }
 
   return data as AdminActionResult
@@ -879,7 +926,7 @@ export async function archiveClassRecurringRule(ruleId: string) {
   })
 
   if (error) {
-    throw error
+    throwCalendarRpcError('admin_archive_class_recurring_rule', error)
   }
 
   return data as AdminActionResult
@@ -898,7 +945,7 @@ export async function createClassSession(input: ClassSessionInput) {
   })
 
   if (error) {
-    throw error
+    throwCalendarRpcError('create_class_session', error)
   }
 
   return data
@@ -919,7 +966,7 @@ export async function updateClassSession(input: UpdateClassSessionInput) {
   })
 
   if (error) {
-    throw error
+    throwCalendarRpcError('update_class_session', error)
   }
 
   return data
@@ -945,7 +992,10 @@ export async function updateRecurringClassSession(
   )
 
   if (error) {
-    throw error
+    throwCalendarRpcError(
+      'admin_update_class_recurring_rule_from_session',
+      error,
+    )
   }
 
   return data as AdminActionResult
@@ -959,7 +1009,7 @@ export async function cancelClassSession(sessionId: string, reason: string) {
   })
 
   if (error) {
-    throw error
+    throwCalendarRpcError('cancel_class_session', error)
   }
 
   return data
@@ -976,7 +1026,7 @@ export async function deleteClassSession(
   })
 
   if (error) {
-    throw error
+    throwCalendarRpcError('admin_delete_class_session', error)
   }
 
   return data as AdminActionResult

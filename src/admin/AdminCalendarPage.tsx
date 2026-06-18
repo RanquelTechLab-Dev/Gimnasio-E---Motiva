@@ -659,6 +659,9 @@ export function AdminCalendarPage() {
       await loadData()
     } catch (saveError) {
       const formattedError = formatAdminError(saveError)
+      if (selectedSession || recurrence.enabled) {
+        await loadData().catch(() => undefined)
+      }
       setError(
         selectedSession
           ? `No se pudo actualizar la clase. ${formattedError}`

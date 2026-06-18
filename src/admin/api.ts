@@ -829,7 +829,11 @@ export async function listCalendarSessions(fromDate: string, toDate: string) {
     throwCalendarRpcError('list_calendar_sessions', error)
   }
 
-  return hydrateCalendarSessionColors(client, (data ?? []) as CalendarSession[])
+  const operationalSessions = ((data ?? []) as CalendarSession[]).filter(
+    (session) => session.active === true && !session.cancelled_at,
+  )
+
+  return hydrateCalendarSessionColors(client, operationalSessions)
 }
 
 async function hydrateCalendarSessionColors(

@@ -14,10 +14,6 @@ import type {
   ClassRecurringRule,
   ClassRecurringRuleInput,
   CreateStudentInput,
-  DeleteClassSessionPreview,
-  DeletePaymentPreview,
-  DeleteStudentPreview,
-  DefinitiveDeleteResult,
   FixedScheduleCancelPreview,
   FixedScheduleCancelResult,
   FixedScheduleOption,
@@ -162,19 +158,6 @@ async function throwEdgeFunctionError(error: unknown): Promise<never> {
   throw error instanceof Error ? error : new Error(getErrorMessage(error))
 }
 
-async function readEdgeFunctionErrorBody(error: unknown) {
-  const response =
-    error && typeof error === 'object' && 'context' in error
-      ? error.context
-      : null
-
-  if (response instanceof Response) {
-    return response.json().catch(() => null)
-  }
-
-  return null
-}
-
 export async function listStudents() {
   const client = getClient()
   const { data, error } = await client
@@ -258,48 +241,17 @@ export async function deactivateStudent(studentId: string) {
   return data as AdminActionResult
 }
 
-export async function previewDeleteStudent(studentId: string) {
-  const client = getClient()
-  const { data, error } = await client.rpc('admin_preview_delete_student', {
-    p_profile_id: studentId,
-  })
-
-  if (error) {
-    await throwEdgeFunctionError(error)
-  }
-
-  return data as DeleteStudentPreview
-}
-
-export async function deleteStudentDefinitive(
-  studentId: string,
-  confirmation: string,
-) {
+export async function deleteStudent(studentId: string) {
   const client = getClient()
   const { data, error } = await client.functions.invoke('delete-student', {
-    body: {
-      student_id: studentId,
-      confirm: confirmation,
-    },
+    body: { student_id: studentId },
   })
 
   if (error) {
-    const body = await readEdgeFunctionErrorBody(error)
-    if (body && typeof body === 'object') {
-      const authCleanupRequired =
-        'auth_cleanup_required' in body && body.auth_cleanup_required === true
-
-      if (authCleanupRequired) {
-        throw new Error(
-          'La base ya fue limpiada, pero fallo el borrado del usuario Auth. Reintenta la baja definitiva o elimina el usuario desde Supabase Auth para completar la limpieza.',
-        )
-      }
-    }
-
     await throwEdgeFunctionError(error)
   }
 
-  return data as DefinitiveDeleteResult
+  return data as AdminActionResult
 }
 
 export async function listPlans() {
@@ -851,36 +803,6 @@ export async function voidPayment(paymentId: string, reason: string) {
   return data
 }
 
-export async function previewDeletePayment(paymentId: string) {
-  const client = getClient()
-  const { data, error } = await client.rpc('admin_preview_delete_payment', {
-    p_payment_id: paymentId,
-  })
-
-  if (error) {
-    throw error
-  }
-
-  return data as DeletePaymentPreview
-}
-
-export async function deletePaymentDefinitive(
-  paymentId: string,
-  confirmation: string,
-) {
-  const client = getClient()
-  const { data, error } = await client.rpc('admin_delete_payment_definitive', {
-    p_payment_id: paymentId,
-    p_confirm: confirmation.trim(),
-  })
-
-  if (error) {
-    throw error
-  }
-
-  return data as DefinitiveDeleteResult
-}
-
 export async function listCalendarSessions(fromDate: string, toDate: string) {
   const client = getClient()
   const { error: materializeError } = await client.rpc(
@@ -1112,42 +1034,6 @@ export async function deleteClassSession(
   }
 
   return data as AdminActionResult
-}
-
-export async function previewDeleteClassSession(sessionId: string) {
-  const client = getClient()
-  const { data, error } = await client.rpc(
-    'admin_preview_delete_class_session',
-    {
-      p_session_id: sessionId,
-    },
-  )
-
-  if (error) {
-    throwCalendarRpcError('admin_preview_delete_class_session', error)
-  }
-
-  return data as DeleteClassSessionPreview
-}
-
-export async function deleteClassSessionDefinitive(
-  sessionId: string,
-  confirmation: string,
-) {
-  const client = getClient()
-  const { data, error } = await client.rpc(
-    'admin_delete_class_session_definitive',
-    {
-      p_session_id: sessionId,
-      p_confirm: confirmation.trim(),
-    },
-  )
-
-  if (error) {
-    throwCalendarRpcError('admin_delete_class_session_definitive', error)
-  }
-
-  return data as DefinitiveDeleteResult
 }
 
 export async function listAttendanceSessions(fromDate: string, toDate: string) {
@@ -1586,37 +1472,6 @@ export async function deleteStudentDriveFile(fileId: string) {
   }
 
   return data as DriveCleanupResult
-}
-
-export async function deleteStudentFileDefinitive(
-  file: AdminStudentFile,
-  confirmation: string,
-) {
-  const client = getClient()
-  const { data, error } = await client.functions.invoke('delete-student-file', {
-    body: {
-      file_id: file.file_id,
-      confirm: confirmation.trim(),
-    },
-  })
-
-  if (error) {
-    const body = await readEdgeFunctionErrorBody(error)
-    if (
-      body &&
-      typeof body === 'object' &&
-      'database_cleanup_required' in body &&
-      body.database_cleanup_required === true
-    ) {
-      throw new Error(
-        'El archivo ya no esta en Drive, pero fallo el borrado de metadata en la base. Reintenta la eliminacion para completar la limpieza.',
-      )
-    }
-
-    await throwEdgeFunctionError(error)
-  }
-
-  return data as DefinitiveDeleteResult
 }
 
 export async function sendMassEmail(input: MassEmailInput) {

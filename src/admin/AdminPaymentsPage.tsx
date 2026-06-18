@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
-  deletePaymentDefinitive,
   formatAdminError,
   listMemberships,
   listPayments,
   listPlans,
-  previewDeletePayment,
   listStudents,
   registerManualPayment,
   updatePayment,
   voidPayment,
 } from './api'
 import type {
-  DeletePaymentPreview,
   Membership,
   Payment,
   PaymentMethod,
@@ -219,12 +216,6 @@ export function AdminPaymentsPage() {
   const [editingPayment, setEditingPayment] = useState<EditPaymentState | null>(
     null,
   )
-  const [deletePaymentPreview, setDeletePaymentPreview] =
-    useState<DeletePaymentPreview | null>(null)
-  const [deletePaymentTarget, setDeletePaymentTarget] = useState<Payment | null>(
-    null,
-  )
-  const [deletePaymentConfirmation, setDeletePaymentConfirmation] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -544,71 +535,6 @@ export function AdminPaymentsPage() {
           message: formatAdminError(voidError),
         },
       })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function openDeletePaymentModal(payment: Payment) {
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    setPaymentsMessage(null)
-    setDeletePaymentConfirmation('')
-    setDeletePaymentTarget(payment)
-    setDeletePaymentPreview(null)
-
-    try {
-      const preview = await previewDeletePayment(payment.id)
-      setDeletePaymentPreview(preview)
-    } catch (previewError) {
-      setDeletePaymentTarget(null)
-      setError(formatAdminError(previewError))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  function closeDeletePaymentModal() {
-    if (saving) {
-      return
-    }
-
-    setDeletePaymentConfirmation('')
-    setDeletePaymentPreview(null)
-    setDeletePaymentTarget(null)
-  }
-
-  async function handleDeletePaymentDefinitive() {
-    if (
-      !deletePaymentTarget ||
-      deletePaymentConfirmation !==
-        (deletePaymentPreview?.details.confirmation_required ?? 'ELIMINAR PAGO')
-    ) {
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-    setSuccess(null)
-    setPaymentsMessage(null)
-    try {
-      const result = await deletePaymentDefinitive(
-        deletePaymentTarget.id,
-        deletePaymentConfirmation,
-      )
-      setPaymentsMessage({
-        type: 'success',
-        message:
-          result.warnings?.[0] ??
-          'Pago eliminado definitivamente y estado del programa recalculado.',
-      })
-      setDeletePaymentConfirmation('')
-      setDeletePaymentPreview(null)
-      setDeletePaymentTarget(null)
-      await loadData(filter)
-    } catch (deleteError) {
-      setError(formatAdminError(deleteError))
     } finally {
       setSaving(false)
     }
@@ -950,14 +876,6 @@ export function AdminPaymentsPage() {
                         >
                           Anular pago
                         </button>
-                        <button
-                          className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-                          disabled={saving}
-                          onClick={() => void openDeletePaymentModal(payment)}
-                          type="button"
-                        >
-                          Eliminar pago
-                        </button>
                       </div>
                       <p className="text-xs text-[var(--muted)]">
                         No borra el pago. Lo marca como anulado y conserva
@@ -987,119 +905,6 @@ export function AdminPaymentsPage() {
           </div>
         )}
       </div>
-
-      {deletePaymentTarget && deletePaymentPreview ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div
-            aria-modal="true"
-            className="w-full max-w-2xl rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow)]"
-            role="dialog"
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
-              Pago definitivo
-            </p>
-            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-              Eliminar pago definitivamente
-            </h3>
-            <div className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4 text-sm sm:grid-cols-2">
-              <p>
-                <strong>Alumno:</strong>{' '}
-                {studentsById.get(deletePaymentTarget.student_id)?.first_name}{' '}
-                {studentsById.get(deletePaymentTarget.student_id)?.last_name}
-              </p>
-              <p>
-                <strong>Monto:</strong>{' '}
-                {moneyFormatter.format(deletePaymentTarget.amount)}
-              </p>
-              <p>
-                <strong>Estado:</strong>{' '}
-                {statusLabels[deletePaymentTarget.status]}
-              </p>
-              <p>
-                <strong>Metodo:</strong> {deletePaymentTarget.method}
-              </p>
-              <p>
-                <strong>Fecha:</strong> {deletePaymentTarget.paid_at.slice(0, 10)}
-              </p>
-              <p>
-                <strong>Programa:</strong>{' '}
-                {deletePaymentTarget.membership_id ? 'Vinculado' : 'Sin programa'}
-              </p>
-            </div>
-            <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white p-4 text-sm">
-              <p>
-                <strong>Required amount:</strong>{' '}
-                {deletePaymentPreview.details.required_amount === null
-                  ? 'No aplica'
-                  : moneyFormatter.format(deletePaymentPreview.details.required_amount)}
-              </p>
-              <p className="mt-1">
-                <strong>Aprobado actual:</strong>{' '}
-                {moneyFormatter.format(
-                  deletePaymentPreview.details.approved_paid_total,
-                )}
-              </p>
-              <p className="mt-1">
-                <strong>Aprobado sin este pago:</strong>{' '}
-                {moneyFormatter.format(
-                  deletePaymentPreview.details.approved_without_payment,
-                )}
-              </p>
-              <p className="mt-1">
-                <strong>Reservas futuras que podrian cancelarse:</strong>{' '}
-                {
-                  deletePaymentPreview.affected
-                    .future_active_bookings_to_cancel
-                }
-              </p>
-            </div>
-            {deletePaymentPreview.warnings.length ? (
-              <div className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
-                {deletePaymentPreview.warnings.map((warning) => (
-                  <p key={warning}>{warning}</p>
-                ))}
-              </div>
-            ) : null}
-            <label className="mt-4 block text-sm font-semibold">
-              Escribi {deletePaymentPreview.details.confirmation_required} para confirmar
-              <input
-                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold"
-                onChange={(event) =>
-                  setDeletePaymentConfirmation(event.target.value)
-                }
-                value={deletePaymentConfirmation}
-              />
-            </label>
-            {error ? (
-              <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
-                {error}
-              </p>
-            ) : null}
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              <button
-                className="rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
-                disabled={saving}
-                onClick={closeDeletePaymentModal}
-                type="button"
-              >
-                Cancelar
-              </button>
-              <button
-                className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
-                disabled={
-                  saving ||
-                  deletePaymentConfirmation !==
-                    deletePaymentPreview.details.confirmation_required
-                }
-                onClick={() => void handleDeletePaymentDefinitive()}
-                type="button"
-              >
-                {saving ? 'Eliminando...' : 'Eliminar pago'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <aside className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5">
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--brand)]">

@@ -175,6 +175,11 @@ La auditoria definitiva debe conservar solo prueba minima de la accion
 contenido eliminado, montos, metodos de pago, ids de Drive ni otros datos que
 permitan reconstruir informacion sensible desde `audit_logs`.
 
+El borrado definitivo elimina de la base activa y del almacenamiento externo
+cuando aplique. Los backups de plataforma pueden retener informacion de forma
+temporal por sus propias politicas, pero la app ya no conserva ni expone ese
+dato operativo una vez ejecutado el borrado definitivo.
+
 ## Politica de UI
 
 - ningun borrado definitivo se ejecuta desde un click unico

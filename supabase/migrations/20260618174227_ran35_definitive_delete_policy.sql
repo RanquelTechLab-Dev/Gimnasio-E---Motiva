@@ -181,19 +181,6 @@ begin
   from public.files f
   where f.student_id = p_profile_id;
 
-  insert into public.audit_logs (actor_id, entity_type, entity_id, action, metadata)
-  values (
-    v_actor,
-    'student',
-    p_profile_id,
-    'student.deleted_definitive',
-    jsonb_build_object(
-      'definitive_delete', true,
-      'had_drive_files', coalesce(array_length(v_drive_file_ids, 1), 0) > 0,
-      'drive_files_count', coalesce(array_length(v_drive_file_ids, 1), 0)
-    )
-  );
-
   delete from public.attendance
   where student_id = p_profile_id;
   get diagnostics v_deleted_attendance = row_count;
@@ -225,6 +212,27 @@ begin
   delete from public.profiles
   where id = p_profile_id;
   get diagnostics v_deleted_profiles = row_count;
+
+  insert into public.audit_logs (actor_id, entity_type, entity_id, action, metadata)
+  values (
+    v_actor,
+    'student',
+    p_profile_id,
+    'student.deleted_definitive',
+    jsonb_build_object(
+      'definitive_delete', true,
+      'deleted_kind', 'student',
+      'had_drive_files', coalesce(array_length(v_drive_file_ids, 1), 0) > 0,
+      'drive_files_count', coalesce(array_length(v_drive_file_ids, 1), 0),
+      'memberships_count', v_deleted_memberships,
+      'payments_count', v_deleted_payments,
+      'bookings_count', v_deleted_bookings,
+      'attendance_count', v_deleted_attendance,
+      'files_count', v_deleted_files,
+      'training_notes_count', v_deleted_training_notes,
+      'fixed_schedules_count', v_deleted_fixed_schedules
+    )
+  );
 
   return jsonb_build_object(
     'ok', true,
@@ -389,7 +397,10 @@ begin
     'payment.deleted_definitive',
     jsonb_build_object(
       'definitive_delete', true,
-      'had_membership', v_payment.membership_id is not null
+      'deleted_kind', 'payment',
+      'had_membership', v_payment.membership_id is not null,
+      'membership_reconciled', coalesce(v_reconcile ->> 'action', 'skipped') <> 'skipped',
+      'affected_payment', true
     )
   );
 
@@ -592,6 +603,7 @@ begin
     'class.deleted_definitive',
     jsonb_build_object(
       'definitive_delete', true,
+      'deleted_kind', 'class_session',
       'activity_id', v_session.activity_id,
       'starts_at', v_session.starts_at,
       'ends_at', v_session.ends_at,
@@ -671,7 +683,9 @@ begin
     'file.deleted_definitive',
     jsonb_build_object(
       'definitive_delete', true,
-      'had_drive_file', v_file.drive_file_id is not null
+      'deleted_kind', 'file',
+      'had_drive_file', v_file.drive_file_id is not null,
+      'metadata_deleted', true
     )
   );
 
@@ -862,9 +876,11 @@ revoke all on function public.admin_preview_demo_cleanup() from public, anon;
 revoke all on function public.admin_execute_demo_cleanup(text) from public, anon;
 
 grant execute on function public.admin_preview_delete_student(uuid) to authenticated;
+grant execute on function public.admin_delete_student_database(uuid, text) to authenticated;
 grant execute on function public.admin_preview_delete_payment(uuid) to authenticated;
 grant execute on function public.admin_delete_payment_definitive(uuid, text) to authenticated;
 grant execute on function public.admin_preview_delete_class_session(uuid) to authenticated;
 grant execute on function public.admin_delete_class_session_definitive(uuid, text) to authenticated;
 grant execute on function public.admin_preview_delete_student_file(uuid) to authenticated;
+grant execute on function public.admin_delete_student_file_metadata_definitive(uuid, text) to authenticated;
 grant execute on function public.admin_preview_demo_cleanup() to authenticated;

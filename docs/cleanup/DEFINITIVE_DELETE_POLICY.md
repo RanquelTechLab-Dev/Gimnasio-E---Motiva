@@ -26,6 +26,7 @@ siempre pasan por preview, confirmacion fuerte, auditoria y alcance explicito.
 ## Confirmaciones fuertes
 
 - Alumno: `ELIMINAR ALUMNO DEFINITIVAMENTE`
+- Clase sin reservas/asistencia: `ELIMINAR CLASE`
 - Clase con reservas/asistencia: `ELIMINAR CLASE Y RESERVAS`
 - Pago: `ELIMINAR PAGO`
 - Archivo: `ELIMINAR ARCHIVO`
@@ -112,6 +113,9 @@ Preview UX:
 - alumno
 - visibilidad
 - advertencia irreversible
+- confirmacion fuerte
+- si el archivo sigue activo en Drive, el borrado definitivo debe pasar por
+  Edge Function y no por RPC directa al metadata
 
 Borrado definitivo:
 
@@ -137,6 +141,8 @@ Reglas:
   debe bloquearse
 - no borrar admins
 - no ejecutar automaticamente
+- la ejecucion completa debe orquestarse desde Edge Function para borrar Drive,
+  DB y Auth en conjunto
 
 ## Riesgos y mitigaciones
 

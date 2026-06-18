@@ -162,6 +162,19 @@ async function throwEdgeFunctionError(error: unknown): Promise<never> {
   throw error instanceof Error ? error : new Error(getErrorMessage(error))
 }
 
+async function readEdgeFunctionErrorBody(error: unknown) {
+  const response =
+    error && typeof error === 'object' && 'context' in error
+      ? error.context
+      : null
+
+  if (response instanceof Response) {
+    return response.json().catch(() => null)
+  }
+
+  return null
+}
+
 export async function listStudents() {
   const client = getClient()
   const { data, error } = await client
@@ -245,19 +258,6 @@ export async function deactivateStudent(studentId: string) {
   return data as AdminActionResult
 }
 
-export async function deleteStudent(studentId: string) {
-  const client = getClient()
-  const { data, error } = await client.functions.invoke('delete-student', {
-    body: { student_id: studentId },
-  })
-
-  if (error) {
-    await throwEdgeFunctionError(error)
-  }
-
-  return data as AdminActionResult
-}
-
 export async function previewDeleteStudent(studentId: string) {
   const client = getClient()
   const { data, error } = await client.rpc('admin_preview_delete_student', {
@@ -284,6 +284,18 @@ export async function deleteStudentDefinitive(
   })
 
   if (error) {
+    const body = await readEdgeFunctionErrorBody(error)
+    if (body && typeof body === 'object') {
+      const authCleanupRequired =
+        'auth_cleanup_required' in body && body.auth_cleanup_required === true
+
+      if (authCleanupRequired) {
+        throw new Error(
+          'La base ya fue limpiada, pero fallo el borrado del usuario Auth. Reintenta la baja definitiva o elimina el usuario desde Supabase Auth para completar la limpieza.',
+        )
+      }
+    }
+
     await throwEdgeFunctionError(error)
   }
 
@@ -1580,27 +1592,28 @@ export async function deleteStudentFileDefinitive(
   file: AdminStudentFile,
   confirmation: string,
 ) {
-  if (!file.archived_at) {
-    const driveResult = await deleteStudentDriveFile(file.file_id)
-    if (driveResult.failed_files.length > 0) {
-      throw new Error(
-        driveResult.failed_files[0]?.error ??
-          'No se pudo eliminar el archivo en Google Drive.',
-      )
-    }
-  }
-
   const client = getClient()
-  const { data, error } = await client.rpc(
-    'admin_delete_student_file_metadata_definitive',
-    {
-      p_file_id: file.file_id,
-      p_confirm: confirmation.trim(),
+  const { data, error } = await client.functions.invoke('delete-student-file', {
+    body: {
+      file_id: file.file_id,
+      confirm: confirmation.trim(),
     },
-  )
+  })
 
   if (error) {
-    throw error
+    const body = await readEdgeFunctionErrorBody(error)
+    if (
+      body &&
+      typeof body === 'object' &&
+      'database_cleanup_required' in body &&
+      body.database_cleanup_required === true
+    ) {
+      throw new Error(
+        'El archivo ya no esta en Drive, pero fallo el borrado de metadata en la base. Reintenta la eliminacion para completar la limpieza.',
+      )
+    }
+
+    await throwEdgeFunctionError(error)
   }
 
   return data as DefinitiveDeleteResult

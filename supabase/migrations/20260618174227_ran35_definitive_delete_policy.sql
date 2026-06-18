@@ -439,7 +439,7 @@ declare
   v_activity public.activities%rowtype;
   v_bookings_count integer := 0;
   v_attendance_count integer := 0;
-  v_confirmation text := 'ELIMINAR';
+  v_confirmation text := 'ELIMINAR CLASE';
   v_warnings text[] := '{}';
 begin
   v_actor := private.ensure_admin();
@@ -525,7 +525,7 @@ declare
   v_deleted_attendance integer := 0;
   v_deleted_bookings integer := 0;
   v_deleted_sessions integer := 0;
-  v_confirmation text := 'ELIMINAR';
+  v_confirmation text := 'ELIMINAR CLASE';
 begin
   v_actor := private.ensure_admin();
 
@@ -695,6 +695,70 @@ begin
 end;
 $$;
 
+create or replace function public.admin_preview_delete_student_file(p_file_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, private
+as $$
+declare
+  v_actor uuid;
+  v_file public.files%rowtype;
+  v_profile public.profiles%rowtype;
+  v_warnings text[] := '{}';
+begin
+  v_actor := private.ensure_admin();
+
+  select *
+  into v_file
+  from public.files f
+  where f.id = p_file_id
+  for update;
+
+  if not found then
+    raise exception 'No se encontro el archivo.';
+  end if;
+
+  select *
+  into v_profile
+  from public.profiles p
+  where p.id = v_file.student_id;
+
+  if v_file.drive_file_id is null then
+    v_warnings := array_append(
+      v_warnings,
+      'Este registro no tiene drive_file_id. La eliminacion definitiva solo borrara metadata.'
+    );
+  end if;
+
+  if v_file.archived_at is not null then
+    v_warnings := array_append(
+      v_warnings,
+      'El archivo ya estaba archivado en la base.'
+    );
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'action', 'preview_delete_student_file',
+    'affected', jsonb_build_object(
+      'files', 1
+    ),
+    'warnings', to_jsonb(v_warnings),
+    'details', jsonb_build_object(
+      'file_id', v_file.id,
+      'student_id', v_file.student_id,
+      'student_email', v_profile.email,
+      'title', v_file.title,
+      'kind', v_file.kind,
+      'drive_file_id', v_file.drive_file_id,
+      'drive_delete_required', v_file.drive_file_id is not null and v_file.archived_at is null,
+      'confirmation_required', 'ELIMINAR ARCHIVO'
+    )
+  );
+end;
+$$;
+
 create or replace function public.admin_preview_demo_cleanup()
 returns jsonb
 language plpgsql
@@ -777,10 +841,6 @@ set search_path = public, private
 as $$
 declare
   v_actor uuid;
-  v_preview jsonb;
-  v_profile record;
-  v_deleted_count integer := 0;
-  v_deleted_ids uuid[] := '{}';
 begin
   v_actor := private.ensure_admin();
 
@@ -790,37 +850,7 @@ begin
     'ejecutar la limpieza demo'
   );
 
-  v_preview := public.admin_preview_demo_cleanup();
-
-  if coalesce((v_preview ->> 'ok')::boolean, false) is false then
-    raise exception 'La limpieza demo esta bloqueada hasta revisar perfiles fuera de la allowlist.';
-  end if;
-
-  for v_profile in
-    select p.id
-    from public.profiles p
-    where p.role = 'student'
-      and lower(coalesce(p.email, '')) in ('ranqueltechlab@gmail.com')
-  loop
-    perform public.admin_delete_student_database(
-      v_profile.id,
-      'ELIMINAR ALUMNO DEFINITIVAMENTE'
-    );
-    v_deleted_count := v_deleted_count + 1;
-    v_deleted_ids := array_append(v_deleted_ids, v_profile.id);
-  end loop;
-
-  return jsonb_build_object(
-    'ok', true,
-    'action', 'executed_demo_cleanup',
-    'affected', jsonb_build_object('deleted_profiles', v_deleted_count),
-    'warnings', jsonb_build_array(
-      'La limpieza demo por SQL no elimina usuarios Auth ni archivos en Drive. Usa la app admin para el flujo completo.'
-    ),
-    'details', jsonb_build_object(
-      'deleted_profile_ids', to_jsonb(v_deleted_ids)
-    )
-  );
+  raise exception 'La limpieza demo completa debe ejecutarse desde Edge Function para borrar Auth y Drive.';
 end;
 $$;
 
@@ -830,16 +860,15 @@ revoke all on function public.admin_preview_delete_payment(uuid) from public, an
 revoke all on function public.admin_delete_payment_definitive(uuid, text) from public, anon;
 revoke all on function public.admin_preview_delete_class_session(uuid) from public, anon;
 revoke all on function public.admin_delete_class_session_definitive(uuid, text) from public, anon;
+revoke all on function public.admin_preview_delete_student_file(uuid) from public, anon;
 revoke all on function public.admin_delete_student_file_metadata_definitive(uuid, text) from public, anon;
 revoke all on function public.admin_preview_demo_cleanup() from public, anon;
 revoke all on function public.admin_execute_demo_cleanup(text) from public, anon;
 
 grant execute on function public.admin_preview_delete_student(uuid) to authenticated;
-grant execute on function public.admin_delete_student_database(uuid, text) to authenticated;
 grant execute on function public.admin_preview_delete_payment(uuid) to authenticated;
 grant execute on function public.admin_delete_payment_definitive(uuid, text) to authenticated;
 grant execute on function public.admin_preview_delete_class_session(uuid) to authenticated;
 grant execute on function public.admin_delete_class_session_definitive(uuid, text) to authenticated;
-grant execute on function public.admin_delete_student_file_metadata_definitive(uuid, text) to authenticated;
+grant execute on function public.admin_preview_delete_student_file(uuid) to authenticated;
 grant execute on function public.admin_preview_demo_cleanup() to authenticated;
-grant execute on function public.admin_execute_demo_cleanup(text) to authenticated;

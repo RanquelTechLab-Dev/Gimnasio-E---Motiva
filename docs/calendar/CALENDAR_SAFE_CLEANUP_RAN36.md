@@ -20,8 +20,9 @@ This stage does not apply cleanup. It only documents what may be cleaned later u
 - `230` future sessions are cancelled or inactive and have no bookings or attendance.
 - `2` recurring rules still use the title `TEST RAN-34 CALENDAR`.
 - `18` `TEST RAN-34 CALENDAR` sessions remain inactive/cancelled.
-- `16` inactive recurring rules only keep future cancelled sessions.
-- `13` inactive recurring rules have no future sessions at all.
+- The initial broad read-only audit found `16` inactive recurring rules with only future cancelled sessions.
+- The initial broad read-only audit found `13` inactive recurring rules without future sessions.
+- The conservative RAN-36A preview narrows those rule-level candidates to `4` inactive rules with only future cancelled sessions and `10` inactive rules without future sessions, because it excludes any rule with lifetime booking or attendance history.
 - `3` protected `DO_NOT_TOUCH` sessions still exist because they carry real booking and/or attendance history.
 
 Protected session IDs:

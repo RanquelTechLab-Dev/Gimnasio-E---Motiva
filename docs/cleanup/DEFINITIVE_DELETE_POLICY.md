@@ -170,6 +170,11 @@ Antes de ejecutar borrados reales en produccion:
 - ejecutar preview y revisar impacto
 - conservar auditoria minima sin datos sensibles innecesarios
 
+La auditoria definitiva debe conservar solo prueba minima de la accion
+(por ejemplo, que hubo borrado definitivo y si habia dependencias), pero no
+contenido eliminado, montos, metodos de pago, ids de Drive ni otros datos que
+permitan reconstruir informacion sensible desde `audit_logs`.
+
 ## Politica de UI
 
 - ningun borrado definitivo se ejecuta desde un click unico

@@ -119,9 +119,12 @@ Deno.serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const anonKey =
+    Deno.env.get('SUPABASE_ANON_KEY') ??
+    Deno.env.get('SUPABASE_PUBLISHABLE_KEY')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return jsonResponse(
       { error: 'La Edge Function no tiene configuracion segura completa.' },
       500,
@@ -165,6 +168,17 @@ Deno.serve(async (req) => {
       autoRefreshToken: false,
     },
   })
+  const userClient = createClient(supabaseUrl, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  })
 
   let requester: { id: string }
   try {
@@ -191,7 +205,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  const { data: previewData, error: previewError } = await adminClient.rpc(
+  const { data: previewData, error: previewError } = await userClient.rpc(
     'admin_preview_delete_student',
     {
       p_profile_id: studentId,
@@ -263,7 +277,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const { data: deleteData, error: deleteError } = await adminClient.rpc(
+  const { data: deleteData, error: deleteError } = await userClient.rpc(
     'admin_delete_student_database',
     {
       p_profile_id: studentId,

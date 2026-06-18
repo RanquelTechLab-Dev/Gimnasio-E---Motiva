@@ -188,8 +188,9 @@ begin
     p_profile_id,
     'student.deleted_definitive',
     jsonb_build_object(
+      'definitive_delete', true,
       'had_drive_files', coalesce(array_length(v_drive_file_ids, 1), 0) > 0,
-      'drive_file_ids', to_jsonb(v_drive_file_ids)
+      'drive_files_count', coalesce(array_length(v_drive_file_ids, 1), 0)
     )
   );
 
@@ -387,12 +388,8 @@ begin
     v_payment.id,
     'payment.deleted_definitive',
     jsonb_build_object(
-      'student_id', v_payment.student_id,
-      'membership_id', v_payment.membership_id,
-      'amount', v_payment.amount,
-      'status', v_payment.status,
-      'method', v_payment.method,
-      'paid_at', v_payment.paid_at
+      'definitive_delete', true,
+      'had_membership', v_payment.membership_id is not null
     )
   );
 
@@ -594,6 +591,7 @@ begin
     v_session.id,
     'class.deleted_definitive',
     jsonb_build_object(
+      'definitive_delete', true,
       'activity_id', v_session.activity_id,
       'starts_at', v_session.starts_at,
       'ends_at', v_session.ends_at,
@@ -672,10 +670,8 @@ begin
     v_file.id,
     'file.deleted_definitive',
     jsonb_build_object(
-      'student_id', v_file.student_id,
-      'title', v_file.title,
-      'kind', v_file.kind,
-      'drive_file_id', v_file.drive_file_id
+      'definitive_delete', true,
+      'had_drive_file', v_file.drive_file_id is not null
     )
   );
 

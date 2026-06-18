@@ -2,6 +2,19 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 type DeleteStudentPayload = {
   student_id?: string
+  confirm?: string
+}
+
+type DeleteStudentPreview = {
+  ok: boolean
+  affected: Record<string, number>
+  warnings?: string[]
+  details?: {
+    drive_file_ids?: string[]
+    confirmation_required?: string
+    email?: string
+    full_name?: string
+  }
 }
 
 const corsHeaders = {
@@ -25,43 +38,75 @@ function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-async function countRows(
-  adminClient: ReturnType<typeof createClient>,
-  table: string,
-  column: string,
-  value: string,
-) {
-  const { count, error } = await adminClient
-    .from(table)
-    .select('id', { count: 'exact', head: true })
-    .eq(column, value)
+async function getGoogleAccessToken() {
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
+  const refreshToken = Deno.env.get('GOOGLE_REFRESH_TOKEN')
 
-  if (error) {
-    throw new Error(error.message)
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Faltan credenciales OAuth de Google Drive.')
   }
 
-  return count ?? 0
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+
+  const body = await response.json().catch(() => null)
+  if (!response.ok || !body?.access_token) {
+    throw new Error('No se pudo autenticar Google Drive.')
+  }
+
+  return String(body.access_token)
 }
 
-async function deleteRows(
+async function deleteDriveFile(accessToken: string, fileId: string) {
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error('No se pudo borrar un archivo en Google Drive.')
+  }
+}
+
+async function ensureAdmin(
   adminClient: ReturnType<typeof createClient>,
-  table: string,
-  column: string,
-  value: string,
+  token: string,
 ) {
-  const count = await countRows(adminClient, table, column, value)
+  const {
+    data: { user: requester },
+    error: authError,
+  } = await adminClient.auth.getUser(token)
 
-  if (count === 0) {
-    return 0
+  if (authError || !requester) {
+    throw new Error('SESSION_INVALID')
   }
 
-  const { error } = await adminClient.from(table).delete().eq(column, value)
+  const { data: requesterProfile, error: requesterProfileError } =
+    await adminClient
+      .from('profiles')
+      .select('id, role, active')
+      .eq('id', requester.id)
+      .single()
 
-  if (error) {
-    throw new Error(error.message)
+  if (
+    requesterProfileError ||
+    !requesterProfile ||
+    requesterProfile.role !== 'admin' ||
+    requesterProfile.active !== true
+  ) {
+    throw new Error('SESSION_FORBIDDEN')
   }
 
-  return count
+  return requester
 }
 
 Deno.serve(async (req) => {
@@ -98,9 +143,20 @@ Deno.serve(async (req) => {
   }
 
   const studentId = cleanText(payload.student_id)
+  const confirmation = cleanText(payload.confirm)
 
   if (!studentId) {
     return jsonResponse({ error: 'Alumno requerido.' }, 400)
+  }
+
+  if (!confirmation) {
+    return jsonResponse(
+      {
+        error:
+          'Debes escribir ELIMINAR ALUMNO DEFINITIVAMENTE para continuar.',
+      },
+      400,
+    )
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -110,29 +166,22 @@ Deno.serve(async (req) => {
     },
   })
 
-  const {
-    data: { user: requester },
-    error: authError,
-  } = await adminClient.auth.getUser(token)
+  let requester: { id: string }
+  try {
+    requester = await ensureAdmin(adminClient, token)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'SESSION_INVALID') {
+      return jsonResponse({ error: 'Sesion admin invalida.' }, 401)
+    }
 
-  if (authError || !requester) {
-    return jsonResponse({ error: 'Sesion admin invalida.' }, 401)
-  }
+    if (error instanceof Error && error.message === 'SESSION_FORBIDDEN') {
+      return jsonResponse(
+        { error: 'Solo un admin activo puede eliminar alumnos.' },
+        403,
+      )
+    }
 
-  const { data: requesterProfile, error: requesterProfileError } =
-    await adminClient
-      .from('profiles')
-      .select('id, role, active')
-      .eq('id', requester.id)
-      .single()
-
-  if (
-    requesterProfileError ||
-    !requesterProfile ||
-    requesterProfile.role !== 'admin' ||
-    requesterProfile.active !== true
-  ) {
-    return jsonResponse({ error: 'Solo un admin activo puede eliminar alumnos.' }, 403)
+    return jsonResponse({ error: 'No se pudo validar la sesion admin.' }, 500)
   }
 
   if (studentId === requester.id) {
@@ -142,107 +191,92 @@ Deno.serve(async (req) => {
     )
   }
 
-  const { data: studentProfile, error: studentProfileError } = await adminClient
-    .from('profiles')
-    .select('id, role, email')
-    .eq('id', studentId)
-    .single()
+  const { data: previewData, error: previewError } = await adminClient.rpc(
+    'admin_preview_delete_student',
+    {
+      p_profile_id: studentId,
+    },
+  )
 
-  if (studentProfileError || !studentProfile) {
-    return jsonResponse({ error: 'No se encontro el alumno.' }, 404)
+  if (previewError) {
+    const status = previewError.message?.includes('admin') ? 403 : 400
+    return jsonResponse({ error: previewError.message }, status)
   }
 
-  if (studentProfile.role === 'admin') {
+  const preview = previewData as DeleteStudentPreview
+  const driveFileIds = Array.isArray(preview?.details?.drive_file_ids)
+    ? preview.details.drive_file_ids.filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+      )
+    : []
+
+  if (
+    confirmation !==
+    (preview?.details?.confirmation_required ?? 'ELIMINAR ALUMNO DEFINITIVAMENTE')
+  ) {
     return jsonResponse(
-      { error: 'No se puede eliminar un usuario admin desde esta accion.' },
-      403,
-    )
-  }
-
-  if (studentProfile.role !== 'student') {
-    return jsonResponse({ error: 'Solo se pueden eliminar perfiles de alumno.' }, 403)
-  }
-
-  const deletedCounts: Record<string, number> = {}
-
-  try {
-    deletedCounts.attendance = await deleteRows(
-      adminClient,
-      'attendance',
-      'student_id',
-      studentId,
-    )
-    deletedCounts.bookings = await deleteRows(
-      adminClient,
-      'bookings',
-      'student_id',
-      studentId,
-    )
-    deletedCounts.payments = await deleteRows(
-      adminClient,
-      'payments',
-      'student_id',
-      studentId,
-    )
-    deletedCounts.memberships = await deleteRows(
-      adminClient,
-      'memberships',
-      'student_id',
-      studentId,
-    )
-    deletedCounts.files = await deleteRows(
-      adminClient,
-      'files',
-      'student_id',
-      studentId,
-    )
-    deletedCounts.training_notes = await deleteRows(
-      adminClient,
-      'training_notes',
-      'student_id',
-      studentId,
-    )
-
-    const { error: auditError } = await adminClient.from('audit_logs').insert({
-      actor_id: requester.id,
-      entity_type: 'student',
-      entity_id: studentId,
-      action: 'student.delete_final',
-      metadata: {
-        email: studentProfile.email,
-        deleted_counts: deletedCounts,
-        note:
-          'Eliminacion definitiva solicitada por admin para alumno de prueba o carga por error. Metadata de archivos eliminada; archivos Drive no se borran masivamente desde esta funcion.',
+      {
+        error:
+          'La confirmacion no coincide. Debes escribir ELIMINAR ALUMNO DEFINITIVAMENTE.',
       },
-    })
+      400,
+    )
+  }
 
-    if (auditError) {
-      deletedCounts.audit_log_error = 1
+  const deletedDriveFileIds: string[] = []
+  if (driveFileIds.length > 0) {
+    let accessToken: string
+
+    try {
+      accessToken = await getGoogleAccessToken()
+    } catch (error) {
+      return jsonResponse(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : 'No se pudo autenticar Google Drive.',
+          preview,
+        },
+        500,
+      )
     }
-  } catch (deleteError) {
-    const message =
-      deleteError instanceof Error
-        ? deleteError.message
-        : 'No se pudieron eliminar los datos asociados del alumno.'
-    return jsonResponse(
-      {
-        error: message,
-        deleted_counts: deletedCounts,
-      },
-      500,
-    )
+
+    for (const driveFileId of driveFileIds) {
+      try {
+        await deleteDriveFile(accessToken, driveFileId)
+        deletedDriveFileIds.push(driveFileId)
+      } catch (error) {
+        return jsonResponse(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : 'No se pudo borrar un archivo en Google Drive.',
+            failed_drive_file_id: driveFileId,
+            deleted_drive_file_ids: deletedDriveFileIds,
+            preview,
+          },
+          500,
+        )
+      }
+    }
   }
 
-  const { error: deactivateError } = await adminClient
-    .from('profiles')
-    .update({ active: false })
-    .eq('id', studentId)
+  const { data: deleteData, error: deleteError } = await adminClient.rpc(
+    'admin_delete_student_database',
+    {
+      p_profile_id: studentId,
+      p_confirm: confirmation,
+    },
+  )
 
-  if (deactivateError) {
+  if (deleteError) {
     return jsonResponse(
       {
-        error: 'No se pudo desactivar el alumno antes de eliminarlo.',
-        detail: deactivateError.message,
+        error: deleteError.message,
+        deleted_drive_file_ids: deletedDriveFileIds,
+        preview,
       },
       500,
     )
@@ -253,50 +287,24 @@ Deno.serve(async (req) => {
 
   if (deleteAuthError) {
     return jsonResponse(
-      { error: deleteAuthError.message ?? 'No se pudo eliminar el usuario Auth.' },
-      500,
-    )
-  }
-
-  const { data: remainingProfile, error: remainingProfileError } =
-    await adminClient
-      .from('profiles')
-      .select('id')
-      .eq('id', studentId)
-      .maybeSingle()
-
-  if (remainingProfileError) {
-    return jsonResponse(
       {
         error:
-          'El usuario Auth fue eliminado, pero no se pudo verificar el profile.',
-        detail: remainingProfileError.message,
+          deleteAuthError.message ??
+          'La base se limpio, pero fallo el borrado del usuario Auth.',
+        database_deleted: true,
+        auth_cleanup_required: true,
+        deleted_drive_file_ids: deletedDriveFileIds,
+        preview,
+        result: deleteData,
       },
       500,
     )
   }
 
-  if (remainingProfile) {
-    const { error: profileDeleteError } = await adminClient
-      .from('profiles')
-      .delete()
-      .eq('id', studentId)
-
-    if (profileDeleteError) {
-      return jsonResponse(
-        {
-          error:
-            'Usuario Auth eliminado, pero fallo la eliminacion del profile.',
-          detail: profileDeleteError.message,
-        },
-        500,
-      )
-    }
-  }
-
   return jsonResponse({
-    action: 'deleted',
-    student_id: studentId,
-    deleted_counts: deletedCounts,
+    ...(deleteData as Record<string, unknown>),
+    deleted_drive_file_ids: deletedDriveFileIds,
+    preview,
+    auth_user_deleted: true,
   })
 })

@@ -8,9 +8,11 @@ import {
   createClassRecurringRule,
   deleteActivity,
   deleteClassSession,
+  deleteClassSessionDefinitive,
   formatAdminError,
   listActivities,
   listCalendarSessions,
+  previewDeleteClassSession,
   updateActivity,
   updateRecurringClassSession,
   updateClassSession,
@@ -22,6 +24,7 @@ import type {
   AdminActionResult,
   CalendarSession,
   ClassSessionInput,
+  DeleteClassSessionPreview,
   UpdateClassSessionInput,
 } from './types'
 import { WeeklyScheduleGrid } from '../components/calendar/WeeklyScheduleGrid'
@@ -344,6 +347,10 @@ export function AdminCalendarPage() {
   const [sessionDeleteRequest, setSessionDeleteRequest] =
     useState<SessionDeleteRequest | null>(null)
   const [sessionDeleteConfirmation, setSessionDeleteConfirmation] =
+    useState('')
+  const [sessionDefinitivePreview, setSessionDefinitivePreview] =
+    useState<DeleteClassSessionPreview | null>(null)
+  const [sessionDefinitiveConfirmation, setSessionDefinitiveConfirmation] =
     useState('')
   const [recurringEditScope, setRecurringEditScope] =
     useState<RecurringEditScope>('single')
@@ -753,6 +760,68 @@ export function AdminCalendarPage() {
       await loadData()
     } catch (archiveError) {
       setError(formatAdminError(archiveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function openDefinitiveDeleteSessionModal() {
+    if (!selectedSession) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    setSessionDefinitiveConfirmation('')
+    setSessionDefinitivePreview(null)
+    try {
+      const preview = await previewDeleteClassSession(selectedSession.session_id)
+      setSessionDefinitivePreview(preview)
+    } catch (previewError) {
+      setError(formatAdminError(previewError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function closeDefinitiveDeleteSessionModal() {
+    if (saving) {
+      return
+    }
+
+    setSessionDefinitivePreview(null)
+    setSessionDefinitiveConfirmation('')
+  }
+
+  async function handleDeleteSessionDefinitive() {
+    if (
+      !selectedSession ||
+      !sessionDefinitivePreview ||
+      sessionDefinitiveConfirmation !==
+        sessionDefinitivePreview.details.confirmation_required
+    ) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await deleteClassSessionDefinitive(
+        selectedSession.session_id,
+        sessionDefinitiveConfirmation,
+      )
+      setSuccess(
+        result.warnings?.[0] ??
+          'Clase eliminada definitivamente y calendario recargado desde la base.',
+      )
+      setSessionDefinitivePreview(null)
+      setSessionDefinitiveConfirmation('')
+      resetForm()
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
     } finally {
       setSaving(false)
     }
@@ -1407,6 +1476,19 @@ export function AdminCalendarPage() {
                     </p>
                   </>
                 )}
+                <button
+                  className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void openDefinitiveDeleteSessionModal()}
+                  type="button"
+                >
+                  Eliminar clase definitivo
+                </button>
+                <p className="text-xs text-[var(--muted)]">
+                  Usa esta accion solo si queres borrar realmente la clase. Si
+                  hay reservas o asistencia, mostrara el impacto y pedira una
+                  confirmacion mas fuerte.
+                </p>
               </div>
             </div>
           </div>
@@ -1805,6 +1887,86 @@ export function AdminCalendarPage() {
                 type="button"
               >
                 {saving ? 'Procesando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {sessionDefinitivePreview && selectedSession ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
+              Eliminacion definitiva
+            </p>
+            <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+              Eliminar clase definitivamente
+            </h3>
+            <div className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4 text-sm sm:grid-cols-2">
+              <p>
+                <strong>Actividad:</strong>{' '}
+                {sessionDefinitivePreview.details.activity_name}
+              </p>
+              <p>
+                <strong>Cupo:</strong> {sessionDefinitivePreview.details.capacity}
+              </p>
+              <p>
+                <strong>Inicio:</strong>{' '}
+                {sessionDefinitivePreview.details.starts_at}
+              </p>
+              <p>
+                <strong>Fin:</strong> {sessionDefinitivePreview.details.ends_at}
+              </p>
+              <p>
+                <strong>Reservas:</strong>{' '}
+                {sessionDefinitivePreview.affected.bookings}
+              </p>
+              <p>
+                <strong>Asistencia:</strong>{' '}
+                {sessionDefinitivePreview.affected.attendance}
+              </p>
+            </div>
+            {sessionDefinitivePreview.warnings.length ? (
+              <div className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+                {sessionDefinitivePreview.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            ) : null}
+            <label className="mt-4 block text-sm font-semibold">
+              Escribi {sessionDefinitivePreview.details.confirmation_required} para confirmar
+              <input
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold"
+                onChange={(event) =>
+                  setSessionDefinitiveConfirmation(event.target.value)
+                }
+                value={sessionDefinitiveConfirmation}
+              />
+            </label>
+            {error ? (
+              <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+                {error}
+              </p>
+            ) : null}
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
+                disabled={saving}
+                onClick={closeDefinitiveDeleteSessionModal}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                disabled={
+                  saving ||
+                  sessionDefinitiveConfirmation !==
+                    sessionDefinitivePreview.details.confirmation_required
+                }
+                onClick={() => void handleDeleteSessionDefinitive()}
+                type="button"
+              >
+                {saving ? 'Procesando...' : 'Eliminar definitivamente'}
               </button>
             </div>
           </div>

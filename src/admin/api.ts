@@ -14,6 +14,10 @@ import type {
   ClassRecurringRule,
   ClassRecurringRuleInput,
   CreateStudentInput,
+  DeleteClassSessionPreview,
+  DeletePaymentPreview,
+  DeleteStudentPreview,
+  DefinitiveDeleteResult,
   FixedScheduleCancelPreview,
   FixedScheduleCancelResult,
   FixedScheduleOption,
@@ -252,6 +256,38 @@ export async function deleteStudent(studentId: string) {
   }
 
   return data as AdminActionResult
+}
+
+export async function previewDeleteStudent(studentId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_preview_delete_student', {
+    p_profile_id: studentId,
+  })
+
+  if (error) {
+    await throwEdgeFunctionError(error)
+  }
+
+  return data as DeleteStudentPreview
+}
+
+export async function deleteStudentDefinitive(
+  studentId: string,
+  confirmation: string,
+) {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('delete-student', {
+    body: {
+      student_id: studentId,
+      confirm: confirmation,
+    },
+  })
+
+  if (error) {
+    await throwEdgeFunctionError(error)
+  }
+
+  return data as DefinitiveDeleteResult
 }
 
 export async function listPlans() {
@@ -803,6 +839,36 @@ export async function voidPayment(paymentId: string, reason: string) {
   return data
 }
 
+export async function previewDeletePayment(paymentId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_preview_delete_payment', {
+    p_payment_id: paymentId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as DeletePaymentPreview
+}
+
+export async function deletePaymentDefinitive(
+  paymentId: string,
+  confirmation: string,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc('admin_delete_payment_definitive', {
+    p_payment_id: paymentId,
+    p_confirm: confirmation.trim(),
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data as DefinitiveDeleteResult
+}
+
 export async function listCalendarSessions(fromDate: string, toDate: string) {
   const client = getClient()
   const { error: materializeError } = await client.rpc(
@@ -1034,6 +1100,42 @@ export async function deleteClassSession(
   }
 
   return data as AdminActionResult
+}
+
+export async function previewDeleteClassSession(sessionId: string) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_preview_delete_class_session',
+    {
+      p_session_id: sessionId,
+    },
+  )
+
+  if (error) {
+    throwCalendarRpcError('admin_preview_delete_class_session', error)
+  }
+
+  return data as DeleteClassSessionPreview
+}
+
+export async function deleteClassSessionDefinitive(
+  sessionId: string,
+  confirmation: string,
+) {
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_delete_class_session_definitive',
+    {
+      p_session_id: sessionId,
+      p_confirm: confirmation.trim(),
+    },
+  )
+
+  if (error) {
+    throwCalendarRpcError('admin_delete_class_session_definitive', error)
+  }
+
+  return data as DefinitiveDeleteResult
 }
 
 export async function listAttendanceSessions(fromDate: string, toDate: string) {
@@ -1472,6 +1574,36 @@ export async function deleteStudentDriveFile(fileId: string) {
   }
 
   return data as DriveCleanupResult
+}
+
+export async function deleteStudentFileDefinitive(
+  file: AdminStudentFile,
+  confirmation: string,
+) {
+  if (!file.archived_at) {
+    const driveResult = await deleteStudentDriveFile(file.file_id)
+    if (driveResult.failed_files.length > 0) {
+      throw new Error(
+        driveResult.failed_files[0]?.error ??
+          'No se pudo eliminar el archivo en Google Drive.',
+      )
+    }
+  }
+
+  const client = getClient()
+  const { data, error } = await client.rpc(
+    'admin_delete_student_file_metadata_definitive',
+    {
+      p_file_id: file.file_id,
+      p_confirm: confirmation.trim(),
+    },
+  )
+
+  if (error) {
+    throw error
+  }
+
+  return data as DefinitiveDeleteResult
 }
 
 export async function sendMassEmail(input: MassEmailInput) {

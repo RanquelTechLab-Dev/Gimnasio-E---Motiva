@@ -10,8 +10,9 @@ import {
   createStudent,
   deactivateStudent,
   deleteSelectedFixedScheduleBookings,
+  deleteStudentDefinitive,
+  deleteStudentFileDefinitive,
   deleteStudentProgram,
-  deleteStudent,
   formatAdminError,
   listStudentFiles,
   listStudentFixedSchedules,
@@ -22,6 +23,7 @@ import {
   listStudents,
   listFixedScheduleOptionsForStudent,
   previewFixedScheduleForStudent,
+  previewDeleteStudent,
   registerManualPayment,
   updateStudentProgram,
   updateStudentFileMetadata,
@@ -33,6 +35,7 @@ import {
 import type {
   AdminStudentFile,
   AdminTrainingNote,
+  DeleteStudentPreview,
   DriveStatusResult,
   FileKind,
   FixedScheduleBookingDetail,
@@ -746,6 +749,11 @@ export function AdminStudentsPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [deleteStudentPreview, setDeleteStudentPreview] =
+    useState<DeleteStudentPreview | null>(null)
+  const [fileDeleteTarget, setFileDeleteTarget] =
+    useState<AdminStudentFile | null>(null)
+  const [fileDeleteConfirmation, setFileDeleteConfirmation] = useState('')
 
   const filteredStudents = useMemo(
     () =>
@@ -1366,15 +1374,25 @@ export function AdminStudentsPage() {
     }
   }
 
-  function openDeleteStudentModal() {
+  async function openDeleteStudentModal() {
     if (!selectedStudent) {
       return
     }
 
+    setSaving(true)
     setDeleteConfirmation('')
+    setDeleteStudentPreview(null)
     setError(null)
     setSuccess(null)
-    setDeleteModalOpen(true)
+    try {
+      const preview = await previewDeleteStudent(selectedStudent.id)
+      setDeleteStudentPreview(preview)
+      setDeleteModalOpen(true)
+    } catch (previewError) {
+      setError(formatAdminError(previewError))
+    } finally {
+      setSaving(false)
+    }
   }
 
   function closeDeleteStudentModal() {
@@ -1383,11 +1401,16 @@ export function AdminStudentsPage() {
     }
 
     setDeleteConfirmation('')
+    setDeleteStudentPreview(null)
     setDeleteModalOpen(false)
   }
 
   async function handleDeleteStudent() {
-    if (!selectedStudent || deleteConfirmation !== 'ELIMINAR') {
+    const expectedConfirmation =
+      deleteStudentPreview?.details.confirmation_required ??
+      'ELIMINAR ALUMNO DEFINITIVAMENTE'
+
+    if (!selectedStudent || deleteConfirmation !== expectedConfirmation) {
       return
     }
 
@@ -1395,11 +1418,12 @@ export function AdminStudentsPage() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteStudent(selectedStudent.id)
+      await deleteStudentDefinitive(selectedStudent.id, deleteConfirmation)
       setSuccess('Alumno eliminado definitivamente.')
       setSelectedStudentId(null)
       setEditForm(null)
       setDeleteConfirmation('')
+      setDeleteStudentPreview(null)
       setDeleteModalOpen(false)
       await loadData()
     } catch (deleteError) {
@@ -1781,6 +1805,47 @@ export function AdminStudentsPage() {
       await loadSelectedStudentOperations(selectedStudent.id)
     } catch (archiveError) {
       setError(formatAdminError(archiveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function openDeleteFileModal(file: AdminStudentFile) {
+    setFileDeleteTarget(file)
+    setFileDeleteConfirmation('')
+    setError(null)
+    setSuccess(null)
+  }
+
+  function closeDeleteFileModal() {
+    if (saving) {
+      return
+    }
+
+    setFileDeleteTarget(null)
+    setFileDeleteConfirmation('')
+  }
+
+  async function handleDeleteFileDefinitive() {
+    if (
+      !fileDeleteTarget ||
+      fileDeleteConfirmation !== 'ELIMINAR ARCHIVO' ||
+      !selectedStudent
+    ) {
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await deleteStudentFileDefinitive(fileDeleteTarget, fileDeleteConfirmation)
+      setSuccess('Archivo eliminado de Drive y de la base.')
+      setFileDeleteTarget(null)
+      setFileDeleteConfirmation('')
+      await loadSelectedStudentOperations(selectedStudent.id)
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
     } finally {
       setSaving(false)
     }
@@ -3089,6 +3154,13 @@ export function AdminStudentsPage() {
                               Archivar
                             </button>
                           ) : null}
+                          <button
+                            className="rounded-xl border border-[var(--accent)] px-3 py-1 text-xs font-semibold text-[var(--accent)]"
+                            onClick={() => openDeleteFileModal(file)}
+                            type="button"
+                          >
+                            Eliminar
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -3367,7 +3439,7 @@ export function AdminStudentsPage() {
                   <button
                     className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
                     disabled={saving}
-                    onClick={openDeleteStudentModal}
+                    onClick={() => void openDeleteStudentModal()}
                     type="button"
                   >
                     Eliminar alumno
@@ -3392,30 +3464,56 @@ export function AdminStudentsPage() {
                 Eliminar alumno definitivamente
               </h3>
               <p className="mt-3 text-sm text-[var(--muted)]">
-                Esta acción elimina el alumno y sus datos asociados. Usala solo
-                para alumnos de prueba o cargados por error. Para alumnos reales
-                con historial, recomendamos desactivarlo.
+                Esta accion elimina el alumno, sus programas, pagos, reservas,
+                asistencia, archivos, horarios habituales y usuario de acceso.
+                Solo segui si ya revisaste el impacto y realmente queres sacarlo
+                de la base activa.
               </p>
               <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4">
                 <p className="text-sm font-bold text-[var(--ink)]">
                   Se eliminará:
                 </p>
                 <ul className="mt-2 grid gap-1 text-sm text-[var(--muted)]">
-                  <li>Pagos</li>
-                  <li>Programas</li>
-                  <li>Reservas</li>
-                  <li>Asistencia</li>
-                  <li>Archivos</li>
-                  <li>Notas / planes</li>
-                  <li>Usuario de acceso</li>
+                  <li>
+                    Programas: {deleteStudentPreview?.affected.memberships ?? 0}
+                  </li>
+                  <li>Pagos: {deleteStudentPreview?.affected.payments ?? 0}</li>
+                  <li>
+                    Reservas: {deleteStudentPreview?.affected.bookings ?? 0}
+                  </li>
+                  <li>
+                    Asistencia: {deleteStudentPreview?.affected.attendance ?? 0}
+                  </li>
+                  <li>Archivos: {deleteStudentPreview?.affected.files ?? 0}</li>
+                  <li>
+                    Notas / planes:{' '}
+                    {deleteStudentPreview?.affected.training_notes ?? 0}
+                  </li>
+                  <li>
+                    Horarios habituales:{' '}
+                    {deleteStudentPreview?.affected.fixed_schedules ?? 0}
+                  </li>
+                  <li>Usuario de acceso: 1</li>
                 </ul>
               </div>
+              {deleteStudentPreview?.warnings.length ? (
+                <div className="mt-4 rounded-2xl bg-[var(--brand-soft)] p-3 text-sm text-[var(--brand)]">
+                  {deleteStudentPreview.warnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              ) : null}
               <p className="mt-4 text-sm text-[var(--ink)]">
                 Para confirmar la eliminación de{' '}
                 <strong>
                   {selectedStudent.first_name} {selectedStudent.last_name}
                 </strong>
-                , escribí <strong>ELIMINAR</strong>.
+                , escribi{' '}
+                <strong>
+                  {deleteStudentPreview?.details.confirmation_required ??
+                    'ELIMINAR ALUMNO DEFINITIVAMENTE'}
+                </strong>
+                .
               </p>
               <input
                 aria-label="Confirmar eliminacion definitiva"
@@ -3439,11 +3537,83 @@ export function AdminStudentsPage() {
                 </button>
                 <button
                   className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
-                  disabled={saving || deleteConfirmation !== 'ELIMINAR'}
+                  disabled={
+                    saving ||
+                    deleteConfirmation !==
+                      (deleteStudentPreview?.details.confirmation_required ??
+                        'ELIMINAR ALUMNO DEFINITIVAMENTE')
+                  }
                   onClick={() => void handleDeleteStudent()}
                   type="button"
                 >
                   {saving ? 'Eliminando...' : 'Eliminar definitivamente'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {fileDeleteTarget ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+            <div
+              aria-modal="true"
+              className="w-full max-w-lg rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow)]"
+              role="dialog"
+            >
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
+                Archivo
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                Eliminar archivo definitivamente
+              </h3>
+              <p className="mt-3 text-sm text-[var(--muted)]">
+                Se eliminara el archivo de Google Drive y despues su metadata en
+                la base. Si uno de los pasos falla, te vamos a mostrar el estado
+                real para reintentar sin mentir con el resultado.
+              </p>
+              <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4 text-sm">
+                <p className="font-semibold text-[var(--ink)]">
+                  {fileDeleteTarget.title}
+                </p>
+                <p className="mt-1 text-[var(--muted)]">
+                  {selectedStudent?.first_name} {selectedStudent?.last_name} ·{' '}
+                  {fileDeleteTarget.visible_to_student
+                    ? 'Visible para alumno'
+                    : 'Solo administracion'}
+                  {fileDeleteTarget.archived_at ? ' · Ya archivado en DB' : ''}
+                </p>
+              </div>
+              <label className="mt-4 block text-sm font-semibold">
+                Escribi ELIMINAR ARCHIVO para confirmar
+                <input
+                  className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold"
+                  onChange={(event) =>
+                    setFileDeleteConfirmation(event.target.value)
+                  }
+                  value={fileDeleteConfirmation}
+                />
+              </label>
+              {error ? (
+                <p className="mt-4 rounded-2xl bg-[var(--accent-soft)] p-3 text-sm text-[var(--accent)]">
+                  {error}
+                </p>
+              ) : null}
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={closeDeleteFileModal}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                  disabled={saving || fileDeleteConfirmation !== 'ELIMINAR ARCHIVO'}
+                  onClick={() => void handleDeleteFileDefinitive()}
+                  type="button"
+                >
+                  {saving ? 'Eliminando...' : 'Eliminar archivo'}
                 </button>
               </div>
             </div>

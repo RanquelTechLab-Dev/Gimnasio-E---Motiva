@@ -4,6 +4,11 @@
 
 E-Motiva App Gimnasio v2.
 
+## Reglas productivas actuales
+
+La fuente de verdad productiva vigente para la operacion real de Carolina esta
+en [`FULL_PRODUCTION_RULES_CAROLINA.md`](./FULL_PRODUCTION_RULES_CAROLINA.md).
+
 ## Motivo del reboot
 
 El intento tecnico anterior quedo contaminado por perdida de trazabilidad de migraciones Supabase. RAN-7 fue aplicado en Supabase remoto, pero los SQL reales no quedaron versionados en Git/GitHub. Eso bloqueo `db push --dry-run` y rompio el flujo profesional de migraciones.

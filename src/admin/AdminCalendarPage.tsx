@@ -68,6 +68,7 @@ type SessionDeleteRequest = {
   scope: DeleteClassSessionScope
   title: string
   description: string
+  confirmationText: string
 }
 
 type RecurringEditScope = 'single' | 'series'
@@ -766,7 +767,10 @@ export function AdminCalendarPage() {
   }
 
   async function confirmDeleteSession() {
-    if (!sessionDeleteRequest || sessionDeleteConfirmation !== 'ELIMINAR') {
+    if (
+      !sessionDeleteRequest ||
+      sessionDeleteConfirmation !== sessionDeleteRequest.confirmationText
+    ) {
       return
     }
 
@@ -1335,12 +1339,14 @@ export function AdminCalendarPage() {
             )}
             <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">
-                {selectedIsRecurring ? 'Acciones del horario recurrente' : 'Eliminacion segura'}
+                {selectedIsRecurring
+                  ? 'Acciones del horario recurrente'
+                  : 'Borrado definitivo pendiente'}
               </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
                 {selectedIsRecurring
                   ? 'Separado en dos acciones: una cancela solo esta fecha y la otra pausa el horario habitual para que no siga bloqueando nuevas creaciones.'
-                  : 'Elimina esta clase. Si tiene historial, se conserva y se cancela de forma segura.'}
+                  : 'La baja definitiva todavia no esta implementada como hard delete real. Mientras tanto, usa "Cancelar clase" para conservar historial sin confundir la accion con un borrado fisico.'}
               </p>
               <div className="mt-3 grid gap-2">
                 {selectedIsRecurring ? (
@@ -1354,6 +1360,7 @@ export function AdminCalendarPage() {
                           title: 'Pausar horario recurrente',
                           description:
                             'Se pausara este horario recurrente desde esta fecha. No se crearan nuevas clases de esta serie y dejara de bloquear la creacion de otro horario igual.',
+                          confirmationText: 'PAUSAR',
                         })
                       }
                       type="button"
@@ -1373,6 +1380,7 @@ export function AdminCalendarPage() {
                           title: 'Cancelar solo esta fecha',
                           description:
                             'Esta accion solo cancela esta fecha. El horario recurrente seguira activo en proximas semanas.',
+                          confirmationText: 'CANCELAR',
                         })
                       }
                       type="button"
@@ -1385,27 +1393,11 @@ export function AdminCalendarPage() {
                     </p>
                   </>
                 ) : (
-                  <>
-                    <button
-                      className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition disabled:opacity-60"
-                      disabled={saving}
-                      onClick={() =>
-                        requestDeleteSession({
-                          scope: 'single',
-                          title: 'Eliminar clase',
-                          description:
-                            'Esta accion borra la clase si no tiene historial. Si tiene reservas o asistencia, la cancela sin borrar esos datos.',
-                        })
-                      }
-                      type="button"
-                    >
-                      Eliminar clase
-                    </button>
-                    <p className="text-xs text-[var(--muted)]">
-                      Borra la clase si no tiene historial. Si tiene reservas o
-                      asistencia, la cancela sin borrar esos datos.
-                    </p>
-                  </>
+                  <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--page)] px-4 py-3 text-sm text-[var(--muted)]">
+                    Si una accion futura dice "Borrar clase", debera hacer
+                    hard delete real. En esta pantalla todavia no se ofrece esa
+                    accion para evitar confundir cancelar con borrar.
+                  </div>
                 )}
               </div>
             </div>
@@ -1777,7 +1769,7 @@ export function AdminCalendarPage() {
               volver a crear la clase o el horario.
             </p>
             <label className="mt-4 block text-sm font-semibold">
-              Escribi ELIMINAR para confirmar
+              Escribi {sessionDeleteRequest.confirmationText} para confirmar
               <input
                 className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 onChange={(event) =>
@@ -1800,7 +1792,11 @@ export function AdminCalendarPage() {
               </button>
               <button
                 className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
-                disabled={saving || sessionDeleteConfirmation !== 'ELIMINAR'}
+                disabled={
+                  saving ||
+                  sessionDeleteConfirmation !==
+                    sessionDeleteRequest.confirmationText
+                }
                 onClick={() => void confirmDeleteSession()}
                 type="button"
               >

@@ -3317,6 +3317,24 @@ export function AdminStudentsPage() {
                   Desactivar alumno
                 </button>
               </div>
+              <div className="grid gap-2 rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent)]">
+                  Eliminacion definitiva deshabilitada
+                </p>
+                <p className="whitespace-normal break-words text-xs font-semibold text-[var(--accent)]">
+                  Por proteccion de datos reales, el borrado definitivo de alumnos
+                  esta deshabilitado en produccion. Usa Desactivar alumno para
+                  bloquear el acceso y conservar historial. Un borrado fisico solo
+                  se hara con flujo E2E/autorizacion explicita de Walter.
+                </p>
+                <button
+                  className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] opacity-60"
+                  disabled
+                  type="button"
+                >
+                  Eliminar alumno definitivamente
+                </button>
+              </div>
             </div>
           </form>
         ) : null}

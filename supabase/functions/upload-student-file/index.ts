@@ -65,6 +65,11 @@ function cleanBoolean(value: FormDataEntryValue | null) {
     : true
 }
 
+function cleanEnvBoolean(value: string | undefined | null) {
+  const normalized = (value ?? '').trim().toLowerCase()
+  return normalized === 'true' || normalized === '1' || normalized === 'yes'
+}
+
 async function getGoogleAccessToken() {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
@@ -269,6 +274,7 @@ async function shareDriveFileForStudent(
   fileId: string,
   email: string | null,
   visibleToStudent: boolean,
+  allowLinkFallback: boolean,
 ): Promise<DriveShareResult> {
   if (!visibleToStudent) {
     return { mode: 'not_requested', warning: null }
@@ -279,12 +285,25 @@ async function shareDriveFileForStudent(
       await grantReaderPermission(accessToken, fileId, email)
       return { mode: 'student_email', warning: null }
     } catch (error) {
-      safeUploadLog('student email share failed; falling back to link share', {
+      safeUploadLog('student email share failed', {
         drive_status: error instanceof GoogleDriveRequestError ? error.status : null,
         drive_reason: error instanceof GoogleDriveRequestError ? error.reason : null,
         student_email_domain: email.split('@')[1] ?? null,
+        link_fallback_enabled: allowLinkFallback,
       })
+      if (!allowLinkFallback) {
+        throw new Error(
+          'El archivo se subio a Drive pero no se pudo compartir con el email del alumno. No se guardo metadata. Verifica que el email del alumno pueda recibir permisos de Drive o subilo como solo admin.',
+          { cause: error },
+        )
+      }
     }
+  }
+
+  if (!allowLinkFallback) {
+    throw new Error(
+      'El archivo se subio a Drive pero el alumno no tiene email para compartirlo. No se guardo metadata. Subilo como solo admin o corregi el email del alumno.',
+    )
   }
 
   await grantAnyoneWithLinkPermission(accessToken, fileId)
@@ -354,6 +373,9 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const rootFolderId = Deno.env.get('GOOGLE_DRIVE_ROOT_FOLDER_ID')
+  const allowDriveLinkFallback = cleanEnvBoolean(
+    Deno.env.get('ALLOW_DRIVE_LINK_FALLBACK'),
+  )
 
   if (!supabaseUrl || !serviceRoleKey || !rootFolderId) {
     return jsonResponse(
@@ -523,6 +545,7 @@ Deno.serve(async (req) => {
       driveFile.id,
       student.email,
       visibleToStudent,
+      allowDriveLinkFallback,
     )
   } catch (error) {
     if (typeof driveFile?.id === 'string') {

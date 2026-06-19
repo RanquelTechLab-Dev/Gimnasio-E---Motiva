@@ -583,6 +583,40 @@ export type DriveCleanupResult = {
   message: string
 }
 
+
+export type DeleteStudentDefinitivePreview = {
+  student_id: string
+  student_email: string
+  student_name: string
+  counts: {
+    attendance: number
+    bookings: number
+    payments: number
+    memberships: number
+    files: number
+    training_notes: number
+    fixed_schedules: number
+    email_logs: number
+    audit_logs: number
+  }
+  drive_files: Array<{
+    file_id: string
+    title: string
+    drive_file_id: string | null
+  }>
+}
+
+export type DeleteStudentDefinitiveResult = {
+  dryRun: boolean
+  deleted: boolean
+  preview: DeleteStudentDefinitivePreview
+  required_confirmation?: 'ELIMINAR'
+  drive_deleted_count?: number
+  database_deleted?: boolean
+  auth_deleted?: boolean
+  auth_cleanup_required?: boolean
+  warning?: string | null
+}
 export type UploadStudentFileInput = {
   student_id: string
   kind: FileKind

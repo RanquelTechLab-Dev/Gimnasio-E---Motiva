@@ -709,7 +709,7 @@ export function AdminCalendarPage() {
         setSuccess(
           calendarActionMessage(
             result,
-            'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
+            'Este horario dejo de repetirse desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
           ),
         )
       } else if (result.action === 'cancelled') {
@@ -747,7 +747,7 @@ export function AdminCalendarPage() {
       setSuccess(
         calendarActionMessage(
           result,
-          'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
+          'Este horario dejo de repetirse desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
         ),
       )
       setSessionCalendarActionRequest(null)
@@ -1348,7 +1348,7 @@ export function AdminCalendarPage() {
               </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
                 {selectedIsRecurring
-                  ? 'Separado en dos acciones: una cancela solo esta fecha y la otra pausa el horario habitual para que no siga bloqueando nuevas creaciones.'
+                  ? 'Separado en dos acciones: una cancela solo esta fecha y la otra deja de repetir el horario habitual para que no siga bloqueando nuevas creaciones.'
                   : 'La baja definitiva todavia no esta implementada como hard delete real. Mientras tanto, usa "Cancelar clase" para conservar historial sin confundir la accion con un borrado fisico.'}
               </p>
               <div className="mt-3 grid gap-2">
@@ -1360,19 +1360,19 @@ export function AdminCalendarPage() {
                       onClick={() =>
                         requestSessionCalendarAction({
                           scope: 'series',
-                          title: 'Pausar horario recurrente',
+                          title: 'Dejar de repetir este horario',
                           description:
-                            'Se pausara este horario recurrente desde esta fecha. No se crearan nuevas clases de esta serie y dejara de bloquear la creacion de otro horario igual.',
+                            'Este horario dejara de repetirse desde esta fecha. No borra historial y evita que se creen nuevas clases de esta serie.',
                           confirmationText: 'PAUSAR',
                         })
                       }
                       type="button"
                     >
-                      Pausar horario recurrente
+                      Dejar de repetir este horario
                     </button>
                     <p className="text-xs text-[var(--muted)]">
-                      Se pausara este horario recurrente desde esta fecha. No
-                      se crearan nuevas clases de esta serie.
+                      Este horario dejara de repetirse desde esta fecha. No
+                      borra historial ni reservas pasadas.
                     </p>
                     <button
                       className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"

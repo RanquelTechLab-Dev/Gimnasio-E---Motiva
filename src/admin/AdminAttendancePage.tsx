@@ -45,7 +45,7 @@ const bookingLabels: Record<AttendanceSessionRow['booking_status'], string> = {
 const correctionLabels: Record<AttendanceStatus, string> = {
   present: 'Corregir a asistio',
   absent: 'Corregir a ausente',
-  justified: 'Justificado historico',
+  justified: 'Corregir a justificado',
 }
 
 function validateDateRange(fromDate: string, toDate: string) {
@@ -707,7 +707,7 @@ export function AdminAttendancePage() {
                                 </button>
                               ) : null}
                               {row.attendance_status ? (
-                                (['present', 'absent'] as const).map(
+                                (['present', 'absent', 'justified'] as const).map(
                                   (status) => (
                                     <button
                                       className="rounded-2xl border border-[var(--line)] px-3 py-2 text-xs font-bold transition hover:bg-[var(--brand-soft)] disabled:opacity-60"

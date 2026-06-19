@@ -8,6 +8,23 @@ type DriveQuota = {
   warning: boolean
 }
 
+type DriveShareResult = {
+  mode: 'not_requested' | 'student_email' | 'anyone_with_link'
+  warning: string | null
+}
+
+class GoogleDriveRequestError extends Error {
+  status: number
+  reason: string | null
+
+  constructor(message: string, status: number, reason: string | null) {
+    super(message)
+    this.name = 'GoogleDriveRequestError'
+    this.status = status
+    this.reason = reason
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -109,6 +126,28 @@ function safeUploadLog(message: string, metadata: Record<string, unknown>) {
   )
 }
 
+function buildGoogleDriveError(
+  status: number,
+  body: unknown,
+  fallbackMessage: string,
+) {
+  const payload = body && typeof body === 'object' ? body as { error?: { message?: unknown; errors?: Array<{ reason?: unknown }> } } : null
+  const error = payload?.error
+  const reason = Array.isArray(error?.errors)
+    ? String(error.errors[0]?.reason ?? '')
+    : ''
+  const message =
+    typeof error?.message === 'string' && error.message.trim()
+      ? error.message.trim()
+      : fallbackMessage
+
+  return new GoogleDriveRequestError(
+    `${fallbackMessage} (${status}: ${message})`,
+    status,
+    reason || null,
+  )
+}
+
 async function uploadToDrive(
   accessToken: string,
   rootFolderId: string,
@@ -139,7 +178,7 @@ async function uploadToDrive(
   ])
 
   const response = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,mimeType,size',
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,webViewLink,mimeType,size',
     {
       method: 'POST',
       headers: {
@@ -151,7 +190,11 @@ async function uploadToDrive(
   )
   const responseBody = await response.json().catch(() => null)
   if (!response.ok || !responseBody?.id) {
-    throw new Error('No se pudo subir el archivo a Google Drive.')
+    throw buildGoogleDriveError(
+      response.status,
+      responseBody,
+      'No se pudo subir el archivo a Google Drive.',
+    )
   }
   return responseBody as {
     id: string
@@ -168,7 +211,7 @@ async function grantReaderPermission(
   email: string,
 ) {
   const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?sendNotificationEmail=false`,
+    `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?sendNotificationEmail=false&supportsAllDrives=true&fields=id,type,role,emailAddress`,
     {
       method: 'POST',
       headers: {
@@ -182,13 +225,78 @@ async function grantReaderPermission(
       }),
     },
   )
+  const responseBody = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error('No se pudo dar acceso de lectura al alumno en Drive.')
+    throw buildGoogleDriveError(
+      response.status,
+      responseBody,
+      'No se pudo dar acceso de lectura al alumno en Drive.',
+    )
+  }
+}
+
+async function grantAnyoneWithLinkPermission(
+  accessToken: string,
+  fileId: string,
+) {
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?supportsAllDrives=true&fields=id,type,role`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'anyone',
+        role: 'reader',
+        allowFileDiscovery: false,
+      }),
+    },
+  )
+  const responseBody = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw buildGoogleDriveError(
+      response.status,
+      responseBody,
+      'No se pudo habilitar acceso por enlace en Drive.',
+    )
+  }
+}
+
+async function shareDriveFileForStudent(
+  accessToken: string,
+  fileId: string,
+  email: string | null,
+  visibleToStudent: boolean,
+): Promise<DriveShareResult> {
+  if (!visibleToStudent) {
+    return { mode: 'not_requested', warning: null }
+  }
+
+  if (email) {
+    try {
+      await grantReaderPermission(accessToken, fileId, email)
+      return { mode: 'student_email', warning: null }
+    } catch (error) {
+      safeUploadLog('student email share failed; falling back to link share', {
+        drive_status: error instanceof GoogleDriveRequestError ? error.status : null,
+        drive_reason: error instanceof GoogleDriveRequestError ? error.reason : null,
+        student_email_domain: email.split('@')[1] ?? null,
+      })
+    }
+  }
+
+  await grantAnyoneWithLinkPermission(accessToken, fileId)
+  return {
+    mode: 'anyone_with_link',
+    warning:
+      'No se pudo compartir por email; se habilito acceso de lectura por enlace.',
   }
 }
 
 async function deleteDriveFile(accessToken: string, fileId: string) {
-  await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+  await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   }).catch(() => null)
@@ -399,7 +507,8 @@ Deno.serve(async (req) => {
     )
   }
 
-  let driveFile: Awaited<ReturnType<typeof uploadToDrive>>
+  let driveFile: Awaited<ReturnType<typeof uploadToDrive>> | null = null
+  let driveShare: DriveShareResult
   try {
     driveFile = await uploadToDrive(
       accessToken,
@@ -409,9 +518,12 @@ Deno.serve(async (req) => {
       title,
       description,
     )
-    if (visibleToStudent && student.email) {
-      await grantReaderPermission(accessToken, driveFile.id, student.email)
-    }
+    driveShare = await shareDriveFileForStudent(
+      accessToken,
+      driveFile.id,
+      student.email,
+      visibleToStudent,
+    )
   } catch (error) {
     if (typeof driveFile?.id === 'string') {
       await deleteDriveFile(accessToken, driveFile.id)
@@ -420,6 +532,10 @@ Deno.serve(async (req) => {
       { error: error instanceof Error ? error.message : 'No se pudo subir el archivo.' },
       500,
     )
+  }
+
+  if (!driveFile) {
+    return jsonResponse({ error: 'No se pudo subir el archivo.' }, 500)
   }
 
   let quota: DriveQuota | null = null
@@ -478,6 +594,8 @@ Deno.serve(async (req) => {
       size_bytes: insertedFile.size_bytes,
       visible_to_student: visibleToStudent,
       drive_file_id: driveFile.id,
+      drive_share_mode: driveShare.mode,
+      drive_share_warning: driveShare.warning,
       drive_warning: quota?.warning ?? null,
     },
   })
@@ -488,5 +606,6 @@ Deno.serve(async (req) => {
       file_id: insertedFile.id,
     },
     drive_status: quota,
+    drive_share: driveShare,
   })
 })

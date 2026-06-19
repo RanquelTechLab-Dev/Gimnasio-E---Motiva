@@ -14,6 +14,12 @@ seguro.
 - `/app/files` sigue mostrando archivos propios visibles desde `list_my_files`.
 - Si el archivo es visible, la funcion intenta dar permiso de lectura al email
   del alumno.
+- El acceso por enlace `anyone_with_link` no es el comportamiento por defecto.
+  Solo se permite como fallback si el secret `ALLOW_DRIVE_LINK_FALLBACK=true`
+  esta configurado explicitamente.
+- Si `visible_to_student=true`, falla el permiso por email y el fallback por
+  enlace no esta habilitado, la funcion elimina el archivo recien subido y no
+  guarda metadata inconsistente.
 - La subida registra metadata en `public.files`.
 - La subida audita `file.uploaded`.
 - La consulta de cuota audita `drive_status.checked`.
@@ -39,10 +45,16 @@ GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 GOOGLE_REFRESH_TOKEN
 GOOGLE_DRIVE_ROOT_FOLDER_ID
+ALLOW_DRIVE_LINK_FALLBACK
 ```
 
 El refresh token debe pertenecer a la cuenta dedicada `e.motiva.gym@gmail.com`
 para que la cuota consultada sea la de esa cuenta.
+
+`ALLOW_DRIVE_LINK_FALLBACK` es opcional y debe omitirse o quedar distinto de
+`true` salvo decision explicita de Walter. Con el valor por defecto, los
+archivos visibles para el alumno solo se guardan si Drive permite compartirlos
+con el email del alumno.
 
 ## Validaciones de upload
 

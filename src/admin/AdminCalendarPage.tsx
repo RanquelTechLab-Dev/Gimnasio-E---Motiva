@@ -64,7 +64,7 @@ type ActivityFormState = {
   cancellation_cutoff_hours: string
 }
 
-type SessionDeleteRequest = {
+type SessionCalendarActionRequest = {
   scope: DeleteClassSessionScope
   title: string
   description: string
@@ -342,10 +342,12 @@ export function AdminCalendarPage() {
     useState<Activity | null>(null)
   const [activityDeleteConfirmation, setActivityDeleteConfirmation] =
     useState('')
-  const [sessionDeleteRequest, setSessionDeleteRequest] =
-    useState<SessionDeleteRequest | null>(null)
-  const [sessionDeleteConfirmation, setSessionDeleteConfirmation] =
-    useState('')
+  const [sessionCalendarActionRequest, setSessionCalendarActionRequest] =
+    useState<SessionCalendarActionRequest | null>(null)
+  const [
+    sessionCalendarActionConfirmation,
+    setSessionCalendarActionConfirmation,
+  ] = useState('')
   const [recurringEditScope, setRecurringEditScope] =
     useState<RecurringEditScope>('single')
 
@@ -721,8 +723,8 @@ export function AdminCalendarPage() {
             : 'Horario recurrente eliminado.',
         )
       }
-      setSessionDeleteRequest(null)
-      setSessionDeleteConfirmation('')
+      setSessionCalendarActionRequest(null)
+      setSessionCalendarActionConfirmation('')
       resetForm()
       await loadData()
     } catch (deleteError) {
@@ -748,8 +750,8 @@ export function AdminCalendarPage() {
           'Horario recurrente pausado desde esta fecha. Ya no deberia bloquear la creacion de otro igual.',
         ),
       )
-      setSessionDeleteRequest(null)
-      setSessionDeleteConfirmation('')
+      setSessionCalendarActionRequest(null)
+      setSessionCalendarActionConfirmation('')
       resetForm()
       await loadData()
     } catch (archiveError) {
@@ -759,27 +761,28 @@ export function AdminCalendarPage() {
     }
   }
 
-  function requestDeleteSession(request: SessionDeleteRequest) {
-    setSessionDeleteRequest(request)
-    setSessionDeleteConfirmation('')
+  function requestSessionCalendarAction(request: SessionCalendarActionRequest) {
+    setSessionCalendarActionRequest(request)
+    setSessionCalendarActionConfirmation('')
     setError(null)
     setSuccess(null)
   }
 
-  async function confirmDeleteSession() {
+  async function confirmSessionCalendarAction() {
     if (
-      !sessionDeleteRequest ||
-      sessionDeleteConfirmation !== sessionDeleteRequest.confirmationText
+      !sessionCalendarActionRequest ||
+      sessionCalendarActionConfirmation !==
+        sessionCalendarActionRequest.confirmationText
     ) {
       return
     }
 
-    if (sessionDeleteRequest.scope === 'series') {
+    if (sessionCalendarActionRequest.scope === 'series') {
       await handleArchiveRecurringRule()
       return
     }
 
-    await handleDeleteSession(sessionDeleteRequest.scope)
+    await handleDeleteSession(sessionCalendarActionRequest.scope)
   }
 
   async function handleActivitySubmit(event: FormEvent<HTMLFormElement>) {
@@ -1355,7 +1358,7 @@ export function AdminCalendarPage() {
                       className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition disabled:opacity-60"
                       disabled={saving}
                       onClick={() =>
-                        requestDeleteSession({
+                        requestSessionCalendarAction({
                           scope: 'series',
                           title: 'Pausar horario recurrente',
                           description:
@@ -1375,7 +1378,7 @@ export function AdminCalendarPage() {
                       className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-[var(--accent-soft)] disabled:opacity-60"
                       disabled={saving}
                       onClick={() =>
-                        requestDeleteSession({
+                        requestSessionCalendarAction({
                           scope: 'single',
                           title: 'Cancelar solo esta fecha',
                           description:
@@ -1755,27 +1758,27 @@ export function AdminCalendarPage() {
           </div>
         </div>
       ) : null}
-      {sessionDeleteRequest ? (
+      {sessionCalendarActionRequest ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-5 shadow-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
               Confirmacion requerida
             </p>
             <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
-              {sessionDeleteRequest.title}
+              {sessionCalendarActionRequest.title}
             </h3>
             <p className="mt-3 text-sm text-[var(--muted)]">
-              {sessionDeleteRequest.description} No se podra deshacer sin
+              {sessionCalendarActionRequest.description} No se podra deshacer sin
               volver a crear la clase o el horario.
             </p>
             <label className="mt-4 block text-sm font-semibold">
-              Escribi {sessionDeleteRequest.confirmationText} para confirmar
+              Escribi {sessionCalendarActionRequest.confirmationText} para confirmar
               <input
                 className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
                 onChange={(event) =>
-                  setSessionDeleteConfirmation(event.target.value)
+                  setSessionCalendarActionConfirmation(event.target.value)
                 }
-                value={sessionDeleteConfirmation}
+                value={sessionCalendarActionConfirmation}
               />
             </label>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
@@ -1783,8 +1786,8 @@ export function AdminCalendarPage() {
                 className="rounded-2xl border border-[var(--line)] px-4 py-2 text-sm font-bold transition hover:bg-[var(--surface-strong)]"
                 disabled={saving}
                 onClick={() => {
-                  setSessionDeleteRequest(null)
-                  setSessionDeleteConfirmation('')
+                  setSessionCalendarActionRequest(null)
+                  setSessionCalendarActionConfirmation('')
                 }}
                 type="button"
               >
@@ -1794,10 +1797,10 @@ export function AdminCalendarPage() {
                 className="rounded-2xl bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
                 disabled={
                   saving ||
-                  sessionDeleteConfirmation !==
-                    sessionDeleteRequest.confirmationText
+                  sessionCalendarActionConfirmation !==
+                    sessionCalendarActionRequest.confirmationText
                 }
-                onClick={() => void confirmDeleteSession()}
+                onClick={() => void confirmSessionCalendarAction()}
                 type="button"
               >
                 {saving ? 'Procesando...' : 'Confirmar'}

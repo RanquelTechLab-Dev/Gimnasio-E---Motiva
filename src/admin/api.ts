@@ -45,6 +45,7 @@ import type {
   UpsertTrainingNoteInput,
   DriveStatusResult,
   DriveCleanupResult,
+  DeleteStudentDefinitiveResult,
 } from './types'
 
 export type DeleteClassSessionScope = 'single' | 'series'
@@ -239,6 +240,24 @@ export async function deactivateStudent(studentId: string) {
   }
 
   return data as AdminActionResult
+}
+
+export async function deleteStudentDefinitive(input: {
+  studentId: string
+  targetEmail: string
+  confirmText?: string
+  dryRun: boolean
+}) {
+  const client = getClient()
+  const { data, error } = await client.functions.invoke('delete-student', {
+    body: input,
+  })
+
+  if (error) {
+    await throwEdgeFunctionError(error)
+  }
+
+  return data as DeleteStudentDefinitiveResult
 }
 
 export async function listPlans() {

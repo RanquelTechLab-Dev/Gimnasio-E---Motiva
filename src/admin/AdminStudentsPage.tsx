@@ -9,6 +9,7 @@ import {
   createStudentFileMetadata,
   createStudent,
   deactivateStudent,
+  deleteStudentDefinitive,
   deleteSelectedFixedScheduleBookings,
   deleteStudentProgram,
   formatAdminError,
@@ -32,6 +33,7 @@ import {
 import type {
   AdminStudentFile,
   AdminTrainingNote,
+  DeleteStudentDefinitiveResult,
   DriveStatusResult,
   FileKind,
   FixedScheduleBookingDetail,
@@ -701,6 +703,11 @@ export function AdminStudentsPage() {
   const [programDeleteTarget, setProgramDeleteTarget] =
     useState<StudentProgram | null>(null)
   const [programDeleteConfirmation, setProgramDeleteConfirmation] = useState('')
+  const [studentDeleteModalOpen, setStudentDeleteModalOpen] = useState(false)
+  const [studentDeleteConfirmation, setStudentDeleteConfirmation] = useState('')
+  const [studentDeleteEmailConfirmation, setStudentDeleteEmailConfirmation] = useState('')
+  const [studentDeletePreview, setStudentDeletePreview] =
+    useState<DeleteStudentDefinitiveResult | null>(null)
   const [paymentForm, setPaymentForm] = useState<PaymentFormState>({
     membership_id: '',
     amount: '',
@@ -996,6 +1003,10 @@ export function AdminStudentsPage() {
     setProgramEditForm(null)
     setProgramDeleteTarget(null)
     setProgramDeleteConfirmation('')
+    setStudentDeleteModalOpen(false)
+    setStudentDeleteConfirmation('')
+    setStudentDeleteEmailConfirmation('')
+    setStudentDeletePreview(null)
     setFixedScheduleForm({
       membership_id: '',
       activity_id: '',
@@ -1065,6 +1076,10 @@ export function AdminStudentsPage() {
     setProgramEditForm(null)
     setProgramDeleteTarget(null)
     setProgramDeleteConfirmation('')
+    setStudentDeleteModalOpen(false)
+    setStudentDeleteConfirmation('')
+    setStudentDeleteEmailConfirmation('')
+    setStudentDeletePreview(null)
     setFixedScheduleForm({
       membership_id: firstFixedProgram?.program_id ?? '',
       activity_id: '',
@@ -1363,6 +1378,71 @@ export function AdminStudentsPage() {
     }
   }
 
+  async function openStudentDeleteModal() {
+    if (!selectedStudent) {
+      return
+    }
+
+    setStudentDeleteModalOpen(true)
+    setStudentDeleteConfirmation('')
+    setStudentDeleteEmailConfirmation('')
+    setStudentDeletePreview(null)
+    setError(null)
+    setSuccess(null)
+    setSaving(true)
+    try {
+      const result = await deleteStudentDefinitive({
+        studentId: selectedStudent.id,
+        targetEmail: selectedStudent.email,
+        dryRun: true,
+      })
+      setStudentDeletePreview(result)
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteStudentDefinitive() {
+    if (!selectedStudent) {
+      return
+    }
+
+    const confirmedEmail = studentDeleteEmailConfirmation.trim().toLowerCase()
+    if (confirmedEmail !== selectedStudent.email.toLowerCase()) {
+      setError('El email de confirmacion no coincide con el alumno seleccionado.')
+      return
+    }
+
+    if (studentDeleteConfirmation !== 'ELIMINAR') {
+      setError('Para borrar definitivamente escribi ELIMINAR.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const result = await deleteStudentDefinitive({
+        studentId: selectedStudent.id,
+        targetEmail: confirmedEmail,
+        confirmText: 'ELIMINAR',
+        dryRun: false,
+      })
+      setSuccess(
+        result.warning
+          ? `Alumno eliminado definitivamente. ${result.warning}`
+          : 'Alumno eliminado definitivamente.',
+      )
+      clearSelectedStudentForms()
+      await loadData()
+    } catch (deleteError) {
+      setError(formatAdminError(deleteError))
+    } finally {
+      setSaving(false)
+    }
+  }
   function handlePlanChange(planId: string) {
     const plan = plansById.get(planId)
     setMembershipForm({
@@ -3319,17 +3399,16 @@ export function AdminStudentsPage() {
               </div>
               <div className="grid gap-2 rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] p-3">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--accent)]">
-                  Eliminacion definitiva deshabilitada
+                  Eliminacion definitiva
                 </p>
                 <p className="whitespace-normal break-words text-xs font-semibold text-[var(--accent)]">
-                  Por proteccion de datos reales, el borrado definitivo de alumnos
-                  esta deshabilitado en produccion. Usa Desactivar alumno para
-                  bloquear el acceso y conservar historial. Un borrado fisico solo
-                  se hara con flujo E2E/autorizacion explicita de Walter.
+                  Borra alumno, Auth, archivos Drive y datos asociados. Usar solo
+                  con autorizacion explicita y despues de revisar el preview.
                 </p>
                 <button
-                  className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] opacity-60"
-                  disabled
+                  className="rounded-2xl border border-[var(--accent)] px-4 py-2 text-sm font-bold text-[var(--accent)] transition hover:bg-white disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void openStudentDeleteModal()}
                   type="button"
                 >
                   Eliminar alumno definitivamente
@@ -3484,6 +3563,111 @@ export function AdminStudentsPage() {
           </div>
         ) : null}
 
+        {studentDeleteModalOpen && selectedStudent ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+            <div
+              aria-modal="true"
+              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow)]"
+              role="dialog"
+            >
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--accent)]">
+                Eliminacion definitiva de alumno
+              </p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[var(--ink)]">
+                {studentDisplayName(selectedStudent)}
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-[var(--muted)]">
+                {selectedStudent.email}
+              </p>
+              <p className="mt-3 text-sm text-[var(--muted)]">
+                Este flujo borra fisicamente el alumno, su usuario Auth, archivos
+                Drive y datos asociados de gestion. No borra planes, actividades,
+                clases, pagos de otros alumnos ni configuracion del gimnasio.
+              </p>
+
+              {studentDeletePreview ? (
+                <div className="mt-4 grid gap-3 rounded-2xl bg-[var(--page)] p-4 text-sm">
+                  <p className="font-bold text-[var(--ink)]">Preview de impacto</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {Object.entries(studentDeletePreview.preview.counts).map(
+                      ([key, value]) => (
+                        <p
+                          className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[var(--muted)]"
+                          key={key}
+                        >
+                          {key}: <span className="text-[var(--ink)]">{value}</span>
+                        </p>
+                      ),
+                    )}
+                  </div>
+                  <p className="text-xs font-semibold text-[var(--muted)]">
+                    Archivos Drive detectados:{' '}
+                    {studentDeletePreview.preview.drive_files.length}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-4 rounded-2xl bg-[var(--page)] p-3 text-sm font-semibold text-[var(--muted)]">
+                  Preparando preview seguro...
+                </p>
+              )}
+
+              <div className="mt-4 grid gap-3">
+                <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+                  Email del alumno
+                  <input
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold normal-case tracking-normal text-[var(--ink)]"
+                    onChange={(event) =>
+                      setStudentDeleteEmailConfirmation(event.target.value)
+                    }
+                    placeholder={selectedStudent.email}
+                    value={studentDeleteEmailConfirmation}
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted)]">
+                  Confirmacion escrita
+                  <input
+                    className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-semibold normal-case tracking-normal text-[var(--ink)]"
+                    onChange={(event) =>
+                      setStudentDeleteConfirmation(event.target.value)
+                    }
+                    placeholder="Escribi ELIMINAR"
+                    value={studentDeleteConfirmation}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  className="rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-strong)] disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => {
+                    setStudentDeleteModalOpen(false)
+                    setStudentDeleteConfirmation('')
+                    setStudentDeleteEmailConfirmation('')
+                    setStudentDeletePreview(null)
+                  }}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-95 disabled:opacity-60"
+                  disabled={
+                    saving ||
+                    !studentDeletePreview ||
+                    studentDeleteConfirmation !== 'ELIMINAR' ||
+                    studentDeleteEmailConfirmation.trim().toLowerCase() !==
+                      selectedStudent.email.toLowerCase()
+                  }
+                  onClick={() => void handleDeleteStudentDefinitive()}
+                  type="button"
+                >
+                  {saving ? 'Eliminando...' : 'Eliminar definitivamente'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {programDeleteTarget ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
             <div

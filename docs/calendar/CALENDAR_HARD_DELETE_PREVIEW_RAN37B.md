@@ -127,6 +127,22 @@ RAN-37B does not:
 - introduce migration or Supabase drift,
 - perform any write in database or external systems.
 
+## Explicitly not implemented in RAN-37B
+
+The following scopes are intentionally not implemented as executable previews in this phase:
+
+- `recurring_series_all`
+- `calendar_all`
+
+They are high-risk operations and must remain future-only until Walter explicitly approves a separate design.
+
+RAN-37B focuses on safe preview foundations for:
+
+- single sessions,
+- recurring occurrences,
+- future recurring series,
+- calendar ranges.
+
 ## Next step after this phase
 
 If this preview is accepted, the next step should be a separate RAN-37C implementation PR that adds:

@@ -345,3 +345,13 @@ from (
     and s.starts_at < p.p_to
 ) ss
 order by ss.scope, ss.starts_at, ss.class_session_id;
+
+select
+  'absolute_exclusions' as section,
+  false as would_touch_profiles,
+  false as would_touch_payments,
+  false as would_touch_memberships,
+  false as would_touch_files,
+  false as would_touch_auth,
+  false as would_touch_drive,
+  'Calendar hard delete preview is limited to class_sessions, class_recurring_rules, class_recurring_rule_exceptions, bookings and attendance only.' as safety_note;

@@ -388,6 +388,43 @@ Si una membresía activa deja de estar totalmente pagada:
 * se devuelven créditos si corresponde;
 * se registra auditoría.
 
+## 5.9. Recordatorios de vencimiento de cuota (RAN-36)
+
+Los recordatorios de cuota se evalúan exactamente 5, 3, 1 y 0 días antes
+del vencimiento.
+
+La única fecha fuente es el `memberships.end_date` actual. No se reconstruye
+el vencimiento desde `payments`, `last_payment_at` ni otra fecha derivada. Si
+una renovación extiende la misma membresía antes de la evaluación, el
+`end_date` nuevo reemplaza al anterior y el recordatorio de la fecha vieja deja
+de ser elegible.
+
+La evaluación usa fechas `YYYY-MM-DD` en la zona
+`America/Argentina/Cordoba`. Un candidato solo es elegible cuando:
+
+* el alumno está activo y tiene un email válido;
+* `receives_payment_reminders = true`;
+* la membresía tiene estado `active`;
+* `start_date` no es posterior a la fecha de evaluación;
+* la diferencia entre la fecha de evaluación y `end_date` es exactamente 5,
+  3, 1 o 0 días.
+
+`receives_payment_reminders` es una preferencia independiente de
+`receives_emails`, con `NOT NULL DEFAULT true`. La clave de idempotencia es:
+
+`payment_due_reminder:<membership_id>:<end_date>:<offset_days>`
+
+`email_logs` admite esa clave de forma nullable y aplica unicidad solo cuando
+la clave no es `NULL`, sin afectar logs históricos.
+
+Las fases están separadas:
+
+* B1A/B1 es únicamente foundation, harness y dry-run: autentica un admin
+  activo, hace solo lecturas y no envía emails ni llama a Mailjet;
+* B1B incorporará la preferencia al frontend después de desplegar el schema;
+* B2 habilitará Mailjet mediante una prueba E2E controlada;
+* B3 incorporará la ejecución programada por cron.
+
 ---
 
 # 6. Reservas

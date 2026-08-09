@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test:harness": "vitest run --environment jsdom --reporter=verbose src/admin/StudentDeleteModal.harness.test.tsx",
+    "test:harness": "npm run test:harness:ran35 && npm run test:harness:ran36",
+    "test:harness:ran35": "vitest run --environment jsdom --reporter=verbose src/admin/StudentDeleteModal.harness.test.tsx",
+    "test:harness:ran36": "vitest run --environment node --reporter=verbose supabase/functions/send-payment-reminders/reminder_logic.harness.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

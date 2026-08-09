@@ -7,6 +7,7 @@ export type StudentProfile = {
   phone: string | null
   active: boolean
   receives_emails: boolean
+  receives_payment_reminders: boolean
   notes: string | null
   last_payment_at: string | null
   last_real_activity_at: string | null
@@ -139,6 +140,7 @@ export type UpdateStudentInput = {
   phone: string
   active: boolean
   receives_emails: boolean
+  receives_payment_reminders: boolean
 }
 
 export type UpdateStudentPasswordInput = {

@@ -57,6 +57,7 @@ export type StudentProfileDetails = {
   phone: string | null
   active: boolean
   receives_emails: boolean
+  receives_payment_reminders: boolean
   last_payment_at: string | null
   last_real_activity_at: string | null
   last_attendance_at: string | null

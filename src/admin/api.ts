@@ -164,7 +164,7 @@ export async function listStudents() {
   const { data, error } = await client
     .from('profiles')
     .select(
-      'id, role, first_name, last_name, email, phone, active, receives_emails, notes, last_payment_at, last_real_activity_at, created_at, updated_at',
+      'id, role, first_name, last_name, email, phone, active, receives_emails, receives_payment_reminders, notes, last_payment_at, last_real_activity_at, created_at, updated_at',
     )
     .eq('role', 'student')
     .order('last_name', { ascending: true })
@@ -205,6 +205,7 @@ export async function updateStudent(
       phone: input.phone.trim() || null,
       active: input.active,
       receives_emails: input.receives_emails,
+      receives_payment_reminders: input.receives_payment_reminders,
     })
     .eq('id', studentId)
 

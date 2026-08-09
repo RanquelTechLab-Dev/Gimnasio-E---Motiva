@@ -15,6 +15,7 @@ export function StudentProfilePage() {
   const [profile, setProfile] = useState<StudentProfileDetails | null>(null)
   const [phone, setPhone] = useState('')
   const [receivesEmails, setReceivesEmails] = useState(true)
+  const [receivesPaymentReminders, setReceivesPaymentReminders] = useState(true)
   const [newPassword, setNewPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
   const [loading, setLoading] = useState(true)
@@ -37,6 +38,9 @@ export function StudentProfilePage() {
           setProfile(summary.profile)
           setPhone(summary.profile.phone ?? '')
           setReceivesEmails(summary.profile.receives_emails)
+          setReceivesPaymentReminders(
+            summary.profile.receives_payment_reminders,
+          )
         }
       } catch (loadError) {
         if (active) {
@@ -65,6 +69,7 @@ export function StudentProfilePage() {
       const nextProfile = await updateMyProfilePreferences({
         phone,
         receives_emails: receivesEmails,
+        receives_payment_reminders: receivesPaymentReminders,
       })
       setProfile((current) =>
         current
@@ -72,9 +77,13 @@ export function StudentProfilePage() {
               ...current,
               phone: nextProfile.phone,
               receives_emails: nextProfile.receives_emails,
+              receives_payment_reminders:
+                nextProfile.receives_payment_reminders,
             }
           : current,
       )
+      setReceivesEmails(nextProfile.receives_emails)
+      setReceivesPaymentReminders(nextProfile.receives_payment_reminders)
       await refreshProfile()
       setSuccess('Datos actualizados.')
     } catch (saveError) {
@@ -183,6 +192,16 @@ export function StudentProfilePage() {
               type="checkbox"
             />
             Recibir novedades por email
+          </label>
+          <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-4 text-sm font-semibold">
+            <input
+              checked={receivesPaymentReminders}
+              onChange={(event) =>
+                setReceivesPaymentReminders(event.target.checked)
+              }
+              type="checkbox"
+            />
+            Recibir recordatorios de vencimiento de cuota
           </label>
           <p className="mt-4 text-sm text-[var(--muted)]">
             El email y el estado de la cuenta los actualiza administración.

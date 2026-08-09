@@ -410,7 +410,13 @@ La evaluación usa fechas `YYYY-MM-DD` en la zona
   3, 1 o 0 días.
 
 `receives_payment_reminders` es una preferencia independiente de
-`receives_emails`, con `NOT NULL DEFAULT true`. La clave de idempotencia es:
+`receives_emails`, con `NOT NULL DEFAULT true`.
+
+En B1B, el alta no expone esta preferencia: las altas nuevas reciben
+`receives_payment_reminders = true` por default de base de datos y la
+administración puede cambiarla luego desde la ficha del alumno.
+
+La clave de idempotencia es:
 
 `payment_due_reminder:<membership_id>:<end_date>:<offset_days>`
 
@@ -421,7 +427,10 @@ Las fases están separadas:
 
 * B1A/B1 es únicamente foundation, harness y dry-run: autentica un admin
   activo, hace solo lecturas y no envía emails ni llama a Mailjet;
-* B1B incorporará la preferencia al frontend después de desplegar el schema;
+* B1B permite a la administración activarla o desactivarla desde la
+  ficha/edición del alumno y al alumno hacerlo desde su perfil, siempre de
+  forma independiente de `receives_emails`; esta UI solo persiste la
+  preferencia, no invoca `send-payment-reminders` ni envía emails;
 * B2 habilitará Mailjet mediante una prueba E2E controlada;
 * B3 incorporará la ejecución programada por cron.
 

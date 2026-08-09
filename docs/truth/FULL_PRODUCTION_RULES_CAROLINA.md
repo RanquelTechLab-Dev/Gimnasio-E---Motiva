@@ -217,12 +217,14 @@ El hard delete debe:
 
 * requerir admin activo;
 * requerir JWT válido;
-* permitir preview/dry-run;
-* mostrar conteos antes de borrar;
-* exigir email exacto del alumno;
-* exigir texto exacto `ELIMINAR`;
+* mostrar en el modal el nombre y el email del alumno seleccionado;
+* tomar internamente el email del alumno seleccionado, sin pedir que la administradora lo vuelva a escribir;
+* validar en el backend que ese email corresponda al alumno seleccionado;
+* requerir un preview/dry-run válido y mostrar los conteos antes de borrar;
+* mantener deshabilitado el botón de eliminación sin preview válido;
+* exigir que la administradora escriba exactamente `ELIMINAR`;
 * borrar solo el alumno elegido;
-* probarse siempre primero con alumno E2E;
+* probarse únicamente con un alumno E2E cuando se autorice una prueba real;
 * dejar resultado claro;
 * devolver warning si falla limpieza Auth;
 * no ejecutarse desde SQL manual.
@@ -819,9 +821,9 @@ Borrar definitivamente:
 Eliminar alumno definitivamente:
 
 * sí borra físicamente todo lo asociado al alumno;
-* requiere preview;
-* requiere email exacto;
-* requiere `ELIMINAR`;
+* requiere preview/dry-run válido;
+* toma internamente el email del alumno seleccionado y valida en el backend que corresponda a ese alumno, sin pedir que la administradora lo vuelva a escribir;
+* requiere que la administradora escriba exactamente `ELIMINAR`;
 * debe ejecutarse por Edge Function;
 * no por SQL manual.
 

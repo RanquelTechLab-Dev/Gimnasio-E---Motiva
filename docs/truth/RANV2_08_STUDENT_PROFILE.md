@@ -9,7 +9,9 @@ Supabase.
   ultimo pago y ultima asistencia.
 - Perfil alumno con edicion limitada:
   - telefono;
-  - preferencia `receives_emails`.
+  - preferencia informativa `receives_emails`;
+  - preferencia independiente `receives_payment_reminders` (RAN-37 / RAN-36
+    B1B).
 - Reservas propias con `list_my_bookings` y cancelacion por `cancel_booking`.
 - Pagos propios solo lectura.
 - Asistencia propia solo lectura.
@@ -28,6 +30,19 @@ La migracion `20260514100000_ranv2_08_student_profile_self_service.sql` agrega:
 Todas requieren `auth.uid()`, operan sobre el alumno autenticado, usan
 `security definer`, `search_path` controlado, revocan `public/anon` y conceden
 ejecucion a `authenticated`.
+
+## Extension RAN-37 / RAN-36 B1B
+
+- `public.get_my_profile_summary()` expone `receives_payment_reminders`.
+- El frontend actual guarda telefono y ambas preferencias exclusivamente con
+  `public.update_my_profile_preferences_v2(phone, receives_emails, receives_payment_reminders)`.
+- `public.update_my_profile_preferences(phone, receives_emails)` permanece en
+  la base para compatibilidad con versiones anteriores, pero el frontend B1B
+  no la invoca.
+- Las dos preferencias se cargan, modifican y actualizan de forma
+  independiente.
+- B1B no invoca ni despliega `send-payment-reminders`, no usa Mailjet y no
+  envia emails. Mailjet sigue reservado a B2.
 
 ## Seguridad
 

@@ -51,6 +51,7 @@ const alphaStudent: StudentProfile = {
   phone: null,
   active: true,
   receives_emails: false,
+  receives_payment_reminders: true,
   notes: null,
   last_payment_at: null,
   last_real_activity_at: null,

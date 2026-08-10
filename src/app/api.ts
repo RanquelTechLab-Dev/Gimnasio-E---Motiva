@@ -140,11 +140,13 @@ export async function getMyProfileSummary() {
 export async function updateMyProfilePreferences(input: {
   phone: string
   receives_emails: boolean
+  receives_payment_reminders: boolean
 }) {
   const client = getClient()
-  const { data, error } = await client.rpc('update_my_profile_preferences', {
+  const { data, error } = await client.rpc('update_my_profile_preferences_v2', {
     p_phone: input.phone,
     p_receives_emails: input.receives_emails,
+    p_receives_payment_reminders: input.receives_payment_reminders,
   })
 
   if (error) {

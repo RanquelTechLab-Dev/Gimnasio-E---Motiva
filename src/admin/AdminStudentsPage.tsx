@@ -65,6 +65,7 @@ type EditStudentState = {
   phone: string
   active: boolean
   receives_emails: boolean
+  receives_payment_reminders: boolean
 }
 
 type PasswordFormState = {
@@ -504,6 +505,7 @@ function studentToEditForm(student: StudentProfile): EditStudentState {
     phone: student.phone ?? '',
     active: student.active,
     receives_emails: student.receives_emails,
+    receives_payment_reminders: student.receives_payment_reminders,
   }
 }
 
@@ -1877,6 +1879,12 @@ export function AdminStudentsPage() {
                 <div className="flex justify-between gap-4">
                   <dt className="text-[var(--muted)]">Recibe emails</dt>
                   <dd>{selectedStudent.receives_emails ? 'Si' : 'No'}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-[var(--muted)]">Recordatorios de cuota</dt>
+                  <dd>
+                    {selectedStudent.receives_payment_reminders ? 'Si' : 'No'}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-[var(--muted)]">
@@ -3262,6 +3270,22 @@ export function AdminStudentsPage() {
               </label>
               <p className="-mt-2 text-xs text-[var(--muted)]">
                 Recibe emails indica si acepta comunicaciones informativas.
+              </p>
+              <label className="flex items-center gap-3 text-sm font-semibold">
+                <input
+                  checked={editForm.receives_payment_reminders}
+                  onChange={(event) =>
+                    setEditForm({
+                      ...editForm,
+                      receives_payment_reminders: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                Recibir recordatorios de vencimiento de cuota
+              </label>
+              <p className="-mt-2 text-xs text-[var(--muted)]">
+                Esta preferencia es independiente de los emails informativos.
               </p>
               <div className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3">
                 <div>

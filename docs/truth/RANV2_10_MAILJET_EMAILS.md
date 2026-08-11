@@ -14,6 +14,75 @@ Supabase Edge Function segura. El frontend no conoce secrets de Mailjet.
 - Cada destinatario queda registrado en `email_logs`.
 - El envio masivo queda auditado como `email.mass_sent`.
 
+## Seleccion segura de destinatarios (RAN-39)
+
+La audiencia manual no cambia: solo incluye perfiles con rol `student`,
+activos, con email valido, `receives_emails = true` y al menos un pago
+`approved` durante los ultimos 6 meses.
+
+El Bloque A incorpora localmente soporte backend compatible para una seleccion
+opcional mediante `recipient_ids`:
+
+- el backend vuelve a calcular la audiencia elegible e intersecta los IDs;
+- los IDs desconocidos o no elegibles quedan excluidos;
+- la ausencia de `recipient_ids` conserva el comportamiento anterior de todos
+  los elegibles;
+- el frontend nunca puede aportar emails arbitrarios como destinatarios;
+- este bloque no cambia la UI, no despliega la funcion y no envia emails
+  reales.
+
+El Bloque B agregara despues buscador, checkbox individual, seleccion multiple,
+seleccionar todos y contador. Los recordatorios automaticos 5/3/1/0 siguen
+separados de este envio manual.
+
+## Separacion entre emails manuales y recordatorios automaticos
+
+### Emails manuales
+
+Carolina redacta el asunto y el mensaje y puede enviarlo manualmente a uno,
+varios o todos los alumnos elegibles.
+
+La audiencia manual conserva estas condiciones:
+
+- `role = student`;
+- alumno activo;
+- `receives_emails = true`;
+- email valido;
+- al menos un pago `approved` durante los ultimos 6 meses.
+
+RAN-39 agrega soporte backend para seleccionar destinatarios mediante
+`recipient_ids`. El backend revalida siempre la elegibilidad y no acepta emails
+arbitrarios enviados por el frontend.
+
+La UI con buscador, lupa y checkboxes todavia no esta desplegada.
+
+### Recordatorios automaticos de cuota
+
+Los recordatorios automaticos son un flujo independiente del envio manual.
+
+La fecha fuente es el valor actual de:
+
+`memberships.end_date`
+
+Solo son elegibles alumnos con:
+
+`receives_payment_reminders = true`
+
+Los offsets son 5/3/1/0 dias:
+
+- 5 dias antes;
+- 3 dias antes;
+- 1 dia antes;
+- dia del vencimiento (offset 0).
+
+B2 sigue pendiente y habilitara una prueba Mailjet E2E controlada.
+
+B3 sigue pendiente y agregara el cron productivo de las 10:00 en:
+
+`America/Argentina/Cordoba`
+
+RAN-39 no modifica ni despliega este flujo automatico.
+
 ## Separacion de RAN-36
 
 - `send-mass-email` sigue siendo el envio manual de comunicaciones

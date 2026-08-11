@@ -1,10 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import {
+  selectEligibleRecipients,
+  validateRecipientIds,
+} from './recipient_selection.ts'
 
 type MassEmailPayload = {
   subject?: string
   body?: string
   audience?: 'recent_payers_6_months'
   dryRun?: boolean
+  recipient_ids?: unknown
 }
 
 type Recipient = {
@@ -75,11 +80,34 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Sesion admin requerida.' }, 401)
   }
 
-  let payload: MassEmailPayload
+  let rawPayload: unknown
   try {
-    payload = await req.json()
+    rawPayload = await req.json()
   } catch {
     return jsonResponse({ error: 'JSON invalido.' }, 400)
+  }
+
+  if (
+    typeof rawPayload !== 'object' ||
+    rawPayload === null ||
+    Array.isArray(rawPayload)
+  ) {
+    return jsonResponse({ error: 'JSON invalido.' }, 400)
+  }
+
+  const payload = rawPayload as MassEmailPayload
+  const payloadRecord = rawPayload as Record<string, unknown>
+  const forbiddenRecipientFields = ['recipient_emails', 'emails', 'to']
+
+  if (
+    forbiddenRecipientFields.some((field) =>
+      Object.prototype.hasOwnProperty.call(payloadRecord, field),
+    )
+  ) {
+    return jsonResponse(
+      { error: 'Solo se aceptan recipient_ids para seleccionar destinatarios.' },
+      400,
+    )
   }
 
   const subject = cleanText(payload.subject)
@@ -102,6 +130,13 @@ Deno.serve(async (req) => {
   if (body.length > 5000) {
     return jsonResponse({ error: 'El mensaje no puede superar 5000 caracteres.' }, 400)
   }
+
+  const selectionValidation = validateRecipientIds(payload.recipient_ids)
+  if (!selectionValidation.valid) {
+    return jsonResponse({ error: selectionValidation.error }, 400)
+  }
+
+  const recipientSelection = selectionValidation.selection
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
@@ -172,6 +207,24 @@ Deno.serve(async (req) => {
   const studentIds = [...latestPaymentByStudent.keys()]
 
   if (studentIds.length === 0) {
+    const selectionResult = selectEligibleRecipients([], recipientSelection)
+
+    if (selectionResult.selection_mode === 'selected') {
+      return jsonResponse(
+        {
+          error: 'No hay destinatarios elegibles dentro de la selección.',
+          audience,
+          dryRun,
+          eligible_count: 0,
+          selection_mode: selectionResult.selection_mode,
+          requested_count: selectionResult.requested_count,
+          selected_count: selectionResult.selected_count,
+          ignored_count: selectionResult.ignored_count,
+        },
+        400,
+      )
+    }
+
     return jsonResponse({
       audience,
       dryRun,
@@ -179,6 +232,10 @@ Deno.serve(async (req) => {
       sent_count: 0,
       failed_count: 0,
       skipped_count: 0,
+      selection_mode: selectionResult.selection_mode,
+      requested_count: selectionResult.requested_count,
+      selected_count: selectionResult.selected_count,
+      ignored_count: selectionResult.ignored_count,
       recipients: [],
       message: 'No hay alumnos elegibles con pagos aprobados recientes.',
     })
@@ -200,7 +257,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  const recipients: Recipient[] = (profiles ?? [])
+  const eligibleRecipients: Recipient[] = (profiles ?? [])
     .filter((profile) => typeof profile.email === 'string' && profile.email.includes('@'))
     .map((profile) => ({
       id: profile.id as string,
@@ -211,14 +268,43 @@ Deno.serve(async (req) => {
     }))
     .sort((a, b) => a.email.localeCompare(b.email))
 
+  const selectionResult = selectEligibleRecipients(
+    eligibleRecipients,
+    recipientSelection,
+  )
+  const recipients = selectionResult.recipients
+
+  if (
+    selectionResult.selection_mode === 'selected' &&
+    selectionResult.selected_count === 0
+  ) {
+    return jsonResponse(
+      {
+        error: 'No hay destinatarios elegibles dentro de la selección.',
+        audience,
+        dryRun,
+        eligible_count: eligibleRecipients.length,
+        selection_mode: selectionResult.selection_mode,
+        requested_count: selectionResult.requested_count,
+        selected_count: selectionResult.selected_count,
+        ignored_count: selectionResult.ignored_count,
+      },
+      400,
+    )
+  }
+
   if (dryRun) {
     return jsonResponse({
       audience,
       dryRun: true,
-      eligible_count: recipients.length,
+      eligible_count: eligibleRecipients.length,
       sent_count: 0,
       failed_count: 0,
       skipped_count: recipients.length,
+      selection_mode: selectionResult.selection_mode,
+      requested_count: selectionResult.requested_count,
+      selected_count: selectionResult.selected_count,
+      ignored_count: selectionResult.ignored_count,
       recipients: recipients.map((recipient) => ({
         student_id: recipient.id,
         email: recipient.email,
@@ -313,6 +399,9 @@ Deno.serve(async (req) => {
             provider_message_id: providerMessageId,
             last_paid_at: recipient.last_paid_at,
             sent_by: requester.id,
+            selection_mode: selectionResult.selection_mode,
+            requested_count: selectionResult.requested_count,
+            selected_count: selectionResult.selected_count,
           },
         })
       } else {
@@ -341,6 +430,9 @@ Deno.serve(async (req) => {
             error: errorMessage,
             last_paid_at: recipient.last_paid_at,
             sent_by: requester.id,
+            selection_mode: selectionResult.selection_mode,
+            requested_count: selectionResult.requested_count,
+            selected_count: selectionResult.selected_count,
           },
         })
       }
@@ -368,6 +460,9 @@ Deno.serve(async (req) => {
           error: errorMessage,
           last_paid_at: recipient.last_paid_at,
           sent_by: requester.id,
+          selection_mode: selectionResult.selection_mode,
+          requested_count: selectionResult.requested_count,
+          selected_count: selectionResult.selected_count,
         },
       })
     }
@@ -380,7 +475,10 @@ Deno.serve(async (req) => {
     metadata: {
       audience,
       subject,
-      eligible_count: recipients.length,
+      selection_mode: selectionResult.selection_mode,
+      requested_count: selectionResult.requested_count,
+      eligible_count: eligibleRecipients.length,
+      selected_count: selectionResult.selected_count,
       sent_count: sentCount,
       failed_count: failedCount,
       provider: 'mailjet',
@@ -390,10 +488,14 @@ Deno.serve(async (req) => {
   return jsonResponse({
     audience,
     dryRun: false,
-    eligible_count: recipients.length,
+    eligible_count: eligibleRecipients.length,
     sent_count: sentCount,
     failed_count: failedCount,
     skipped_count: 0,
+    selection_mode: selectionResult.selection_mode,
+    requested_count: selectionResult.requested_count,
+    selected_count: selectionResult.selected_count,
+    ignored_count: selectionResult.ignored_count,
     recipients: results,
   })
 })

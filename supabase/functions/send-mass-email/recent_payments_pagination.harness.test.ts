@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildSafeRecentPaymentsPageRange,
   buildLatestPaymentByStudent,
+  buildPostgrestRecentPaymentsCursorFilter,
   collectAllRecentApprovedPayments,
-  nextSafeRecentPaymentsPageStart,
+  compareRecentPaymentKeys,
+  cursorFromRecentPayment,
   RECENT_PAYMENTS_PAGE_SIZE,
   type FetchRecentPaymentsPage,
   type RecentApprovedPayment,
+  type RecentPaymentsCursor,
 } from './recent_payments_pagination'
 import {
   selectEligibleRecipients,
@@ -26,7 +28,7 @@ function payment(
   overrides: Partial<RecentApprovedPayment> = {},
 ): RecentApprovedPayment {
   return {
-    id: `payment-${index.toString().padStart(6, '0')}`,
+    id: syntheticUuid(100_000 + index),
     student_id: syntheticUuid(index + 1),
     paid_at: syntheticDate(index),
     approved_at: null,
@@ -39,89 +41,113 @@ function payments(count: number) {
   return Array.from({ length: count }, (_, index) => payment(index))
 }
 
-function pageFetcher(
+type FetchCall = readonly [RecentPaymentsCursor | null, number]
+
+function databaseKeyIsAfterCursor(
+  row: RecentApprovedPayment,
+  cursor: RecentPaymentsCursor,
+) {
+  if (!row.paid_at) {
+    return false
+  }
+
+  return (
+    row.paid_at > cursor.paid_at ||
+    (row.paid_at === cursor.paid_at && row.id.toLowerCase() > cursor.id)
+  )
+}
+
+function keysetPageFetcher(
   rows: readonly RecentApprovedPayment[],
-  calls: Array<[number, number]> = [],
+  calls: FetchCall[] = [],
 ): FetchRecentPaymentsPage {
-  return async (from, to) => {
-    calls.push([from, to])
-    return rows.slice(from, to + 1)
+  return async (cursor, limit) => {
+    calls.push([cursor ? { ...cursor } : null, limit])
+    return rows
+      .filter(
+        (row) =>
+          cursor === null || databaseKeyIsAfterCursor(row, cursor),
+      )
+      .slice(0, limit)
   }
 }
 
 describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', () => {
-  it('1. obtiene 999 filas en una sola página', async () => {
+  it('1. obtiene 999 filas con una llamada de cursor nulo', async () => {
     const rows = payments(999)
-    const calls: Array<[number, number]> = []
+    const calls: FetchCall[] = []
 
     const result = await collectAllRecentApprovedPayments(
-      pageFetcher(rows, calls),
+      keysetPageFetcher(rows, calls),
     )
 
     expect(result).toEqual(rows)
-    expect(calls).toEqual([[0, 999]])
+    expect(calls).toEqual([[null, RECENT_PAYMENTS_PAGE_SIZE]])
   })
 
-  it('2. con 1000 filas consulta una segunda página vacía y conserva todas', async () => {
+  it('2. con 1000 filas avanza con el cursor de la fila 1000', async () => {
     const rows = payments(1_000)
-    const calls: Array<[number, number]> = []
+    const calls: FetchCall[] = []
 
     const result = await collectAllRecentApprovedPayments(
-      pageFetcher(rows, calls),
+      keysetPageFetcher(rows, calls),
     )
 
     expect(result).toEqual(rows)
     expect(calls).toEqual([
-      [0, 999],
-      [1_000, 1_999],
+      [null, RECENT_PAYMENTS_PAGE_SIZE],
+      [cursorFromRecentPayment(rows[999]), RECENT_PAYMENTS_PAGE_SIZE],
     ])
   })
 
-  it('3. obtiene 1001 filas completas en dos páginas', async () => {
+  it('3. obtiene 1001 filas completas en dos paginas keyset', async () => {
     const rows = payments(1_001)
-    const calls: Array<[number, number]> = []
+    const calls: FetchCall[] = []
 
     const result = await collectAllRecentApprovedPayments(
-      pageFetcher(rows, calls),
+      keysetPageFetcher(rows, calls),
     )
 
     expect(result).toEqual(rows)
     expect(calls).toHaveLength(2)
   })
 
-  it('4. obtiene 2001 filas completas en tres páginas', async () => {
+  it('4. obtiene 2001 filas completas en tres paginas keyset', async () => {
     const rows = payments(2_001)
-    const calls: Array<[number, number]> = []
+    const calls: FetchCall[] = []
 
     const result = await collectAllRecentApprovedPayments(
-      pageFetcher(rows, calls),
+      keysetPageFetcher(rows, calls),
     )
 
     expect(result).toEqual(rows)
     expect(calls).toHaveLength(3)
   })
 
-  it('5. usa rangos inclusivos exactos para cada página', async () => {
-    const calls: Array<[number, number]> = []
+  it('5. construye cursor y filtro exactos desde la ultima fila previa', async () => {
+    const rows = payments(1_001)
+    rows[999] = payment(999, {
+      paid_at: '2026-01-01T00:16:39.123456Z',
+      created_at: '2026-01-01T00:16:39.123456Z',
+    })
+    const calls: FetchCall[] = []
 
-    await collectAllRecentApprovedPayments(
-      pageFetcher(payments(2_001), calls),
+    await collectAllRecentApprovedPayments(keysetPageFetcher(rows, calls))
+
+    const expectedCursor = cursorFromRecentPayment(rows[999])
+    expect(calls[1]).toEqual([expectedCursor, RECENT_PAYMENTS_PAGE_SIZE])
+    expect(buildPostgrestRecentPaymentsCursorFilter(expectedCursor)).toBe(
+      `paid_at.gt.${expectedCursor.paid_at},and(paid_at.eq.${expectedCursor.paid_at},id.gt.${expectedCursor.id})`,
     )
-
-    expect(calls).toEqual([
-      [0, 999],
-      [1_000, 1_999],
-      [2_000, 2_999],
-    ])
   })
 
-  it('6. un error en la segunda página rechaza toda la operación', async () => {
+  it('6. un error en la segunda pagina rechaza toda la operacion', async () => {
     const firstPage = payments(RECENT_PAYMENTS_PAGE_SIZE)
-    const calls: Array<[number, number]> = []
+    const calls: FetchCall[] = []
     const pageError = new Error('synthetic second page failure')
-    const fetchPage: FetchRecentPaymentsPage = async (from, to) => {
-      calls.push([from, to])
-      if (from === 0) {
+    const fetchPage: FetchRecentPaymentsPage = async (cursor, limit) => {
+      calls.push([cursor ? { ...cursor } : null, limit])
+      if (cursor === null) {
         return firstPage
       }
       throw pageError
@@ -131,12 +157,12 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
       pageError,
     )
     expect(calls).toEqual([
-      [0, 999],
-      [1_000, 1_999],
+      [null, RECENT_PAYMENTS_PAGE_SIZE],
+      [cursorFromRecentPayment(firstPage[999]), RECENT_PAYMENTS_PAGE_SIZE],
     ])
   })
 
-  it('7. rechaza una página con más de 1000 filas', async () => {
+  it('7. rechaza una pagina con mas de 1000 filas', async () => {
     const oversizedPage = payments(RECENT_PAYMENTS_PAGE_SIZE + 1)
 
     await expect(
@@ -144,29 +170,25 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
     ).rejects.toBeInstanceOf(RangeError)
   })
 
-  it('8. preserva el orden global recibido entre páginas', async () => {
-    const firstPage = payments(1_000).reverse()
-    const finalRow = payment(2_500)
-    const expected = [...firstPage, finalRow]
-    const fetchPage: FetchRecentPaymentsPage = async (from) =>
-      from === 0 ? firstPage : [finalRow]
+  it('8. preserva el orden global recibido entre paginas', async () => {
+    const rows = payments(1_001)
 
-    const result = await collectAllRecentApprovedPayments(fetchPage)
-
-    expect(result.map((row) => row.id)).toEqual(
-      expected.map((row) => row.id),
+    const result = await collectAllRecentApprovedPayments(
+      keysetPageFetcher(rows),
     )
+
+    expect(result.map((row) => row.id)).toEqual(rows.map((row) => row.id))
   })
 
-  it('9. no muta las páginas ni los objetos recibidos', async () => {
+  it('9. no muta las paginas ni los objetos recibidos', async () => {
     const firstPage = Object.freeze(
       payments(1_000).map((row) => Object.freeze(row)),
     )
     const finalPage = Object.freeze([Object.freeze(payment(1_000))])
     const originalFirstPage = JSON.stringify(firstPage)
     const originalFinalPage = JSON.stringify(finalPage)
-    const fetchPage: FetchRecentPaymentsPage = async (from) =>
-      from === 0 ? firstPage : finalPage
+    const fetchPage: FetchRecentPaymentsPage = async (cursor) =>
+      cursor === null ? firstPage : finalPage
 
     const result = await collectAllRecentApprovedPayments(fetchPage)
     buildLatestPaymentByStudent(result)
@@ -177,7 +199,7 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
     expect(result[0]).toBe(firstPage[0])
   })
 
-  it('10. incluye al alumno cuyo único pago está en la fila 1001', async () => {
+  it('10. incluye al alumno cuyo unico pago esta despues de la primera pagina', async () => {
     const targetId = syntheticUuid(9_001)
     const rows = payments(1_001).map((row, index) => ({
       ...row,
@@ -185,7 +207,7 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
     }))
 
     const allPayments = await collectAllRecentApprovedPayments(
-      pageFetcher(rows),
+      keysetPageFetcher(rows),
     )
     const latestPaymentByStudent = buildLatestPaymentByStudent(allPayments)
 
@@ -193,7 +215,7 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
     expect(latestPaymentByStudent.size).toBe(1)
   })
 
-  it('11. conserva el pago más reciente del mismo alumno entre páginas', async () => {
+  it('11. conserva el pago mas reciente del mismo alumno entre paginas', async () => {
     const targetId = syntheticUuid(9_002)
     const newerDate = '2026-06-01T00:00:00.000Z'
     const olderDate = '2026-01-01T00:00:00.000Z'
@@ -208,14 +230,14 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
     })
 
     const allPayments = await collectAllRecentApprovedPayments(
-      pageFetcher(rows),
+      keysetPageFetcher(rows),
     )
     const latestPaymentByStudent = buildLatestPaymentByStudent(allPayments)
 
     expect(latestPaymentByStudent.get(targetId)).toBe(newerDate)
   })
 
-  it('12. selección mixta conserva elegibles antes y después de la fila 1000', async () => {
+  it('12. seleccion mixta conserva elegibles antes y despues de la primera pagina', async () => {
     const beforeId = syntheticUuid(9_003)
     const afterId = syntheticUuid(9_004)
     const rows = payments(1_001).map((row) => ({
@@ -226,7 +248,7 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
     rows[1_000] = payment(1_000, { student_id: afterId })
 
     const allPayments = await collectAllRecentApprovedPayments(
-      pageFetcher(rows),
+      keysetPageFetcher(rows),
     )
     const latestPaymentByStudent = buildLatestPaymentByStudent(allPayments)
     const eligibleRecipients = [...latestPaymentByStudent.keys()].map((id) => ({
@@ -252,41 +274,111 @@ describe('MANUAL EMAIL BACKEND recent approved payments pagination contract', ()
     expect(selection.ignored_count).toBe(0)
   })
 
-  it('13. construye el rango inicial exacto 0-999', () => {
-    expect(buildSafeRecentPaymentsPageRange(0)).toEqual({
-      from: 0,
-      to: 999,
+  it('13. la primera llamada usa cursor nulo y limite 1000', async () => {
+    const calls: FetchCall[] = []
+    const fetchPage: FetchRecentPaymentsPage = async (cursor, limit) => {
+      calls.push([cursor, limit])
+      return []
+    }
+
+    await collectAllRecentApprovedPayments(fetchPage)
+
+    expect(calls).toEqual([[null, RECENT_PAYMENTS_PAGE_SIZE]])
+  })
+
+  it('14. timestamp duplicado usa id como desempate sin perder filas', async () => {
+    const rows = payments(1_001)
+    rows[1_000] = payment(1_000, {
+      paid_at: rows[999].paid_at,
+      created_at: rows[999].created_at,
     })
-  })
+    const calls: FetchCall[] = []
 
-  it('14. acepta el último rango inclusivo seguro', () => {
-    const from = Number.MAX_SAFE_INTEGER - (RECENT_PAYMENTS_PAGE_SIZE - 1)
-
-    expect(buildSafeRecentPaymentsPageRange(from)).toEqual({
-      from,
-      to: Number.MAX_SAFE_INTEGER,
-    })
-  })
-
-  it('15. rechaza un rango cuyo to excedería el entero seguro', () => {
-    const from = Number.MAX_SAFE_INTEGER - (RECENT_PAYMENTS_PAGE_SIZE - 2)
-
-    expect(() => buildSafeRecentPaymentsPageRange(from)).toThrow(RangeError)
-  })
-
-  it('16. una página completa que termina en MAX_SAFE_INTEGER no puede avanzar', () => {
-    const range = buildSafeRecentPaymentsPageRange(
-      Number.MAX_SAFE_INTEGER - (RECENT_PAYMENTS_PAGE_SIZE - 1),
+    const result = await collectAllRecentApprovedPayments(
+      keysetPageFetcher(rows, calls),
     )
 
+    expect(result).toEqual(rows)
+    expect(calls[1]?.[0]).toEqual(cursorFromRecentPayment(rows[999]))
+    expect(compareRecentPaymentKeys(rows[999], rows[1_000])).toBeLessThan(0)
+  })
+
+  it('15. rechaza claves duplicadas o paginas regresivas', async () => {
+    const duplicate = payment(0)
+    await expect(
+      collectAllRecentApprovedPayments(async () => [duplicate, duplicate]),
+    ).rejects.toBeInstanceOf(RangeError)
+
+    await expect(
+      collectAllRecentApprovedPayments(async () => [payment(1), payment(0)]),
+    ).rejects.toBeInstanceOf(RangeError)
+  })
+
+  it('16. una pagina completa sin cursor valido produce RangeError', async () => {
+    const invalidIdPage = payments(RECENT_PAYMENTS_PAGE_SIZE)
+    invalidIdPage[999] = payment(999, { id: 'not-a-uuid' })
+    const invalidTimestampPage = payments(RECENT_PAYMENTS_PAGE_SIZE)
+    invalidTimestampPage[999] = payment(999, {
+      paid_at: 'not-a-timestamp',
+    })
+
+    await expect(
+      collectAllRecentApprovedPayments(async () => invalidIdPage),
+    ).rejects.toBeInstanceOf(RangeError)
+    await expect(
+      collectAllRecentApprovedPayments(async () => invalidTimestampPage),
+    ).rejects.toBeInstanceOf(RangeError)
     expect(() =>
-      nextSafeRecentPaymentsPageStart(range.from, range.to),
+      cursorFromRecentPayment(payment(0, { paid_at: '' })),
+    ).toThrow(RangeError)
+    expect(() =>
+      cursorFromRecentPayment(payment(0, { paid_at: 'not-a-timestamp' })),
+    ).toThrow(RangeError)
+    expect(() =>
+      buildPostgrestRecentPaymentsCursorFilter({
+        paid_at: '2026-01-01T00:00:00Z),id.gt.injected',
+        id: syntheticUuid(1),
+      }),
+    ).toThrow(RangeError)
+    expect(() =>
+      buildPostgrestRecentPaymentsCursorFilter({
+        paid_at: '2026-01-01T00:00:00Z',
+        id: `${syntheticUuid(1)}\n`,
+      }),
+    ).toThrow(RangeError)
+    expect(() =>
+      buildPostgrestRecentPaymentsCursorFilter({
+        paid_at: '2026-01-01T00:00:00Z\n',
+        id: syntheticUuid(1),
+      }),
     ).toThrow(RangeError)
   })
 
-  it('17. rechaza un avance que no supera estrictamente from y to', () => {
-    expect(() => nextSafeRecentPaymentsPageStart(1_000, 999)).toThrow(
-      RangeError,
-    )
+  it('17. eliminar una fila anterior al cursor no salta la fila 1001 original', async () => {
+    const originalRows = payments(1_001)
+    const originalRow1001 = originalRows[1_000]
+    let mutableRows = [...originalRows]
+    let calls = 0
+    const fetchPage: FetchRecentPaymentsPage = async (cursor, limit) => {
+      calls += 1
+      const page = mutableRows
+        .filter(
+          (row) =>
+            cursor === null || databaseKeyIsAfterCursor(row, cursor),
+        )
+        .slice(0, limit)
+
+      if (calls === 1) {
+        mutableRows = mutableRows.filter((_, index) => index !== 100)
+      }
+
+      return page
+    }
+
+    const result = await collectAllRecentApprovedPayments(fetchPage)
+
+    expect(calls).toBe(2)
+    expect(result).toHaveLength(1_001)
+    expect(result.at(-1)).toEqual(originalRow1001)
   })
 })

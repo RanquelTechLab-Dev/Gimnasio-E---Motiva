@@ -4,6 +4,7 @@ import {
   validateRecipientIds,
 } from './recipient_selection.ts'
 import {
+  buildPostgrestRecentPaymentsCursorFilter,
   buildLatestPaymentByStudent,
   collectAllRecentApprovedPayments,
   type RecentApprovedPayment,
@@ -192,15 +193,21 @@ Deno.serve(async (req) => {
   let recentPayments: RecentApprovedPayment[]
   try {
     recentPayments = await collectAllRecentApprovedPayments(
-      async (from, to) => {
-        const { data, error } = await adminClient
+      async (cursor, limit) => {
+        const baseQuery = adminClient
           .from('payments')
           .select('id, student_id, paid_at, approved_at, created_at')
           .eq('status', 'approved')
           .gte('paid_at', since.toISOString())
+
+        const keysetQuery = cursor
+          ? baseQuery.or(buildPostgrestRecentPaymentsCursorFilter(cursor))
+          : baseQuery
+
+        const { data, error } = await keysetQuery
           .order('paid_at', { ascending: true })
           .order('id', { ascending: true })
-          .range(from, to)
+          .limit(limit)
 
         if (error) {
           throw error

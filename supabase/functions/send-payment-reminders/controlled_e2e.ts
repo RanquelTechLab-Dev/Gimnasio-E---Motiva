@@ -8,6 +8,7 @@ import {
 } from './reminder_logic.ts'
 import {
   executeReminderDelivery,
+  ReminderReconciliationRequiredError,
   type ClaimReminderResponse,
   type FinalizeReminderResponse,
   type ReminderDeliveryDependencies,
@@ -51,6 +52,19 @@ export class PaymentReminderRequestError extends Error {
     super(message)
     this.name = 'PaymentReminderRequestError'
     this.status = status
+  }
+}
+
+export function getReminderReconciliationRequiredResponse(error: unknown) {
+  if (!(error instanceof ReminderReconciliationRequiredError)) {
+    return null
+  }
+
+  return {
+    error: 'reconciliation_required' as const,
+    reconciliation_required: true as const,
+    log_id: error.log_id,
+    desired_status: error.desired_status,
   }
 }
 

@@ -1,4 +1,4 @@
--- RAN-36 B2A: atomic payment reminder delivery claims and finalization.
+-- RAN-36 B2A: atomic payment reminder delivery claims, finalization and reconciliation.
 
 create or replace function public.claim_payment_reminder_delivery(
   p_student_id uuid,
@@ -152,6 +152,12 @@ begin
     return;
   end if;
 
+  if v_log.status = 'uncertain' then
+    return query
+    select false, v_log.id, 'uncertain_outcome'::text, v_attempt;
+    return;
+  end if;
+
   if v_log.status = 'failed' then
     v_attempt := v_attempt + 1;
 
@@ -164,7 +170,8 @@ begin
       status = 'pending',
       sent_at = null,
       metadata = (
-        (email_log.metadata - 'provider_message_id') - 'error'
+        ((email_log.metadata - 'provider_message_id') - 'error')
+          - 'delivery_certainty'
       ) || pg_catalog.jsonb_build_object(
         'notification_type', 'payment_due_reminder',
         'membership_id', p_membership_id,
@@ -223,10 +230,10 @@ begin
       message = 'La identidad de la entrega es obligatoria.';
   end if;
 
-  if p_status is null or p_status not in ('sent', 'failed') then
+  if p_status is null or p_status not in ('sent', 'failed', 'uncertain') then
     raise exception using
       errcode = '22023',
-      message = 'El estado final debe ser sent o failed.';
+      message = 'El estado final debe ser sent, failed o uncertain.';
   end if;
 
   if pg_catalog.jsonb_typeof(v_metadata) <> 'object' then
@@ -246,7 +253,12 @@ begin
       || email_log.metadata
       || pg_catalog.jsonb_build_object(
         'provider_message_id', p_provider_message_id,
-        'error', p_error
+        'error', p_error,
+        'delivery_certainty', case p_status
+          when 'sent' then 'accepted'
+          when 'failed' then 'rejected'
+          else 'uncertain'
+        end
       )
   where email_log.id = p_log_id
     and email_log.idempotency_key = p_idempotency_key
@@ -265,6 +277,115 @@ begin
 
   return query
   select true, v_finalized_log_id, 'finalized'::text, p_status;
+end;
+$function$;
+
+create or replace function public.reconcile_payment_reminder_delivery(
+  p_log_id uuid,
+  p_idempotency_key text,
+  p_final_status text,
+  p_provider_message_id text default null,
+  p_error text default null,
+  p_metadata jsonb default '{}'::jsonb
+)
+returns table (
+  reconciled boolean,
+  log_id uuid,
+  reason text,
+  final_status text
+)
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_log public.email_logs%rowtype;
+  v_reconciled_log_id uuid;
+  v_metadata jsonb := coalesce(p_metadata, '{}'::jsonb);
+begin
+  if p_log_id is null or nullif(pg_catalog.btrim(p_idempotency_key), '') is null then
+    raise exception using
+      errcode = '22023',
+      message = 'La identidad de la entrega es obligatoria.';
+  end if;
+
+  if p_final_status is null
+    or p_final_status not in ('sent', 'failed', 'uncertain') then
+    raise exception using
+      errcode = '22023',
+      message = 'El estado reconciliado debe ser sent, failed o uncertain.';
+  end if;
+
+  if pg_catalog.jsonb_typeof(v_metadata) <> 'object' then
+    raise exception using
+      errcode = '22023',
+      message = 'La metadata de reconciliacion debe ser un objeto JSON.';
+  end if;
+
+  select email_log.*
+  into v_log
+  from public.email_logs as email_log
+  where email_log.id = p_log_id
+    and email_log.idempotency_key = p_idempotency_key
+    and email_log.provider = 'mailjet'
+    and email_log.metadata ->> 'notification_type' = 'payment_due_reminder'
+  for update;
+
+  if not found then
+    return query
+    select false, p_log_id, 'identity_mismatch'::text, null::text;
+    return;
+  end if;
+
+  if v_log.status = 'sent' then
+    return query
+    select false, v_log.id, 'already_sent'::text, 'sent'::text;
+    return;
+  end if;
+
+  if v_log.status not in ('pending', 'uncertain') then
+    return query
+    select
+      false,
+      v_log.id,
+      'current_status_not_reconcilable'::text,
+      v_log.status;
+    return;
+  end if;
+
+  update public.email_logs as email_log
+  set
+    status = p_final_status,
+    sent_at = case
+      when p_final_status = 'sent' then pg_catalog.now()
+      else null
+    end,
+    metadata = v_metadata
+      || email_log.metadata
+      || pg_catalog.jsonb_build_object(
+        'provider_message_id', p_provider_message_id,
+        'error', p_error,
+        'delivery_certainty', case p_final_status
+          when 'sent' then 'accepted'
+          when 'failed' then 'rejected'
+          else 'uncertain'
+        end,
+        'reconciled_from_status', v_log.status,
+        'reconciled_at', pg_catalog.now()
+      )
+  where email_log.id = v_log.id
+    and email_log.idempotency_key = p_idempotency_key
+    and email_log.status = v_log.status
+  returning email_log.id into v_reconciled_log_id;
+
+  if not found then
+    raise exception using
+      errcode = '40001',
+      message = 'La entrega cambio durante la reconciliacion; vuelva a intentar.';
+  end if;
+
+  return query
+  select true, v_reconciled_log_id, 'reconciled'::text, p_final_status;
 end;
 $function$;
 
@@ -308,6 +429,24 @@ grant execute on function public.finalize_payment_reminder_delivery(
   jsonb
 ) to service_role;
 
+revoke all on function public.reconcile_payment_reminder_delivery(
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  jsonb
+) from public, anon, authenticated;
+
+grant execute on function public.reconcile_payment_reminder_delivery(
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  jsonb
+) to service_role;
+
 comment on function public.claim_payment_reminder_delivery(
   uuid,
   text,
@@ -326,4 +465,13 @@ comment on function public.finalize_payment_reminder_delivery(
   text,
   text,
   jsonb
-) is 'Finalizes an exact pending payment reminder delivery as sent or failed.';
+) is 'Finalizes an exact pending payment reminder delivery as sent, failed or uncertain.';
+
+comment on function public.reconcile_payment_reminder_delivery(
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  jsonb
+) is 'Explicitly reconciles an exact pending or uncertain payment reminder without sending email.';

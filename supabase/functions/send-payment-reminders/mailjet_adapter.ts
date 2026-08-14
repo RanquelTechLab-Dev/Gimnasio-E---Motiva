@@ -27,6 +27,11 @@ type MailjetResponseBody = {
 
 const MAILJET_SEND_URL = 'https://api.mailjet.com/v3.1/send'
 const MAX_PROVIDER_ERROR_LENGTH = 1_000
+const SENSITIVE_HEADER_PATTERN = /\b(?:Bearer|Basic)\s+[A-Za-z0-9+/_=.-]+/gi
+const EMAIL_PATTERN =
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
+const SENSITIVE_ASSIGNMENT_PATTERN =
+  /(\b(?:authorization|(?:mailjet[_ -]?)?api[_ -]?(?:key|secret)|token|password)\b\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi
 
 function requireSecret(
   getEnv: (name: string) => string | undefined,
@@ -55,16 +60,29 @@ export function readMailjetConfig(
   }
 }
 
-function providerError(body: MailjetResponseBody | null, status: number) {
+function boundedProviderError(value: unknown, fallback: string) {
+  const candidate =
+    value instanceof Error
+      ? value.message
+      : typeof value === 'string'
+        ? value
+        : ''
+
+  return (candidate.trim() || fallback)
+    .replace(SENSITIVE_HEADER_PATTERN, '[REDACTED]')
+    .replace(SENSITIVE_ASSIGNMENT_PATTERN, '$1[REDACTED]')
+    .replace(EMAIL_PATTERN, '[REDACTED_EMAIL]')
+    .slice(0, MAX_PROVIDER_ERROR_LENGTH)
+}
+
+function explicitProviderError(body: MailjetResponseBody | null) {
   const firstMessage = body?.Messages?.[0]
   const candidate =
     firstMessage?.Errors?.[0]?.ErrorMessage ?? body?.ErrorMessage
-  const message =
-    typeof candidate === 'string' && candidate.trim()
-      ? candidate.trim()
-      : `Mailjet respondio HTTP ${status}.`
 
-  return message.slice(0, MAX_PROVIDER_ERROR_LENGTH)
+  return typeof candidate === 'string' && candidate.trim()
+    ? boundedProviderError(candidate, 'Mailjet rechazo el mensaje.')
+    : null
 }
 
 export function createMailjetAdapter(
@@ -74,52 +92,93 @@ export function createMailjetAdapter(
   return async function sendMail(
     message: ReminderMailMessage,
   ): Promise<ReminderMailResult> {
-    const encodedCredentials = btoa(`${config.apiKey}:${config.apiSecret}`)
-    const response = await fetchImpl(MAILJET_SEND_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${encodedCredentials}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        Messages: [
-          {
-            From: {
-              Email: config.fromEmail,
-              Name: config.fromName,
-            },
-            To: [
-              {
-                Email: message.toEmail,
-                Name: message.toName,
+    let response: Response
+    try {
+      const encodedCredentials = btoa(`${config.apiKey}:${config.apiSecret}`)
+      response = await fetchImpl(MAILJET_SEND_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${encodedCredentials}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          Messages: [
+            {
+              From: {
+                Email: config.fromEmail,
+                Name: config.fromName,
               },
-            ],
-            Subject: message.subject,
-            TextPart: message.textPart,
-            HTMLPart: message.htmlPart,
-          },
-        ],
-      }),
-    })
+              To: [
+                {
+                  Email: message.toEmail,
+                  Name: message.toName,
+                },
+              ],
+              Subject: message.subject,
+              TextPart: message.textPart,
+              HTMLPart: message.htmlPart,
+            },
+          ],
+        }),
+      })
+    } catch (error) {
+      return {
+        outcome: 'uncertain',
+        error: boundedProviderError(
+          error,
+          'No se pudo confirmar la respuesta de Mailjet.',
+        ),
+      }
+    }
+
     const body = (await response.json().catch(() => null)) as
       | MailjetResponseBody
       | null
     const firstMessage = body?.Messages?.[0]
+    const providerError = explicitProviderError(body)
+    const providerStatus =
+      typeof firstMessage?.Status === 'string'
+        ? firstMessage.Status.trim().toLowerCase()
+        : null
 
-    if (response.ok && firstMessage?.Status === 'success') {
-      const messageId = firstMessage.To?.[0]?.MessageID
+    if (!response.ok) {
       return {
-        ok: true,
+        outcome: 'rejected',
+        error:
+          providerError ??
+          boundedProviderError(
+            null,
+            `Mailjet respondio HTTP ${response.status}.`,
+          ),
+      }
+    }
+
+    if (providerStatus === 'error' || providerError !== null) {
+      return {
+        outcome: 'rejected',
+        error:
+          providerError ??
+          boundedProviderError(null, 'Mailjet rechazo el mensaje.'),
+      }
+    }
+
+    if (providerStatus === 'success') {
+      const messageId = firstMessage?.To?.[0]?.MessageID
+      return {
+        outcome: 'accepted',
         provider_message_id:
           messageId === null || messageId === undefined
             ? null
-            : String(messageId),
+            : String(messageId).slice(0, MAX_PROVIDER_ERROR_LENGTH),
       }
     }
 
     return {
-      ok: false,
-      error: providerError(body, response.status),
+      outcome: 'uncertain',
+      error: boundedProviderError(
+        null,
+        `Mailjet respondio HTTP ${response.status} sin confirmacion interpretable.`,
+      ),
     }
   }
 }

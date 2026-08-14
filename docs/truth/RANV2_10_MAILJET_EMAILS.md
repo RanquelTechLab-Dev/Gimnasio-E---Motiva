@@ -108,8 +108,16 @@ RAN-39 no modifica ni despliega este flujo automatico.
 ## RAN-36 B2A - foundation local controlada
 
 - La migracion local agrega RPC `claim`/`finalize` atomicas sobre la clave de
-  idempotencia existente en `email_logs`, con retry controlado para un estado
-  `failed` y ejecucion exclusiva de `service_role`.
+  idempotencia existente en `email_logs`, con ejecucion exclusiva de
+  `service_role`.
+- `failed` significa que Mailjet rechazo explicitamente la entrega. Este es el
+  unico resultado que admite un retry controlado.
+- `uncertain` significa que el resultado del provider es ambiguo, por ejemplo
+  ante una excepcion de transporte o una respuesta que no confirma de forma
+  confiable la aceptacion ni el rechazo. Nunca se reintenta automaticamente.
+- Las entregas `pending` o `uncertain` requieren reconciliacion explicita. La
+  reconciliacion solo finaliza el registro existente y nunca llama ni reenvia a
+  Mailjet.
 - `dryRun=true` conserva el flujo B1 de solo lectura: no reserva entregas, no
   llama a Mailjet y no escribe logs ni otros datos.
 - `dryRun=false` solo admite `mode="controlled_e2e"`, un fixture sintetico
@@ -119,9 +127,9 @@ RAN-39 no modifica ni despliega este flujo automatico.
   misma clave de idempotencia aun si cambia el dia de ejecucion.
 - El fixture usa `student_id=NULL` y no crea ni modifica alumnos reales.
 - La entrega productiva real permanece bloqueada con respuesta 409.
-- B2A existe unicamente en esta implementacion local: no se aplico la
-  migracion, no se desplego `send-payment-reminders`, no se llamo a Mailjet y
-  no se envio ningun email.
+- B2A existe unicamente en esta implementacion local: la entrega productiva
+  sigue bloqueada, no se aplico la migracion, no se desplego
+  `send-payment-reminders`, no se llamo a Mailjet y no se envio ningun email.
 - RAN-36 B3 y su cron productivo siguen pendientes. Las 10:00 en
   `America/Argentina/Cordoba` continúan siendo el objetivo futuro.
 

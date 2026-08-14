@@ -28,18 +28,29 @@ export type ReminderMailMessage = {
 
 export type ReminderMailResult =
   | {
-      ok: true
+      outcome: 'accepted'
       provider_message_id: string | null
     }
   | {
-      ok: false
+      outcome: 'rejected'
       error: string
     }
+  | {
+      outcome: 'uncertain'
+      error: string
+    }
+
+export type ReminderFinalStatus = 'sent' | 'failed' | 'uncertain'
+
+export type ReminderDeliveryCertainty =
+  | 'accepted'
+  | 'rejected'
+  | 'uncertain'
 
 export type FinalizeReminderInput = {
   log_id: string
   idempotency_key: string
-  status: 'sent' | 'failed'
+  status: ReminderFinalStatus
   provider_message_id: string | null
   error: string | null
   metadata: Record<string, unknown>
@@ -49,7 +60,7 @@ export type FinalizeReminderResponse = {
   finalized: boolean
   log_id: string | null
   reason: string
-  final_status: 'sent' | 'failed' | null
+  final_status: ReminderFinalStatus | null
 }
 
 export type ReminderDeliveryDependencies = {
@@ -93,20 +104,69 @@ export type FailedDelivery = {
   error: string
 }
 
+export type UncertainDelivery = {
+  state: 'uncertain'
+  log_id: string
+  attempt: number
+  error: string
+}
+
 export type ReminderDeliveryResult =
   | SkippedDelivery
   | SentDelivery
   | FailedDelivery
+  | UncertainDelivery
 
 const MAX_ERROR_LENGTH = 1_000
+const SENSITIVE_HEADER_PATTERN = /\b(?:Bearer|Basic)\s+[A-Za-z0-9+/_=.-]+/gi
+const EMAIL_PATTERN =
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
+const SENSITIVE_ASSIGNMENT_PATTERN =
+  /(\b(?:authorization|(?:mailjet[_ -]?)?api[_ -]?(?:key|secret)|(?:supabase[_ -]?)?service[_ -]?role(?:[_ -]?key)?|token|password)\b\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi
 
-function boundedErrorMessage(error: unknown) {
-  const message =
-    error instanceof Error && error.message.trim()
-      ? error.message.trim()
-      : 'No se pudo enviar el recordatorio.'
+function boundedErrorMessage(
+  error: unknown,
+  fallback = 'No se pudo enviar el recordatorio.',
+) {
+  const candidate =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : ''
+  const message = candidate.trim() || fallback
 
-  return message.slice(0, MAX_ERROR_LENGTH)
+  return message
+    .replace(SENSITIVE_HEADER_PATTERN, '[REDACTED]')
+    .replace(SENSITIVE_ASSIGNMENT_PATTERN, '$1[REDACTED]')
+    .replace(EMAIL_PATTERN, '[REDACTED_EMAIL]')
+    .slice(0, MAX_ERROR_LENGTH)
+}
+
+export class ReminderReconciliationRequiredError extends Error {
+  readonly code = 'reconciliation_required' as const
+  readonly reconciliation_required = true as const
+  readonly log_id: string
+  readonly idempotency_key: string
+  readonly desired_status: ReminderFinalStatus
+  readonly provider_message_id: string | null
+  readonly bounded_error: string
+
+  constructor(
+    input: FinalizeReminderInput,
+    error: unknown,
+  ) {
+    super('La entrega requiere reconciliacion explicita.')
+    this.name = 'ReminderReconciliationRequiredError'
+    this.log_id = input.log_id
+    this.idempotency_key = input.idempotency_key
+    this.desired_status = input.status
+    this.provider_message_id = input.provider_message_id
+    this.bounded_error = boundedErrorMessage(
+      error,
+      'No se pudo confirmar la finalizacion de la entrega.',
+    )
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -116,25 +176,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function normalizeMailResult(result: unknown): ReminderMailResult {
   if (
     isRecord(result) &&
-    result.ok === true &&
+    result.outcome === 'accepted' &&
     (result.provider_message_id === null ||
       typeof result.provider_message_id === 'string')
   ) {
     return {
-      ok: true,
-      provider_message_id: result.provider_message_id,
+      outcome: 'accepted',
+      provider_message_id:
+        typeof result.provider_message_id === 'string'
+          ? result.provider_message_id.slice(0, MAX_ERROR_LENGTH)
+          : null,
     }
   }
 
   if (
     isRecord(result) &&
-    result.ok === false &&
+    (result.outcome === 'rejected' || result.outcome === 'uncertain') &&
     typeof result.error === 'string' &&
     result.error.trim()
   ) {
     return {
-      ok: false,
-      error: result.error,
+      outcome: result.outcome,
+      error: boundedErrorMessage(result.error),
     }
   }
 
@@ -186,19 +249,32 @@ async function finalizeOrThrow(
   input: FinalizeReminderInput,
   finalize: ReminderDeliveryDependencies['finalize'],
 ) {
-  const response = await finalize(input)
+  try {
+    const response = await finalize(input)
 
-  if (!response.finalized) {
-    throw new Error(
-      `No se pudo finalizar el recordatorio: ${response.reason || 'rejected'}.`,
-    )
-  }
+    if (!isRecord(response)) {
+      throw new Error('La RPC finalize devolvio una respuesta invalida.')
+    }
 
-  if (
-    response.log_id !== input.log_id ||
-    response.final_status !== input.status
-  ) {
-    throw new Error('La RPC finalize devolvio una respuesta invalida.')
+    if (response.finalized !== true) {
+      const reason =
+        typeof response.reason === 'string' && response.reason.trim()
+          ? response.reason.trim()
+          : 'rejected'
+      throw new Error(`No se pudo finalizar el recordatorio: ${reason}.`)
+    }
+
+    if (
+      response.log_id !== input.log_id ||
+      response.final_status !== input.status
+    ) {
+      throw new Error('La RPC finalize devolvio una respuesta invalida.')
+    }
+  } catch (error) {
+    if (error instanceof ReminderReconciliationRequiredError) {
+      throw error
+    }
+    throw new ReminderReconciliationRequiredError(input, error)
   }
 }
 
@@ -222,24 +298,42 @@ export async function executeReminderDelivery(
     )
   } catch (error) {
     mailResult = {
-      ok: false,
+      outcome: 'uncertain',
       error: boundedErrorMessage(error),
     }
   }
 
-  if (mailResult.ok) {
-    await finalizeOrThrow(
-      {
-        log_id: claimResult.log_id,
-        idempotency_key: request.claim.idempotency_key,
-        status: 'sent',
-        provider_message_id: mailResult.provider_message_id,
-        error: null,
-        metadata: request.finalizeMetadata ?? {},
-      },
-      dependencies.finalize,
-    )
+  const finalStatus: ReminderFinalStatus =
+    mailResult.outcome === 'accepted'
+      ? 'sent'
+      : mailResult.outcome === 'rejected'
+        ? 'failed'
+        : 'uncertain'
+  const providerMessageId =
+    mailResult.outcome === 'accepted'
+      ? mailResult.provider_message_id
+      : null
+  const errorMessage =
+    mailResult.outcome === 'accepted'
+      ? null
+      : boundedErrorMessage(mailResult.error)
 
+  await finalizeOrThrow(
+    {
+      log_id: claimResult.log_id,
+      idempotency_key: request.claim.idempotency_key,
+      status: finalStatus,
+      provider_message_id: providerMessageId,
+      error: errorMessage,
+      metadata: {
+        ...(request.finalizeMetadata ?? {}),
+        delivery_certainty: mailResult.outcome,
+      },
+    },
+    dependencies.finalize,
+  )
+
+  if (mailResult.outcome === 'accepted') {
     return {
       state: 'sent',
       log_id: claimResult.log_id,
@@ -248,23 +342,19 @@ export async function executeReminderDelivery(
     }
   }
 
-  const errorMessage = boundedErrorMessage(new Error(mailResult.error))
-  await finalizeOrThrow(
-    {
+  if (mailResult.outcome === 'rejected') {
+    return {
+      state: 'failed',
       log_id: claimResult.log_id,
-      idempotency_key: request.claim.idempotency_key,
-      status: 'failed',
-      provider_message_id: null,
-      error: errorMessage,
-      metadata: request.finalizeMetadata ?? {},
-    },
-    dependencies.finalize,
-  )
+      attempt: claimResult.attempt,
+      error: errorMessage as string,
+    }
+  }
 
   return {
-    state: 'failed',
+    state: 'uncertain',
     log_id: claimResult.log_id,
     attempt: claimResult.attempt,
-    error: errorMessage,
+    error: errorMessage as string,
   }
 }

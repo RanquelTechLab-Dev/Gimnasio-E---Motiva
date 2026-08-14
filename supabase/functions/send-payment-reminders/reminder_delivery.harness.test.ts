@@ -17,6 +17,7 @@ import {
   classifyPaymentReminderRequest,
   createReminderRpcDependencies,
   executeControlledE2E,
+  getReminderReconciliationRequiredResponse,
 } from './controlled_e2e'
 import { renderPaymentReminder } from './reminder_template'
 
@@ -68,7 +69,7 @@ function successfulDependencies(
       attempt: 1,
     }),
     sendMail: vi.fn().mockResolvedValue({
-      ok: true,
+      outcome: 'accepted',
       provider_message_id: 'mailjet-message-01',
     }),
     finalize: vi.fn().mockImplementation(async (input) => ({
@@ -116,7 +117,7 @@ describe('RAN-36 B2A delivery orchestration', () => {
     })
   })
 
-  it('3. Mailjet success finalizes sent', async () => {
+  it('3. an accepted Mailjet result finalizes sent', async () => {
     const dependencies = successfulDependencies()
 
     await expect(
@@ -137,10 +138,10 @@ describe('RAN-36 B2A delivery orchestration', () => {
     )
   })
 
-  it('4. provider failure finalizes failed', async () => {
+  it('4. an explicit provider rejection finalizes failed', async () => {
     const dependencies = successfulDependencies({
       sendMail: vi.fn().mockResolvedValue({
-        ok: false,
+        outcome: 'rejected',
         error: 'mailjet_provider_failure',
       }),
     })
@@ -160,7 +161,7 @@ describe('RAN-36 B2A delivery orchestration', () => {
     )
   })
 
-  it('5. Mailjet exception finalizes failed', async () => {
+  it('A. a transport exception finalizes uncertain, never failed', async () => {
     const dependencies = successfulDependencies({
       sendMail: vi.fn().mockRejectedValue(new Error('network unavailable')),
     })
@@ -168,18 +169,21 @@ describe('RAN-36 B2A delivery orchestration', () => {
     await expect(
       executeReminderDelivery(deliveryRequest(), dependencies),
     ).resolves.toMatchObject({
-      state: 'failed',
+      state: 'uncertain',
       error: 'network unavailable',
     })
     expect(dependencies.finalize).toHaveBeenCalledWith(
       expect.objectContaining({
-        status: 'failed',
+        status: 'uncertain',
         error: 'network unavailable',
+        metadata: expect.objectContaining({
+          delivery_certainty: 'uncertain',
+        }),
       }),
     )
   })
 
-  it('6. finalize rejection is surfaced after a successful send', async () => {
+  it('R. finalize rejection after accepted delivery requires reconciliation', async () => {
     const dependencies = successfulDependencies({
       finalize: vi.fn().mockResolvedValue({
         finalized: false,
@@ -191,10 +195,52 @@ describe('RAN-36 B2A delivery orchestration', () => {
 
     await expect(
       executeReminderDelivery(deliveryRequest(), dependencies),
-    ).rejects.toThrow(/not_pending/)
+    ).rejects.toMatchObject({
+      name: 'ReminderReconciliationRequiredError',
+      code: 'reconciliation_required',
+      reconciliation_required: true,
+      log_id: LOG_ID,
+      idempotency_key: IDEMPOTENCY_KEY,
+      desired_status: 'sent',
+      provider_message_id: 'mailjet-message-01',
+      bounded_error: expect.stringMatching(/not_pending/),
+    })
+    expect(dependencies.sendMail).toHaveBeenCalledTimes(1)
   })
 
-  it('6a. malformed Mailjet output is finalized as failed', async () => {
+  it('R2. exposes only a redacted reconciliation response', async () => {
+    const dependencies = successfulDependencies({
+      finalize: vi
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            `Authorization: Basic sensitive-token for ${E2E_EMAIL}`,
+          ),
+        ),
+    })
+
+    const error = await executeReminderDelivery(
+      deliveryRequest(),
+      dependencies,
+    ).catch((caught: unknown) => caught)
+
+    expect(error).toMatchObject({
+      name: 'ReminderReconciliationRequiredError',
+      bounded_error: expect.not.stringContaining('sensitive-token'),
+    })
+    expect((error as { bounded_error: string }).bounded_error).not.toContain(
+      E2E_EMAIL,
+    )
+    expect(getReminderReconciliationRequiredResponse(error)).toEqual({
+      error: 'reconciliation_required',
+      reconciliation_required: true,
+      log_id: LOG_ID,
+      desired_status: 'sent',
+    })
+    expect(dependencies.sendMail).toHaveBeenCalledTimes(1)
+  })
+
+  it('6a. malformed Mailjet output is finalized as uncertain', async () => {
     const dependencies = successfulDependencies({
       sendMail: vi.fn().mockResolvedValue(null),
     })
@@ -202,15 +248,15 @@ describe('RAN-36 B2A delivery orchestration', () => {
     await expect(
       executeReminderDelivery(deliveryRequest(), dependencies),
     ).resolves.toMatchObject({
-      state: 'failed',
+      state: 'uncertain',
       error: 'El adaptador Mailjet devolvio una respuesta invalida.',
     })
     expect(dependencies.finalize).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'failed' }),
+      expect.objectContaining({ status: 'uncertain' }),
     )
   })
 
-  it('7. finalize exception is surfaced after a failed send', async () => {
+  it('T. finalize exception after uncertain delivery is structured', async () => {
     const dependencies = successfulDependencies({
       sendMail: vi.fn().mockRejectedValue(new Error('provider timeout')),
       finalize: vi.fn().mockRejectedValue(new Error('finalize unavailable')),
@@ -218,7 +264,17 @@ describe('RAN-36 B2A delivery orchestration', () => {
 
     await expect(
       executeReminderDelivery(deliveryRequest(), dependencies),
-    ).rejects.toThrow('finalize unavailable')
+    ).rejects.toMatchObject({
+      name: 'ReminderReconciliationRequiredError',
+      code: 'reconciliation_required',
+      reconciliation_required: true,
+      log_id: LOG_ID,
+      idempotency_key: IDEMPOTENCY_KEY,
+      desired_status: 'uncertain',
+      provider_message_id: null,
+      bounded_error: expect.stringMatching(/finalize unavailable/),
+    })
+    expect(dependencies.sendMail).toHaveBeenCalledTimes(1)
   })
 
   it('8. finalize metadata is forwarded without replacing claim metadata', async () => {
@@ -228,9 +284,201 @@ describe('RAN-36 B2A delivery orchestration', () => {
 
     expect(dependencies.finalize).toHaveBeenCalledWith(
       expect.objectContaining({
-        metadata: { delivery_mode: 'controlled_e2e' },
+        metadata: {
+          delivery_mode: 'controlled_e2e',
+          delivery_certainty: 'accepted',
+        },
       }),
     )
+  })
+
+  it('D. an uncertain row skips Mailjet with uncertain_outcome', async () => {
+    const dependencies = successfulDependencies({
+      claim: vi.fn().mockResolvedValue({
+        claimed: false,
+        log_id: LOG_ID,
+        reason: 'uncertain_outcome',
+        attempt: 1,
+      }),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({
+      state: 'skipped',
+      reason: 'uncertain_outcome',
+    })
+    expect(dependencies.sendMail).not.toHaveBeenCalled()
+    expect(dependencies.finalize).not.toHaveBeenCalled()
+  })
+
+  it('E. a controlled failed retry can claim attempt two', async () => {
+    const dependencies = successfulDependencies({
+      claim: vi.fn().mockResolvedValue({
+        claimed: true,
+        log_id: LOG_ID,
+        reason: 'retry_claimed',
+        attempt: 2,
+      }),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({
+      state: 'sent',
+      attempt: 2,
+    })
+    expect(dependencies.sendMail).toHaveBeenCalledTimes(1)
+  })
+
+  it('F. a sent row remains terminal and never calls Mailjet', async () => {
+    const dependencies = successfulDependencies({
+      claim: vi.fn().mockResolvedValue({
+        claimed: false,
+        log_id: LOG_ID,
+        reason: 'already_sent',
+        attempt: 1,
+      }),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({ state: 'skipped', reason: 'already_sent' })
+    expect(dependencies.sendMail).not.toHaveBeenCalled()
+  })
+
+  it('G. a pending row remains in progress and never calls Mailjet', async () => {
+    const dependencies = successfulDependencies({
+      claim: vi.fn().mockResolvedValue({
+        claimed: false,
+        log_id: LOG_ID,
+        reason: 'in_progress',
+        attempt: 1,
+      }),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({ state: 'skipped', reason: 'in_progress' })
+    expect(dependencies.sendMail).not.toHaveBeenCalled()
+  })
+
+  it('H. an uncertain provider outcome finalizes uncertain', async () => {
+    const dependencies = successfulDependencies({
+      sendMail: vi.fn().mockResolvedValue({
+        outcome: 'uncertain',
+        error: 'provider response was ambiguous',
+      }),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({
+      state: 'uncertain',
+      error: 'provider response was ambiguous',
+    })
+    expect(dependencies.finalize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'uncertain',
+        provider_message_id: null,
+        error: 'provider response was ambiguous',
+        metadata: {
+          delivery_mode: 'controlled_e2e',
+          delivery_certainty: 'uncertain',
+        },
+      }),
+    )
+  })
+
+  it('S. finalize failure after rejection requires reconciliation', async () => {
+    const dependencies = successfulDependencies({
+      sendMail: vi.fn().mockResolvedValue({
+        outcome: 'rejected',
+        error: 'provider rejected message',
+      }),
+      finalize: vi.fn().mockRejectedValue(new Error('finalize unavailable')),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).rejects.toMatchObject({
+      name: 'ReminderReconciliationRequiredError',
+      code: 'reconciliation_required',
+      reconciliation_required: true,
+      log_id: LOG_ID,
+      idempotency_key: IDEMPOTENCY_KEY,
+      desired_status: 'failed',
+      provider_message_id: null,
+      bounded_error: expect.stringMatching(/finalize unavailable/),
+    })
+    expect(dependencies.sendMail).toHaveBeenCalledTimes(1)
+  })
+
+  it('U. a second execution left pending never resends Mailjet', async () => {
+    const claim = vi
+      .fn()
+      .mockResolvedValueOnce({
+        claimed: true,
+        log_id: LOG_ID,
+        reason: 'claimed',
+        attempt: 1,
+      })
+      .mockResolvedValueOnce({
+        claimed: false,
+        log_id: LOG_ID,
+        reason: 'in_progress',
+        attempt: 1,
+      })
+    const dependencies = successfulDependencies({
+      claim,
+      finalize: vi.fn().mockRejectedValue(new Error('finalize unavailable')),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).rejects.toMatchObject({
+      name: 'ReminderReconciliationRequiredError',
+      desired_status: 'sent',
+    })
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({ state: 'skipped', reason: 'in_progress' })
+    expect(dependencies.sendMail).toHaveBeenCalledTimes(1)
+  })
+
+  it('V. a second execution left uncertain never resends Mailjet', async () => {
+    const claim = vi
+      .fn()
+      .mockResolvedValueOnce({
+        claimed: true,
+        log_id: LOG_ID,
+        reason: 'claimed',
+        attempt: 1,
+      })
+      .mockResolvedValueOnce({
+        claimed: false,
+        log_id: LOG_ID,
+        reason: 'uncertain_outcome',
+        attempt: 1,
+      })
+    const dependencies = successfulDependencies({
+      claim,
+      sendMail: vi.fn().mockResolvedValue({
+        outcome: 'uncertain',
+        error: 'provider response was ambiguous',
+      }),
+    })
+
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({ state: 'uncertain' })
+    await expect(
+      executeReminderDelivery(deliveryRequest(), dependencies),
+    ).resolves.toMatchObject({
+      state: 'skipped',
+      reason: 'uncertain_outcome',
+    })
+    expect(dependencies.sendMail).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -514,7 +762,7 @@ describe('RAN-36 B2A deterministic template and Mailjet adapter', () => {
         htmlPart: rendered.htmlPart,
       }),
     ).resolves.toEqual({
-      ok: true,
+      outcome: 'accepted',
       provider_message_id: '12345',
     })
 
@@ -527,7 +775,7 @@ describe('RAN-36 B2A deterministic template and Mailjet adapter', () => {
     })
   })
 
-  it('22. converts provider failure into a bounded failed result', async () => {
+  it('C. converts an explicit provider rejection into rejected', async () => {
     const adapter = createMailjetAdapter(
       {
         apiKey: 'api-key-value',
@@ -551,12 +799,12 @@ describe('RAN-36 B2A deterministic template and Mailjet adapter', () => {
     )
 
     await expect(adapter(deliveryRequest().message)).resolves.toEqual({
-      ok: false,
+      outcome: 'rejected',
       error: 'provider rejected message',
     })
   })
 
-  it('22a. keeps an injected fetch exception observable to delivery', async () => {
+  it('A2. converts an injected fetch exception into uncertain', async () => {
     const adapter = createMailjetAdapter(
       {
         apiKey: 'api-key-value',
@@ -567,9 +815,32 @@ describe('RAN-36 B2A deterministic template and Mailjet adapter', () => {
       vi.fn().mockRejectedValue(new Error('network unavailable')),
     )
 
-    await expect(adapter(deliveryRequest().message)).rejects.toThrow(
-      'network unavailable',
+    await expect(adapter(deliveryRequest().message)).resolves.toEqual({
+      outcome: 'uncertain',
+      error: 'network unavailable',
+    })
+  })
+
+  it('B. converts an ambiguous HTTP 200 body into uncertain', async () => {
+    const adapter = createMailjetAdapter(
+      {
+        apiKey: 'api-key-value',
+        apiSecret: 'api-secret-value',
+        fromEmail: 'from@example.invalid',
+        fromName: 'E-Motiva',
+      },
+      vi.fn().mockResolvedValue(
+        new Response('{"Messages":[]}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
     )
+
+    await expect(adapter(deliveryRequest().message)).resolves.toEqual({
+      outcome: 'uncertain',
+      error: expect.any(String),
+    })
   })
 
   it('22b. surfaces bounded PostgREST error messages', async () => {

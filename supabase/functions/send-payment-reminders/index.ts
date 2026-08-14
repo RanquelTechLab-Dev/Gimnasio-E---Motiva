@@ -10,6 +10,7 @@ import {
 import {
   classifyPaymentReminderRequest,
   executeControlledE2EFromRuntime,
+  getReminderReconciliationRequiredResponse,
   PaymentReminderRequestError,
   PRODUCTION_SEND_BLOCKED_MESSAGE,
 } from './controlled_e2e.ts'
@@ -139,13 +140,27 @@ Deno.serve(async (request) => {
         getEnv: (name) => Deno.env.get(name),
         fetchImpl: fetch,
       })
+      if (result.state === 'uncertain') {
+        return jsonResponse(
+          {
+            ...result,
+            reconciliation_required: true,
+            desired_status: 'uncertain',
+          },
+          503,
+        )
+      }
       return jsonResponse(result, result.state === 'failed' ? 502 : 200)
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'No se pudo ejecutar la prueba E2E controlada.'
-      return jsonResponse({ error: message }, 500)
+      const reconciliationResponse =
+        getReminderReconciliationRequiredResponse(error)
+      if (reconciliationResponse !== null) {
+        return jsonResponse(reconciliationResponse, 503)
+      }
+      return jsonResponse(
+        { error: 'No se pudo ejecutar la prueba E2E controlada.' },
+        500,
+      )
     }
   }
 

@@ -3,6 +3,13 @@ import {
   selectEligibleRecipients,
   validateRecipientIds,
 } from './recipient_selection.ts'
+import {
+  buildPostgrestRecentPaymentsCursorFilter,
+  buildLatestPaymentByStudent,
+  collectAllRecentApprovedPayments,
+  type RecentApprovedPayment,
+} from './recent_payments_pagination.ts'
+import { collectProfilesInBatches } from './profile_batching.ts'
 
 type MassEmailPayload = {
   subject?: string
@@ -18,6 +25,16 @@ type Recipient = {
   last_name: string
   email: string
   last_paid_at: string
+}
+
+type EligibleProfile = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string | null
+  active: boolean
+  role: string
+  receives_emails: boolean
 }
 
 const corsHeaders = {
@@ -173,36 +190,40 @@ Deno.serve(async (req) => {
   const since = new Date()
   since.setMonth(since.getMonth() - 6)
 
-  const { data: recentPayments, error: paymentsError } = await adminClient
-    .from('payments')
-    .select('student_id, paid_at, approved_at, created_at')
-    .eq('status', 'approved')
-    .gte('paid_at', since.toISOString())
+  let recentPayments: RecentApprovedPayment[]
+  try {
+    recentPayments = await collectAllRecentApprovedPayments(
+      async (cursor, limit) => {
+        const baseQuery = adminClient
+          .from('payments')
+          .select('id, student_id, paid_at, approved_at, created_at')
+          .eq('status', 'approved')
+          .gte('paid_at', since.toISOString())
 
-  if (paymentsError) {
+        const keysetQuery = cursor
+          ? baseQuery.or(buildPostgrestRecentPaymentsCursorFilter(cursor))
+          : baseQuery
+
+        const { data, error } = await keysetQuery
+          .order('paid_at', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(limit)
+
+        if (error) {
+          throw error
+        }
+
+        return (data ?? []) as RecentApprovedPayment[]
+      },
+    )
+  } catch {
     return jsonResponse(
       { error: 'No se pudo obtener la audiencia de pagos recientes.' },
       500,
     )
   }
 
-  const latestPaymentByStudent = new Map<string, string>()
-  for (const payment of recentPayments ?? []) {
-    const studentId = payment.student_id as string | null
-    const paidAt =
-      (payment.approved_at as string | null) ??
-      (payment.paid_at as string | null) ??
-      (payment.created_at as string | null)
-
-    if (!studentId || !paidAt) {
-      continue
-    }
-
-    const current = latestPaymentByStudent.get(studentId)
-    if (!current || new Date(paidAt).getTime() > new Date(current).getTime()) {
-      latestPaymentByStudent.set(studentId, paidAt)
-    }
-  }
+  const latestPaymentByStudent = buildLatestPaymentByStudent(recentPayments)
 
   const studentIds = [...latestPaymentByStudent.keys()]
 
@@ -241,23 +262,37 @@ Deno.serve(async (req) => {
     })
   }
 
-  const { data: profiles, error: profilesError } = await adminClient
-    .from('profiles')
-    .select('id, first_name, last_name, email, active, role, receives_emails')
-    .in('id', studentIds)
-    .eq('role', 'student')
-    .eq('active', true)
-    .eq('receives_emails', true)
-    .not('email', 'is', null)
+  let profiles: EligibleProfile[]
+  try {
+    profiles = await collectProfilesInBatches<EligibleProfile>(
+      studentIds,
+      async (batchIds) => {
+        const { data, error } = await adminClient
+          .from('profiles')
+          .select(
+            'id, first_name, last_name, email, active, role, receives_emails',
+          )
+          .in('id', batchIds)
+          .eq('role', 'student')
+          .eq('active', true)
+          .eq('receives_emails', true)
+          .not('email', 'is', null)
 
-  if (profilesError) {
+        if (error) {
+          throw error
+        }
+
+        return (data ?? []) as EligibleProfile[]
+      },
+    )
+  } catch {
     return jsonResponse(
       { error: 'No se pudo filtrar alumnos con opt-in activo.' },
       500,
     )
   }
 
-  const eligibleRecipients: Recipient[] = (profiles ?? [])
+  const eligibleRecipients: Recipient[] = profiles
     .filter((profile) => typeof profile.email === 'string' && profile.email.includes('@'))
     .map((profile) => ({
       id: profile.id as string,

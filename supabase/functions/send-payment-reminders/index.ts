@@ -7,6 +7,12 @@ import {
   type ReminderCandidate,
   validateDryRunPayload,
 } from './reminder_logic.ts'
+import {
+  classifyPaymentReminderRequest,
+  executeControlledE2EFromRuntime,
+  PaymentReminderRequestError,
+  PRODUCTION_SEND_BLOCKED_MESSAGE,
+} from './controlled_e2e.ts'
 
 type MembershipRow = {
   id: string
@@ -114,10 +120,38 @@ Deno.serve(async (request) => {
     )
   }
 
+  let mode
+  try {
+    mode = classifyPaymentReminderRequest(rawPayload)
+  } catch (error) {
+    if (error instanceof PaymentReminderRequestError) {
+      const status =
+        error.message === PRODUCTION_SEND_BLOCKED_MESSAGE ? 409 : error.status
+      return jsonResponse({ error: error.message }, status)
+    }
+    return jsonResponse({ error: 'Payload invalido.' }, 400)
+  }
+
+  if (mode.kind === 'controlled_e2e') {
+    try {
+      const result = await executeControlledE2EFromRuntime(mode.value, {
+        client: adminClient,
+        getEnv: (name) => Deno.env.get(name),
+        fetchImpl: fetch,
+      })
+      return jsonResponse(result, result.state === 'failed' ? 502 : 200)
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo ejecutar la prueba E2E controlada.'
+      return jsonResponse({ error: message }, 500)
+    }
+  }
+
   const payload = validateDryRunPayload(rawPayload)
   if (!payload.valid) {
-    const status = payload.error === 'RAN-36 B1 solo permite dry-run.' ? 409 : 400
-    return jsonResponse({ error: payload.error }, status)
+    return jsonResponse({ error: payload.error }, 400)
   }
 
   const evaluationDate =

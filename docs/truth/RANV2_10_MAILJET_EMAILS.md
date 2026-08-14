@@ -85,7 +85,8 @@ Los offsets son 5/3/1/0 dias:
 - 1 dia antes;
 - dia del vencimiento (offset 0).
 
-B2 sigue pendiente y habilitara una prueba Mailjet E2E controlada.
+B2A incorpora localmente la base para una prueba Mailjet E2E controlada. No
+esta desplegada ni habilita envios productivos.
 
 B3 sigue pendiente y agregara el cron productivo de las 10:00 en:
 
@@ -101,7 +102,28 @@ RAN-39 no modifica ni despliega este flujo automatico.
   y respeta la preferencia independiente `receives_payment_reminders`.
 - RAN-36 B1 es estrictamente dry-run: no llama a Mailjet, no envia emails y no
   realiza mutaciones de datos.
-- El envio E2E controlado corresponde a RAN-36 B2 y el cron a RAN-36 B3.
+- RAN-36 B2A prepara localmente el envio E2E controlado; el cron corresponde a
+  RAN-36 B3.
+
+## RAN-36 B2A - foundation local controlada
+
+- La migracion local agrega RPC `claim`/`finalize` atomicas sobre la clave de
+  idempotencia existente en `email_logs`, con retry controlado para un estado
+  `failed` y ejecucion exclusiva de `service_role`.
+- `dryRun=true` conserva el flujo B1 de solo lectura: no reserva entregas, no
+  llama a Mailjet y no escribe logs ni otros datos.
+- `dryRun=false` solo admite `mode="controlled_e2e"`, un fixture sintetico
+  interno y el destino del secret `PAYMENT_REMINDER_E2E_EMAIL`. El request no
+  puede elegir email, alumno ni membresia.
+- La fecha del fixture es interna y fija; repetir el mismo offset conserva la
+  misma clave de idempotencia aun si cambia el dia de ejecucion.
+- El fixture usa `student_id=NULL` y no crea ni modifica alumnos reales.
+- La entrega productiva real permanece bloqueada con respuesta 409.
+- B2A existe unicamente en esta implementacion local: no se aplico la
+  migracion, no se desplego `send-payment-reminders`, no se llamo a Mailjet y
+  no se envio ningun email.
+- RAN-36 B3 y su cron productivo siguen pendientes. Las 10:00 en
+  `America/Argentina/Cordoba` continúan siendo el objetivo futuro.
 
 ## Seguridad
 

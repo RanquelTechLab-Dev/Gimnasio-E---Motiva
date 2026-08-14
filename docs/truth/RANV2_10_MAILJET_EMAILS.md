@@ -31,6 +31,14 @@ opcional mediante `recipient_ids`:
 - este bloque no cambia la UI, no despliega la funcion y no envia emails
   reales.
 
+La remediacion P2 pagina localmente todos los pagos aprobados en rangos
+deterministicos de 1000 filas y consulta los perfiles en lotes acotados. La
+audiencia manual ya no depende de una primera respuesta truncada a 1000 filas.
+Si falla cualquier pagina o lote, se aborta el calculo completo antes de
+Mailjet y de los registros de envio: nunca se usa una audiencia parcial. Esta
+correccion sigue pendiente de auditoria, merge y deploy; no esta activa en la
+funcion productiva.
+
 El Bloque B agregara despues buscador, checkbox individual, seleccion multiple,
 seleccionar todos y contador. Los recordatorios automaticos 5/3/1/0 siguen
 separados de este envio manual.

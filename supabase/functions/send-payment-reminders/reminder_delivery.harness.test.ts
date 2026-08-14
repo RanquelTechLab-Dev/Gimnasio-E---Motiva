@@ -804,6 +804,89 @@ describe('RAN-36 B2A deterministic template and Mailjet adapter', () => {
     })
   })
 
+  it.each([500, 502, 503])(
+    'C1. converts a bodyless HTTP %i response into uncertain',
+    async (status) => {
+      const adapter = createMailjetAdapter(
+        {
+          apiKey: 'api-key-value',
+          apiSecret: 'api-secret-value',
+          fromEmail: 'from@example.invalid',
+          fromName: 'E-Motiva',
+        },
+        vi.fn().mockResolvedValue(new Response(null, { status })),
+      )
+
+      await expect(adapter(deliveryRequest().message)).resolves.toEqual({
+        outcome: 'uncertain',
+        error: expect.any(String),
+      })
+    },
+  )
+
+  it('C2. converts an invalid non-2xx response body into uncertain', async () => {
+    const adapter = createMailjetAdapter(
+      {
+        apiKey: 'api-key-value',
+        apiSecret: 'api-secret-value',
+        fromEmail: 'from@example.invalid',
+        fromName: 'E-Motiva',
+      },
+      vi.fn().mockResolvedValue(
+        new Response('<html>upstream unavailable</html>', { status: 504 }),
+      ),
+    )
+
+    await expect(adapter(deliveryRequest().message)).resolves.toEqual({
+      outcome: 'uncertain',
+      error: expect.any(String),
+    })
+  })
+
+  it('C3. converts an explicit top-level Mailjet ErrorMessage into rejected', async () => {
+    const adapter = createMailjetAdapter(
+      {
+        apiKey: 'api-key-value',
+        apiSecret: 'api-secret-value',
+        fromEmail: 'from@example.invalid',
+        fromName: 'E-Motiva',
+      },
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ ErrorMessage: 'explicit Mailjet rejection' }),
+          { status: 400 },
+        ),
+      ),
+    )
+
+    await expect(adapter(deliveryRequest().message)).resolves.toEqual({
+      outcome: 'rejected',
+      error: 'explicit Mailjet rejection',
+    })
+  })
+
+  it('C4. converts an explicit Mailjet Status error into rejected', async () => {
+    const adapter = createMailjetAdapter(
+      {
+        apiKey: 'api-key-value',
+        apiSecret: 'api-secret-value',
+        fromEmail: 'from@example.invalid',
+        fromName: 'E-Motiva',
+      },
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ Messages: [{ Status: 'error' }] }),
+          { status: 422 },
+        ),
+      ),
+    )
+
+    await expect(adapter(deliveryRequest().message)).resolves.toEqual({
+      outcome: 'rejected',
+      error: 'Mailjet rechazo el mensaje.',
+    })
+  })
+
   it('A2. converts an injected fetch exception into uncertain', async () => {
     const adapter = createMailjetAdapter(
       {

@@ -159,6 +159,18 @@ SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 ```
 
+Para RAN-36 B2 controlled E2E, y solamente bajo autorizacion B2B, se
+requerira:
+
+```text
+PAYMENT_REMINDER_E2E_EMAIL
+```
+
+Este secret pertenece exclusivamente al E2E controlado de RAN-36 B2. No es
+necesario para `send-mass-email` y todavia no esta configurado en produccion.
+No guardar su valor en Git. Cuando se autorice su configuracion, debe apuntar
+exclusivamente a una cuenta controlada, nunca a un alumno real.
+
 ## Deploy de RANV2-10
 
 Los secrets y cualquier redeploy de `send-mass-email` se gestionan por

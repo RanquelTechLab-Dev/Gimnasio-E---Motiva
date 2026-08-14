@@ -141,24 +141,22 @@ export function createMailjetAdapter(
         ? firstMessage.Status.trim().toLowerCase()
         : null
 
-    if (!response.ok) {
-      return {
-        outcome: 'rejected',
-        error:
-          providerError ??
-          boundedProviderError(
-            null,
-            `Mailjet respondio HTTP ${response.status}.`,
-          ),
-      }
-    }
-
     if (providerStatus === 'error' || providerError !== null) {
       return {
         outcome: 'rejected',
         error:
           providerError ??
           boundedProviderError(null, 'Mailjet rechazo el mensaje.'),
+      }
+    }
+
+    if (!response.ok) {
+      return {
+        outcome: 'uncertain',
+        error: boundedProviderError(
+          null,
+          `Mailjet respondio HTTP ${response.status} sin rechazo explicito confirmado.`,
+        ),
       }
     }
 

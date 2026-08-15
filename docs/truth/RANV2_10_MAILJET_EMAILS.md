@@ -85,10 +85,13 @@ Los offsets son 5/3/1/0 dias:
 - 1 dia antes;
 - dia del vencimiento (offset 0).
 
-B2A incorpora localmente la base para una prueba Mailjet E2E controlada. No
-esta desplegada ni habilita envios productivos.
+B2B completo la prueba Mailjet E2E controlada: se envio exactamente un email
+sintetico, la segunda ejecucion de la misma clave devolvio `already_sent` y los
+recordatorios para alumnos reales continuaron en cero.
 
-B3 sigue pendiente y agregara el cron productivo de las 10:00 en:
+B3A agrega una foundation code-only para `scheduled_preview` y
+`scheduled_production`, desactivada por defecto y todavia sin cron. La futura
+programacion productiva de las 10:00 usara:
 
 `America/Argentina/Cordoba`
 
@@ -102,13 +105,14 @@ RAN-39 no modifica ni despliega este flujo automatico.
   y respeta la preferencia independiente `receives_payment_reminders`.
 - RAN-36 B1 es estrictamente dry-run: no llama a Mailjet, no envia emails y no
   realiza mutaciones de datos.
-- RAN-36 B2A prepara localmente el envio E2E controlado; el cron corresponde a
-  RAN-36 B3.
+- RAN-36 B2B valido el envio E2E controlado con una sola entrega sintetica.
+- RAN-36 B3A prepara localmente el worker productivo; cron y activacion remota
+  corresponden a bloques posteriores.
 
-## RAN-36 B2A - foundation local controlada
+## RAN-36 B2B - controlled E2E validado
 
-- La migracion local agrega RPC `claim`/`finalize` atomicas sobre la clave de
-  idempotencia existente en `email_logs`, con ejecucion exclusiva de
+- La migracion B2 aplicada agrega RPC `claim`/`finalize` atomicas sobre la
+  clave de idempotencia existente en `email_logs`, con ejecucion exclusiva de
   `service_role`.
 - `failed` significa que Mailjet rechazo explicitamente la entrega. Este es el
   unico resultado que admite un retry controlado.
@@ -120,22 +124,61 @@ RAN-39 no modifica ni despliega este flujo automatico.
   Mailjet.
 - `dryRun=true` conserva el flujo B1 de solo lectura: no reserva entregas, no
   llama a Mailjet y no escribe logs ni otros datos.
-- `dryRun=false` solo admite `mode="controlled_e2e"`, un fixture sintetico
-  interno y el destino del secret `PAYMENT_REMINDER_E2E_EMAIL`. El request no
-  puede elegir email, alumno ni membresia.
+- En la ruta admin B2, `dryRun=false` solo admite `mode="controlled_e2e"`, un
+  fixture sintetico interno y el destino del secret
+  `PAYMENT_REMINDER_E2E_EMAIL`. El request no puede elegir email, alumno ni
+  membresia.
 - La fecha del fixture es interna y fija; repetir el mismo offset conserva la
   misma clave de idempotencia aun si cambia el dia de ejecucion.
 - El fixture usa `student_id=NULL` y no crea ni modifica alumnos reales.
-- La entrega productiva real permanece bloqueada con respuesta 409.
-- B2A existe unicamente en esta implementacion local: la entrega productiva
-  sigue bloqueada, no se aplico la migracion, no se desplego
-  `send-payment-reminders`, no se llamo a Mailjet y no se envio ningun email.
-- RAN-36 B3 y su cron productivo siguen pendientes. Las 10:00 en
-  `America/Argentina/Cordoba` continúan siendo el objetivo futuro.
+- Cualquier intento productivo desde la ruta admin permanece bloqueado con
+  respuesta 409. El modo scheduled productivo de B3A es una ruta de servicio
+  separada y responde 503 mientras su kill-switch este desactivado.
+- B2B aplico la base atomica y desplego `send-payment-reminders` con la ruta
+  controlada. La validacion envio exactamente un email sintetico y comprobo
+  `already_sent` al repetir la misma clave.
+- No se enviaron recordatorios a alumnos reales.
+- RAN-36 B3A no repite la prueba B2B ni autoriza nuevos envios.
+
+## RAN-36 B3A - production worker foundation code-only
+
+- `dryRun` y `controlled_e2e` conservan autenticacion manual con JWT real de
+  Supabase Auth y perfil admin activo.
+- `scheduled_preview` y `scheduled_production` usan autenticacion de servicio
+  mediante el header `x-e-motiva-cron-secret` y el secret
+  `PAYMENT_REMINDER_CRON_SECRET`.
+- La configuracion local futura fija `verify_jwt=false` solo para
+  `send-payment-reminders`; la funcion sigue autenticando cada ruta dentro de
+  su propio codigo. Este cambio no se despliega en B3A.
+- `scheduled_preview` calcula la fecha real de
+  `America/Argentina/Cordoba`, ejecuta el selector y devuelve solo conteos. No
+  hace claim, no llama a Mailjet y no escribe datos.
+- `scheduled_production` reutiliza selector, template, claim atomico,
+  idempotencia y Mailjet, pero queda bloqueado por defecto. Solo puede avanzar
+  cuando `PAYMENT_REMINDERS_PRODUCTION_ENABLED` es exactamente `true`.
+- La nueva migracion local revalida membership y profile actuales dentro del
+  claim real. Una renovacion o cambio previo al claim produce
+  `candidate_no_longer_eligible`, sin `email_logs` nuevo ni Mailjet.
+- El worker es secuencial. Un rechazo explicito se registra como `failed` y no
+  se reintenta dentro del mismo run. Un outcome `uncertain` o una
+  reconciliacion requerida detiene el batch y nunca reenvia automaticamente.
+- Los requests scheduled no pueden aportar fecha, destinatario, alumno,
+  membership, vencimiento, offset ni fixture. Las respuestas normales contienen
+  solo fecha, timezone y contadores, sin PII; un error de reconciliacion puede
+  agregar exclusivamente `log_id` y `desired_status`.
+- Cron NO esta activo. `pg_cron` y `pg_net` NO estan instalados y B3A no crea
+  extensiones, jobs, llamadas HTTP desde Postgres ni secretos en Vault.
+- `PRODUCTION_MAILJET_SENDER_VERIFICATION_PENDING` permanece como gate
+  separado. No se cambia `MAILJET_FROM_EMAIL` ni se verifica mediante envio
+  real en B3A.
+- No hay deploy, secrets remotos, migration remota, Mailjet ni emails reales
+  autorizados en B3A.
 
 ## Seguridad
 
-- La Edge Function exige token de sesion y valida admin activo.
+- Las rutas admin exigen token de sesion y validan admin activo.
+- Las rutas scheduled exigen el secret de servicio dedicado y nunca aceptan el
+  JWT admin como sustituto.
 - La funcion usa `SUPABASE_SERVICE_ROLE_KEY` solo en runtime backend.
 - Los secrets de Mailjet deben cargarse como Supabase secrets.
 - No se guardan secrets en Git ni en variables publicas de frontend.
@@ -159,17 +202,26 @@ SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 ```
 
-Para RAN-36 B2 controlled E2E, y solamente bajo autorizacion B2B, se
-requerira:
+Para RAN-36 B2 controlled E2E se requiere:
 
 ```text
 PAYMENT_REMINDER_E2E_EMAIL
 ```
 
 Este secret pertenece exclusivamente al E2E controlado de RAN-36 B2. No es
-necesario para `send-mass-email` y todavia no esta configurado en produccion.
-No guardar su valor en Git. Cuando se autorice su configuracion, debe apuntar
-exclusivamente a una cuenta controlada, nunca a un alumno real.
+necesario para `send-mass-email`. No guardar su valor en Git y usar siempre una
+cuenta controlada, nunca un alumno real.
+
+La foundation B3A declara, solo por nombre y sin configurar valores remotos:
+
+```text
+PAYMENT_REMINDER_CRON_SECRET
+PAYMENT_REMINDERS_PRODUCTION_ENABLED
+```
+
+El primero autentica futuras llamadas scheduler/service. El segundo es el
+kill-switch y mantiene `scheduled_production` bloqueado cuando falta o cuando
+su valor no es exactamente `true`.
 
 ## Deploy de RANV2-10
 

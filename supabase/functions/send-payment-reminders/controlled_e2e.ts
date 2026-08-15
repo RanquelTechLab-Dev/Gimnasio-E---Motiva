@@ -32,6 +32,7 @@ const CONTROLLED_E2E_STUDENT_ID =
 const DESTINATION_SECRET = 'PAYMENT_REMINDER_E2E_EMAIL'
 const ALLOWED_TOP_LEVEL_FIELDS = new Set(['dryRun', 'mode', 'fixture'])
 const ALLOWED_FIXTURE_FIELDS = new Set(['offset_days'])
+const ALLOWED_SCHEDULED_FIELDS = new Set(['dryRun', 'mode'])
 
 export type ControlledE2EPayload = {
   dryRun: false
@@ -41,9 +42,21 @@ export type ControlledE2EPayload = {
   }
 }
 
+export type ScheduledPreviewPayload = {
+  dryRun: true
+  mode: 'scheduled_preview'
+}
+
+export type ScheduledProductionPayload = {
+  dryRun: false
+  mode: 'scheduled_production'
+}
+
 export type PaymentReminderMode =
   | { kind: 'dry_run' }
   | { kind: 'controlled_e2e'; value: ControlledE2EPayload }
+  | { kind: 'scheduled_preview'; value: ScheduledPreviewPayload }
+  | { kind: 'scheduled_production'; value: ScheduledProductionPayload }
 
 export class PaymentReminderRequestError extends Error {
   readonly status: number
@@ -75,11 +88,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function rejectUnknownFields(
   value: Record<string, unknown>,
   allowed: Set<string>,
+  safeMessage?: string,
 ) {
   const unknownFields = Object.keys(value).filter((key) => !allowed.has(key))
   if (unknownFields.length > 0) {
     throw new PaymentReminderRequestError(
-      `Campos no permitidos: ${unknownFields.sort().join(', ')}.`,
+      safeMessage ??
+        `Campos no permitidos: ${unknownFields.sort().join(', ')}.`,
       400,
     )
   }
@@ -92,7 +107,46 @@ export function classifyPaymentReminderRequest(
     throw new PaymentReminderRequestError('Payload invalido.', 400)
   }
 
+  if (payload.mode === 'scheduled_preview') {
+    rejectUnknownFields(
+      payload,
+      ALLOWED_SCHEDULED_FIELDS,
+      'scheduled_request_invalid',
+    )
+    if (payload.dryRun !== true) {
+      throw new PaymentReminderRequestError(
+        'scheduled_preview requiere dryRun=true.',
+        400,
+      )
+    }
+    return {
+      kind: 'scheduled_preview',
+      value: { dryRun: true, mode: 'scheduled_preview' },
+    }
+  }
+
+  if (payload.mode === 'scheduled_production') {
+    rejectUnknownFields(
+      payload,
+      ALLOWED_SCHEDULED_FIELDS,
+      'scheduled_request_invalid',
+    )
+    if (payload.dryRun !== false) {
+      throw new PaymentReminderRequestError(
+        'scheduled_production requiere dryRun=false.',
+        400,
+      )
+    }
+    return {
+      kind: 'scheduled_production',
+      value: { dryRun: false, mode: 'scheduled_production' },
+    }
+  }
+
   if (payload.dryRun === true) {
+    if (payload.mode !== undefined) {
+      throw new PaymentReminderRequestError('admin_request_invalid', 400)
+    }
     return { kind: 'dry_run' }
   }
 

@@ -166,13 +166,41 @@ RAN-39 no modifica ni despliega este flujo automatico.
   membership, vencimiento, offset ni fixture. Las respuestas normales contienen
   solo fecha, timezone y contadores, sin PII; un error de reconciliacion puede
   agregar exclusivamente `log_id` y `desired_status`.
-- Cron NO esta activo. `pg_cron` y `pg_net` NO estan instalados y B3A no crea
-  extensiones, jobs, llamadas HTTP desde Postgres ni secretos en Vault.
-- `PRODUCTION_MAILJET_SENDER_VERIFICATION_PENDING` permanece como gate
-  separado. No se cambia `MAILJET_FROM_EMAIL` ni se verifica mediante envio
-  real en B3A.
+- Cron NO esta activo remotamente. B3D agrega una migration code-only, no
+  aplicada, que prepara `pg_cron`, `pg_net`, Vault y un job inicialmente en
+  modo `scheduled_preview`.
+- B3C alineo el sender compartido de Mailjet con
+  `e.motiva.gym@gmail.com`, validado individualmente en Mailjet. Sigue siendo
+  una direccion Gmail/freemail sin autenticacion SPF/DKIM de dominio propio.
 - No hay deploy, secrets remotos, migration remota, Mailjet ni emails reales
   autorizados en B3A.
+
+## RAN-36 B3D - scheduler foundation code-only
+
+- B3B esta COMPLETE y conserva una sola entrega sintetica; los recordatorios
+  enviados a alumnos reales siguen en cero.
+- B3C alineo `MAILJET_FROM_EMAIL` con `e.motiva.gym@gmail.com`. Ese secret es
+  compartido por recordatorios y emails manuales/masivos.
+- B3D prepara exclusivamente codigo versionado para el scheduler. La migration
+  no esta aplicada y `pg_cron`/`pg_net` siguen ausentes remotamente.
+- El scheduler usa el patron `pg_cron + pg_net + Vault + Edge Function`.
+- El job `emotiva-payment-reminders` corre con expresion `0 * * * *`; el
+  wrapper solo despacha cuando la hora de `America/Argentina/Cordoba` es 10.
+  La zona IANA es la fuente de verdad, no un offset UTC fijo.
+- Una tabla tecnica privada con `local_date` unico limita el scheduler a un
+  maximo de un request HTTP por dia local, incluso ante invocaciones
+  concurrentes. La idempotencia por entrega continua como segunda defensa.
+- El payload inicial es exactamente `dryRun=true` y
+  `mode="scheduled_preview"`. Nunca agenda `scheduled_production`.
+- `PAYMENT_REMINDERS_PRODUCTION_ENABLED` permanece en `false` y no se modifica
+  en B3D. Los emails reales siguen deshabilitados.
+- La migration no incluye secrets ni valores sensibles. Solo fija el project
+  ref publico esperado para ligar el URL recuperado desde Vault al proyecto
+  autorizado. El wrapper falla cerrado si falta cualquiera de los nombres
+  Vault requeridos y valida el URL antes de poner headers en la cola, cuya
+  lectura queda revocada a roles de frontend.
+- B3E debe configurar Vault, aplicar y auditar la migration antes de cualquier
+  decision separada sobre activacion productiva.
 
 ## Seguridad
 
@@ -222,6 +250,19 @@ PAYMENT_REMINDERS_PRODUCTION_ENABLED
 El primero autentica futuras llamadas scheduler/service. El segundo es el
 kill-switch y mantiene `scheduled_production` bloqueado cuando falta o cuando
 su valor no es exactamente `true`.
+
+La foundation B3D referencia exclusivamente estos nombres de Supabase Vault,
+sin guardar sus valores en Git:
+
+```text
+emotiva_project_url
+emotiva_publishable_key
+emotiva_payment_reminder_cron_secret
+```
+
+El wrapper usa esos valores solo en runtime para invocar
+`send-payment-reminders` con `scheduled_preview`. No usa `service_role`, JWT de
+usuario ni credenciales de Mailjet.
 
 ## Deploy de RANV2-10
 
